@@ -8,7 +8,9 @@ A science-based gradual desensitisation protocol tracker for dogs with separatio
 
 ## What It Does
 
-Separation anxiety in dogs is treated with a structured programme of very short absences that are slowly extended over many sessions. Brave Paws turns that programme into a guided workflow:
+Canine separation anxiety is an involuntary panic response — not a disobedience problem. The gold-standard treatment is **gradual desensitisation**: planned absences that stay below the dog's anxiety threshold, remove predictable departure cues, and vary in duration so the dog never learns "it only gets worse." Over many sessions the maximum alone-time is gently extended while the dog stays calm.
+
+Brave Paws turns that protocol into a guided workflow:
 
 1. **Plan** – build a list of timed steps for the session (e.g. 30 s, 10 s, 1 min …).
 2. **Train** – run each step with a per-step countdown and an overall session stopwatch.
@@ -16,6 +18,8 @@ Separation anxiety in dogs is treated with a structured programme of very short 
 4. **Review** – browse the full session history, visualise progress over time, and tweak past records.
 
 All session data is stored locally in the browser (`localStorage`), so no account or server is required.
+
+> For a deeper introduction to the training method, see [INFO.md](INFO.md).
 
 ---
 
