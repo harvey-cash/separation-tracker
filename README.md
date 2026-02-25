@@ -44,7 +44,6 @@ All session data is stored locally in the browser (`localStorage`), so no accoun
 | Icons | [Lucide React](https://lucide.dev/) |
 | Animations | [Motion](https://motion.dev/) |
 | Date helpers | [date-fns](https://date-fns.org/) |
-| AI (optional) | [Google Gemini API](https://ai.google.dev/) via `@google/genai` |
 | Persistence | Browser `localStorage` |
 
 ---
@@ -54,11 +53,11 @@ All session data is stored locally in the browser (`localStorage`), so no accoun
 ```
 separation-tracker/
 ├── index.html              # HTML entry point
-├── vite.config.ts          # Vite + Tailwind + Gemini API key config
+├── vite.config.ts          # Vite + Tailwind config
 ├── tsconfig.json           # TypeScript config
 ├── package.json
 ├── .env.example            # Environment variable template
-├── metadata.json           # AI Studio app metadata
+├── metadata.json           # App metadata
 └── src/
     ├── main.tsx            # React entry point
     ├── App.tsx             # Root component — view routing (dashboard → config → active → complete → history → graph)
@@ -92,17 +91,11 @@ separation-tracker/
 # 1. Install dependencies
 npm install
 
-# 2. Copy the environment template
-cp .env.example .env.local
-
-# 3. Add your Gemini API key to .env.local
-#    GEMINI_API_KEY="your-key-here"
-
-# 4. Start the development server (http://localhost:3000)
+# 2. Start the development server (http://localhost:3000)
 npm run dev
 ```
 
-The dev server runs on port 3000 with hot-module replacement (HMR) enabled by default. Set `DISABLE_HMR=true` in your environment to turn HMR off (used by AI Studio to prevent flickering during agent edits).
+The dev server runs on port 3000 with hot-module replacement (HMR) enabled by default.
 
 ---
 
@@ -124,8 +117,7 @@ Copy `.env.example` to `.env.local` and fill in the values before running locall
 
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes (for AI features) | Google Gemini API key. In AI Studio this is injected automatically from the user's secrets. |
-| `APP_URL` | No | The URL where the app is hosted. Used for self-referential links and API callbacks. Injected automatically by AI Studio at runtime. |
+| `APP_URL` | No | The URL where the app is hosted. Used for self-referential links. |
 
 ---
 
@@ -147,13 +139,7 @@ npm run preview
 
 ## Deployment
 
-The app is designed for [Google AI Studio](https://ai.google.dev/aistudio) and can be deployed to Cloud Run directly from AI Studio. The `metadata.json` file provides the app name and description used by the AI Studio launcher.
-
-For any other static host:
+For any static host:
 
 1. Run `npm run build`.
 2. Deploy the contents of `dist/` to your host.
-3. Ensure the `GEMINI_API_KEY` environment variable is available at build time (Vite inlines it via `process.env.GEMINI_API_KEY`).
-
-You can also view the live AI Studio version of this app at:  
-https://ai.studio/apps/d289c774-0331-402a-bfd5-8e9ec4f3f388
