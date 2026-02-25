@@ -7,10 +7,11 @@ import { ActiveSession } from './components/ActiveSession';
 import { SessionComplete } from './components/SessionComplete';
 import { GraphView } from './components/GraphView';
 import { HistoryList } from './components/HistoryList';
-import { exportToCSV, exportToHTML } from './utils/export';
+import { SessionView } from './components/SessionView';
+import { exportToCSV, parseCSV } from './utils/export';
 import { ArrowLeft } from 'lucide-react';
 
-type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history';
+type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view';
 
 const DEFAULT_STEPS: Step[] = [
   { id: crypto.randomUUID(), durationSeconds: 30, completed: false },
@@ -24,6 +25,7 @@ const DEFAULT_STEPS: Step[] = [
 export default function App() {
   const { sessions, addSession, updateSession, deleteSession } = useSessions();
   const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [previousView, setPreviousView] = useState<View>('dashboard');
   const [activeSession, setActiveSession] = useState<Session | null>(null);
 
   const handleStartNew = () => {
@@ -83,8 +85,11 @@ export default function App() {
           onStartNew={handleStartNew}
           onViewGraph={() => setCurrentView('graph')}
           onViewHistory={() => setCurrentView('history')}
-          onExportCSV={() => exportToCSV(sessions)}
-          onExportHTML={() => exportToHTML(sessions)}
+          onViewSession={(session) => {
+            setActiveSession(session);
+            setPreviousView('dashboard');
+            setCurrentView('session-view');
+          }}
         />
       )}
 
@@ -135,8 +140,34 @@ export default function App() {
             onDelete={deleteSession}
             onEdit={updateSession}
             onAddHistorical={addSession}
+            onExportCSV={() => exportToCSV(sessions)}
+            onImportCSV={(csvContent) => {
+              const importedSessions = parseCSV(csvContent);
+              importedSessions.forEach(session => addSession(session));
+            }}
+            onViewSession={(session) => {
+              setActiveSession(session);
+              setPreviousView('history');
+              setCurrentView('session-view');
+            }}
           />
         </div>
+      )}
+
+      {currentView === 'session-view' && activeSession && (
+        <SessionView
+          session={activeSession}
+          allSessions={sessions}
+          onBack={() => {
+            setActiveSession(null);
+            setCurrentView(previousView);
+          }}
+          onNavigate={(session) => setActiveSession(session)}
+          onSave={(updatedSession) => {
+            updateSession(updatedSession);
+            setActiveSession(updatedSession);
+          }}
+        />
       )}
     </div>
   );

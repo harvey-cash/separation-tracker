@@ -27,16 +27,16 @@ export function DurationInput({ valueSeconds, onChange, className = '' }: Props)
   };
 
   return (
-    <div className={`flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500 ${className}`}>
+    <div className={`flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-rose-400 focus-within:border-transparent transition-all ${className}`}>
       <input
         type="number"
         min="0"
         value={h || ''}
         placeholder="0"
         onChange={(e) => handleChange('h', e.target.value)}
-        className="w-10 text-right outline-none bg-transparent text-slate-700 font-mono"
+        className="w-10 text-right outline-none bg-transparent text-slate-700 font-mono font-medium"
       />
-      <span className="text-slate-400 text-sm font-medium">h</span>
+      <span className="text-slate-400 text-sm font-bold">h</span>
       
       <input
         type="number"
@@ -44,9 +44,9 @@ export function DurationInput({ valueSeconds, onChange, className = '' }: Props)
         value={m || ''}
         placeholder="0"
         onChange={(e) => handleChange('m', e.target.value)}
-        className="w-10 text-right outline-none bg-transparent text-slate-700 font-mono"
+        className="w-10 text-right outline-none bg-transparent text-slate-700 font-mono font-medium"
       />
-      <span className="text-slate-400 text-sm font-medium">m</span>
+      <span className="text-slate-400 text-sm font-bold">m</span>
       
       <input
         type="number"
@@ -54,9 +54,9 @@ export function DurationInput({ valueSeconds, onChange, className = '' }: Props)
         value={s || ''}
         placeholder="0"
         onChange={(e) => handleChange('s', e.target.value)}
-        className="w-10 text-right outline-none bg-transparent text-slate-700 font-mono"
+        className="w-10 text-right outline-none bg-transparent text-slate-700 font-mono font-medium"
       />
-      <span className="text-slate-400 text-sm font-medium">s</span>
+      <span className="text-slate-400 text-sm font-bold">s</span>
     </div>
   );
 }
