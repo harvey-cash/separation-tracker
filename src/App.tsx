@@ -8,10 +8,11 @@ import { SessionComplete } from './components/SessionComplete';
 import { GraphView } from './components/GraphView';
 import { HistoryList } from './components/HistoryList';
 import { SessionView } from './components/SessionView';
+import { InfoView } from './components/InfoView';
 import { exportToCSV, parseCSV } from './utils/export';
 import { ArrowLeft } from 'lucide-react';
 
-type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view';
+type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view' | 'info';
 
 const DEFAULT_STEPS: Step[] = [
   { id: crypto.randomUUID(), durationSeconds: 30, completed: false },
@@ -85,6 +86,7 @@ export default function App() {
           onStartNew={handleStartNew}
           onViewGraph={() => setCurrentView('graph')}
           onViewHistory={() => setCurrentView('history')}
+          onViewInfo={() => setCurrentView('info')}
           onViewSession={(session) => {
             setActiveSession(session);
             setPreviousView('dashboard');
@@ -168,6 +170,10 @@ export default function App() {
             setActiveSession(updatedSession);
           }}
         />
+      )}
+
+      {currentView === 'info' && (
+        <InfoView onBack={() => setCurrentView('dashboard')} />
       )}
     </div>
   );
