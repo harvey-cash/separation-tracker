@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Session, Step } from '../types';
 import { Plus, Trash2, Play, ArrowLeft, GripVertical } from 'lucide-react';
 import { formatDuration } from '../utils/format';
+import { DurationInput } from './DurationInput';
 
 type Props = {
   initialSession: Session;
@@ -11,15 +12,14 @@ type Props = {
 
 export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
   const [session, setSession] = useState<Session>(initialSession);
-  const [newStepDuration, setNewStepDuration] = useState('30');
+  const [newStepDuration, setNewStepDuration] = useState(30);
 
   const handleAddStep = () => {
-    const duration = parseInt(newStepDuration, 10);
-    if (isNaN(duration) || duration <= 0) return;
+    if (newStepDuration <= 0) return;
 
     const newStep: Step = {
       id: crypto.randomUUID(),
-      durationSeconds: duration,
+      durationSeconds: newStepDuration,
       completed: false,
     };
 
@@ -27,7 +27,7 @@ export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
       ...prev,
       steps: [...prev.steps, newStep],
     }));
-    setNewStepDuration('');
+    setNewStepDuration(30);
   };
 
   const handleRemoveStep = (id: string) => {
@@ -77,16 +77,12 @@ export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
                 <GripVertical size={20} />
               </div>
               <span className="font-medium text-slate-500 w-8">#{index + 1}</span>
-              <input
-                type="number"
-                value={step.durationSeconds}
-                onChange={(e) =>
-                  handleUpdateStepDuration(step.id, parseInt(e.target.value, 10) || 0)
-                }
-                className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                min="1"
+              <DurationInput
+                valueSeconds={step.durationSeconds}
+                onChange={(duration) => handleUpdateStepDuration(step.id, duration)}
+                className="flex-1"
               />
-              <span className="text-slate-500 w-16 text-right">
+              <span className="text-slate-500 w-16 text-right text-sm">
                 {formatDuration(step.durationSeconds)}
               </span>
               <button
@@ -100,14 +96,10 @@ export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
         </div>
 
         <div className="flex gap-3">
-          <input
-            type="number"
-            value={newStepDuration}
-            onChange={(e) => setNewStepDuration(e.target.value)}
-            placeholder="Duration in seconds"
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            min="1"
-            onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
+          <DurationInput
+            valueSeconds={newStepDuration}
+            onChange={setNewStepDuration}
+            className="flex-1"
           />
           <button
             onClick={handleAddStep}

@@ -6,8 +6,9 @@ import { SessionConfig } from './components/SessionConfig';
 import { ActiveSession } from './components/ActiveSession';
 import { SessionComplete } from './components/SessionComplete';
 import { GraphView } from './components/GraphView';
-import { HistoryView } from './components/HistoryView';
+import { HistoryList } from './components/HistoryList';
 import { exportToCSV, exportToHTML } from './utils/export';
+import { ArrowLeft } from 'lucide-react';
 
 type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history';
 
@@ -118,12 +119,24 @@ export default function App() {
       )}
 
       {currentView === 'history' && (
-        <HistoryView
-          sessions={sessions}
-          onBack={() => setCurrentView('dashboard')}
-          onDelete={deleteSession}
-          onUpdate={updateSession}
-        />
+        <div className="max-w-3xl mx-auto p-4 space-y-6">
+          <header className="flex items-center justify-between py-4">
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-2xl font-bold text-slate-800">History</h1>
+            <div className="w-10" />
+          </header>
+          <HistoryList
+            sessions={sessions}
+            onDelete={deleteSession}
+            onEdit={updateSession}
+            onAddHistorical={addSession}
+          />
+        </div>
       )}
     </div>
   );
