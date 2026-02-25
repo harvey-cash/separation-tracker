@@ -2,19 +2,158 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# Brave Paws — Canine Separation Anxiety Tracker
 
-This contains everything you need to run your app locally.
+A science-based gradual desensitisation protocol tracker for dogs with separation anxiety. Brave Paws helps owners plan, run, and review training sessions that gradually build a dog's tolerance for being alone, following recognised behaviour-modification techniques.
 
-View your app in AI Studio: https://ai.studio/apps/d289c774-0331-402a-bfd5-8e9ec4f3f388
+## What It Does
 
-## Run Locally
+Separation anxiety in dogs is treated with a structured programme of very short absences that are slowly extended over many sessions. Brave Paws turns that programme into a guided workflow:
 
-**Prerequisites:**  Node.js
+1. **Plan** – build a list of timed steps for the session (e.g. 30 s, 10 s, 1 min …).
+2. **Train** – run each step with a per-step countdown and an overall session stopwatch.
+3. **Reflect** – rate how calm the dog was (Calm / Coping / Panicking) and add optional notes.
+4. **Review** – browse the full session history, visualise progress over time, and tweak past records.
 
+All session data is stored locally in the browser (`localStorage`), so no account or server is required.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+---
+
+## Features
+
+| Feature | Description |
+|---|---|
+| Session planner | Add, remove, and reorder timed steps before each training session. New sessions pre-fill with the previous session's step list. |
+| Live session runner | Per-step countdown timer with play/pause and manual "mark complete" controls. A background stopwatch tracks total elapsed time. |
+| Post-session rating | Three-level anxiety score (Calm / Coping / Panicking) plus a free-text notes field saved with every session. |
+| Dashboard | Overview of recent sessions showing date, steps completed, max step duration, and anxiety rating. |
+| Progress chart | Line chart of maximum independence time per session across the full history, powered by Recharts. |
+| Session history | Chronological list of all sessions with inline edit and delete. Historical sessions can be added manually. |
+| CSV export / import | Export all sessions to a CSV file or import a previously exported file to restore or migrate data. |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| UI framework | [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) |
+| Build tool | [Vite 6](https://vitejs.dev/) |
+| Styling | [Tailwind CSS v4](https://tailwindcss.com/) (via `@tailwindcss/vite`) |
+| Charts | [Recharts](https://recharts.org/) |
+| Icons | [Lucide React](https://lucide.dev/) |
+| Animations | [Motion](https://motion.dev/) |
+| Date helpers | [date-fns](https://date-fns.org/) |
+| AI (optional) | [Google Gemini API](https://ai.google.dev/) via `@google/genai` |
+| Persistence | Browser `localStorage` |
+
+---
+
+## Project Structure
+
+```
+separation-tracker/
+├── index.html              # HTML entry point
+├── vite.config.ts          # Vite + Tailwind + Gemini API key config
+├── tsconfig.json           # TypeScript config
+├── package.json
+├── .env.example            # Environment variable template
+├── metadata.json           # AI Studio app metadata
+└── src/
+    ├── main.tsx            # React entry point
+    ├── App.tsx             # Root component — view routing (dashboard → config → active → complete → history → graph)
+    ├── types.ts            # Shared TypeScript types: Session, Step
+    ├── store.ts            # useSessions hook — localStorage read/write
+    ├── index.css           # Global styles
+    ├── components/
+    │   ├── Dashboard.tsx        # Home screen with recent sessions
+    │   ├── SessionConfig.tsx    # Pre-session step planner
+    │   ├── ActiveSession.tsx    # Live countdown timer UI
+    │   ├── SessionComplete.tsx  # Post-session rating and notes
+    │   ├── SessionView.tsx      # Read-only detail view of a saved session
+    │   ├── SessionEditModal.tsx # Modal to edit a saved session
+    │   ├── SessionRunner.tsx    # Reusable session-running logic
+    │   ├── SessionSetup.tsx     # Reusable session-setup logic
+    │   ├── GraphView.tsx        # Progress line chart
+    │   ├── HistoryList.tsx      # Full session history with CSV controls
+    │   └── DurationInput.tsx    # Minutes + seconds input widget
+    └── utils/
+        ├── export.ts       # CSV export and import helpers
+        └── format.ts       # formatDuration and formatTime helpers
+```
+
+---
+
+## Development Setup
+
+**Prerequisites:** [Node.js](https://nodejs.org/) 18 or later.
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Copy the environment template
+cp .env.example .env.local
+
+# 3. Add your Gemini API key to .env.local
+#    GEMINI_API_KEY="your-key-here"
+
+# 4. Start the development server (http://localhost:3000)
+npm run dev
+```
+
+The dev server runs on port 3000 with hot-module replacement (HMR) enabled by default. Set `DISABLE_HMR=true` in your environment to turn HMR off (used by AI Studio to prevent flickering during agent edits).
+
+---
+
+## Available Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the Vite dev server on `http://localhost:3000` |
+| `npm run build` | Type-check and compile a production bundle into `dist/` |
+| `npm run preview` | Serve the production build locally for final checks |
+| `npm run lint` | Run the TypeScript compiler in `--noEmit` mode to catch type errors |
+| `npm run clean` | Delete the `dist/` directory |
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` and fill in the values before running locally.
+
+| Variable | Required | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes (for AI features) | Google Gemini API key. In AI Studio this is injected automatically from the user's secrets. |
+| `APP_URL` | No | The URL where the app is hosted. Used for self-referential links and API callbacks. Injected automatically by AI Studio at runtime. |
+
+---
+
+## Building for Production
+
+```bash
+npm run build
+```
+
+The compiled output is written to `dist/`. Because the app is entirely client-side, `dist/` can be served from any static file host (Netlify, Vercel, GitHub Pages, Cloud Run, etc.).
+
+To verify the build locally before deploying:
+
+```bash
+npm run preview
+```
+
+---
+
+## Deployment
+
+The app is designed for [Google AI Studio](https://ai.google.dev/aistudio) and can be deployed to Cloud Run directly from AI Studio. The `metadata.json` file provides the app name and description used by the AI Studio launcher.
+
+For any other static host:
+
+1. Run `npm run build`.
+2. Deploy the contents of `dist/` to your host.
+3. Ensure the `GEMINI_API_KEY` environment variable is available at build time (Vite inlines it via `process.env.GEMINI_API_KEY`).
+
+You can also view the live AI Studio version of this app at:  
+https://ai.studio/apps/d289c774-0331-402a-bfd5-8e9ec4f3f388
