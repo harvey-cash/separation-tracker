@@ -32,3 +32,39 @@ jobs:
           name: ${{ github.event.inputs.version }}
           files: dist.zip
           generate_release_notes: true
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  deploy:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Checkout website repo
+        uses: actions/checkout@v4
+        with:
+          repository: harvey-cash/harvey-cash.github.io
+          token: ${{ secrets.DEPLOY_TOKEN }}
+          path: website
+      - name: Update site files
+        run: |
+          rm -rf website/fermi/separation
+          mkdir -p website/fermi/separation
+          cp -r dist/* website/fermi/separation/
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.DEPLOY_TOKEN }}
+          path: website
+          branch: deploy/separation-${{ github.event.inputs.version }}
+          title: "Deploy separation-tracker ${{ github.event.inputs.version }}"
+          body: |
+            Automated deployment of separation-tracker ${{ github.event.inputs.version }} to `/fermi/separation/`.
+          commit-message: "deploy separation-tracker ${{ github.event.inputs.version }}"
