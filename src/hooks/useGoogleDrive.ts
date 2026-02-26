@@ -238,6 +238,7 @@ export function useGoogleDrive(
   }, [conflictData, getValidToken, folderId, sessions]);
 
   return {
+    isClientIdConfigured: !!CLIENT_ID,
     isConnected,
     syncStatus,
     syncError,

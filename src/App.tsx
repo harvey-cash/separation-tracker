@@ -101,17 +101,19 @@ export default function App() {
             setCurrentView('session-view');
           }}
           driveSync={
-            <GoogleDriveSync
-              isConnected={drive.isConnected}
-              syncStatus={drive.syncStatus}
-              syncError={drive.syncError}
-              conflictData={drive.conflictData}
-              onConnect={drive.connect}
-              onDisconnect={drive.disconnect}
-              onSyncNow={drive.syncNow}
-              onAcceptRemote={drive.acceptRemote}
-              onKeepLocal={drive.keepLocal}
-            />
+            drive.isClientIdConfigured ? (
+              <GoogleDriveSync
+                isConnected={drive.isConnected}
+                syncStatus={drive.syncStatus}
+                syncError={drive.syncError}
+                conflictData={drive.conflictData}
+                onConnect={drive.connect}
+                onDisconnect={drive.disconnect}
+                onSyncNow={drive.syncNow}
+                onAcceptRemote={drive.acceptRemote}
+                onKeepLocal={drive.keepLocal}
+              />
+            ) : null
           }
         />
       )}
