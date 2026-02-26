@@ -139,6 +139,8 @@ export function Dashboard({
       </div>
 
       {driveSync}
+
+      <p className="text-center text-xs text-slate-300 pb-2">v{__APP_VERSION__}</p>
     </div>
   );
 }
