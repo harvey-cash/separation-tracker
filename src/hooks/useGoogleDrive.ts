@@ -81,8 +81,11 @@ export function useGoogleDrive(
 
     if (tryInit()) return;
 
+    const MAX_INIT_ATTEMPTS = 25; // ~5 seconds at 200 ms intervals
+    let attempts = 0;
     const interval = setInterval(() => {
-      if (tryInit()) clearInterval(interval);
+      attempts++;
+      if (tryInit() || attempts >= MAX_INIT_ATTEMPTS) clearInterval(interval);
     }, 200);
 
     return () => clearInterval(interval);
@@ -124,9 +127,15 @@ export function useGoogleDrive(
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   const disconnect = useCallback(() => {
-    // Revoke the access token at Google so the user sees a clean consent next time.
+    // Best-effort revoke of the access token so the user sees a clean consent next time.
     if (tokens?.access_token && typeof google !== 'undefined' && google?.accounts?.oauth2) {
-      google.accounts.oauth2.revoke(tokens.access_token);
+      try {
+        google.accounts.oauth2.revoke(tokens.access_token, () => {
+          /* revocation done — local state already cleared below */
+        });
+      } catch (e) {
+        console.warn('Token revocation failed:', e);
+      }
     }
     clearTokens();
     setTokens(null);
