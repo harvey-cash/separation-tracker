@@ -1,29 +1,29 @@
 import { Session, Step } from '../types';
 import { format } from 'date-fns';
 
-export function exportToCSV(sessions: Session[]) {
+export function generateCSVContent(sessions: Session[]): string {
   const headers = [
-    'Date', 
-    'Total Duration (s)', 
+    'Date',
+    'Total Duration (s)',
     'Max Step Duration (s)',
-    'Completed Steps', 
-    'Total Steps', 
-    'Anxiety Score', 
+    'Completed Steps',
+    'Total Steps',
+    'Anxiety Score',
     'Notes',
     ...Array.from({ length: 10 }, (_, i) => `Step ${i + 1} Duration (s)`)
   ];
-  
+
   const rows = sessions.map(s => {
     const completedSteps = s.steps.filter(step => step.completed).length;
     const score = s.anxietyScore === 0 ? 'Calm' : s.anxietyScore === 1 ? 'Coping' : s.anxietyScore === 2 ? 'Panicking' : 'N/A';
     const notes = s.notes ? `"${s.notes.replace(/"/g, '""')}"` : '';
-    
+
     const maxDuration = s.steps.length > 0 ? Math.max(...s.steps.map(step => step.durationSeconds)) : 0;
 
     const stepDurations = Array.from({ length: 10 }, (_, i) => {
       return i < s.steps.length ? s.steps[i].durationSeconds : '';
     });
-    
+
     return [
       format(new Date(s.date), 'yyyy-MM-dd HH:mm:ss'),
       s.totalDurationSeconds,
@@ -36,7 +36,11 @@ export function exportToCSV(sessions: Session[]) {
     ].join(',');
   });
 
-  const csvContent = [headers.join(','), ...rows].join('\n');
+  return [headers.join(','), ...rows].join('\n');
+}
+
+export function exportToCSV(sessions: Session[]) {
+  const csvContent = generateCSVContent(sessions);
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

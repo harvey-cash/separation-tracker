@@ -9,6 +9,8 @@ import { GraphView } from './components/GraphView';
 import { HistoryList } from './components/HistoryList';
 import { SessionView } from './components/SessionView';
 import { InfoView } from './components/InfoView';
+import { GoogleDriveSync } from './components/GoogleDriveSync';
+import { useGoogleDrive } from './hooks/useGoogleDrive';
 import { exportToCSV, parseCSV } from './utils/export';
 import { ArrowLeft } from 'lucide-react';
 
@@ -24,10 +26,16 @@ const DEFAULT_STEPS: Step[] = [
 ];
 
 export default function App() {
-  const { sessions, addSession, updateSession, deleteSession } = useSessions();
+  const { sessions, addSession, updateSession, deleteSession, replaceSessions } = useSessions();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
   const [activeSession, setActiveSession] = useState<Session | null>(null);
+
+  const handleImportSessions = (imported: Session[]) => {
+    replaceSessions(imported);
+  };
+
+  const drive = useGoogleDrive(sessions, handleImportSessions);
 
   const handleStartNew = () => {
     let initialSteps = DEFAULT_STEPS;
@@ -92,6 +100,19 @@ export default function App() {
             setPreviousView('dashboard');
             setCurrentView('session-view');
           }}
+          driveSync={
+            <GoogleDriveSync
+              isConnected={drive.isConnected}
+              syncStatus={drive.syncStatus}
+              syncError={drive.syncError}
+              conflictData={drive.conflictData}
+              onConnect={drive.connect}
+              onDisconnect={drive.disconnect}
+              onSyncNow={drive.syncNow}
+              onAcceptRemote={drive.acceptRemote}
+              onKeepLocal={drive.keepLocal}
+            />
+          }
         />
       )}
 
