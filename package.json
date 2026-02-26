@@ -7,7 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node_modules/.bin/tsx --test 'tests/**/*.test.{js,ts}'",
+    "test": "node_modules/.bin/tsx --test 'tests/**/*.test.js' 'tests/**/*.test.ts'",
     "clean": "rm -rf dist",
     "lint": "npm install --prefer-offline --silent && tsc --noEmit",
     "test:e2e": "playwright test"
