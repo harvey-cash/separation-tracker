@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "node --test",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
+    "lint": "npm install --prefer-offline --silent && tsc --noEmit",
     "test:e2e": "playwright test"
   },
   "dependencies": {
