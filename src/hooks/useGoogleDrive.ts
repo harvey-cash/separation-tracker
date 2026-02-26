@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DriveTokens,
   saveTokens,
@@ -18,6 +18,7 @@ import {
   uploadFile,
   downloadFile,
   CODE_VERIFIER_KEY,
+  REDIRECT_URI_KEY,
 } from '../utils/googleDrive';
 import { Session } from '../types';
 import { generateCSVContent, parseCSV } from '../utils/export';
@@ -46,39 +47,45 @@ export function useGoogleDrive(
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
+  const exchangeInProgress = useRef(false);
 
   const isConnected = tokens !== null;
 
   // ── Handle OAuth redirect callback ────────────────────────────────────────
   useEffect(() => {
+    if (exchangeInProgress.current) return;
+
     const url = new URL(window.location.href);
     const code = url.searchParams.get('code');
     if (!code) return;
 
-    // The code verifier is stored in sessionStorage (not localStorage) so it
-    // survives the redirect but is not accessible across tabs or persisted
-    // beyond the browser session.
-    const codeVerifier = sessionStorage.getItem(CODE_VERIFIER_KEY);
-    if (!codeVerifier || !CLIENT_ID) return;
+    // The code verifier and redirect URI are stored in localStorage so they
+    // reliably survive the full-page redirect to Google and back.
+    const codeVerifier = localStorage.getItem(CODE_VERIFIER_KEY);
+    const storedRedirectUri = localStorage.getItem(REDIRECT_URI_KEY);
+    if (!codeVerifier || !storedRedirectUri || !CLIENT_ID) return;
 
-    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+    exchangeInProgress.current = true;
 
     // Clean up URL
     url.searchParams.delete('code');
     url.searchParams.delete('state');
     url.searchParams.delete('scope');
     window.history.replaceState({}, '', url.toString());
-    sessionStorage.removeItem(CODE_VERIFIER_KEY);
+    localStorage.removeItem(CODE_VERIFIER_KEY);
+    localStorage.removeItem(REDIRECT_URI_KEY);
 
     (async () => {
       try {
-        const newTokens = await exchangeCodeForTokens(code, CLIENT_ID, redirectUri, codeVerifier);
+        const newTokens = await exchangeCodeForTokens(code, CLIENT_ID, storedRedirectUri, codeVerifier);
         saveTokens(newTokens);
         setTokens(newTokens);
       } catch (e) {
         console.error('Token exchange failed', e);
         setSyncError('Authentication failed. Please try connecting again.');
         setSyncStatus('error');
+      } finally {
+        exchangeInProgress.current = false;
       }
     })();
   }, []);
@@ -124,9 +131,11 @@ export function useGoogleDrive(
     }
     const verifier = generateCodeVerifier();
     const challenge = await generateCodeChallenge(verifier);
-    // Store verifier in sessionStorage so it survives the OAuth redirect.
-    sessionStorage.setItem(CODE_VERIFIER_KEY, verifier);
     const redirectUri = `${window.location.origin}${window.location.pathname}`;
+    // Store verifier and redirect URI in localStorage so they reliably survive
+    // the full-page redirect to Google's consent screen and back.
+    localStorage.setItem(CODE_VERIFIER_KEY, verifier);
+    localStorage.setItem(REDIRECT_URI_KEY, redirectUri);
     window.location.href = buildAuthUrl(CLIENT_ID, redirectUri, challenge);
   }, []);
 
