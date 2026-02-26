@@ -1,7 +1,8 @@
 import { Session } from '../types';
 import { formatDuration } from '../utils/format';
-import { Play, BarChart2, History, Download, Heart, Info } from 'lucide-react';
+import { Play, BarChart2, History, Heart, Info } from 'lucide-react';
 import { format } from 'date-fns';
+import { ReactNode } from 'react';
 
 type Props = {
   sessions: Session[];
@@ -10,6 +11,7 @@ type Props = {
   onViewHistory: () => void;
   onViewInfo: () => void;
   onViewSession: (session: Session) => void;
+  driveSync?: ReactNode;
 };
 
 export function Dashboard({
@@ -19,6 +21,7 @@ export function Dashboard({
   onViewHistory,
   onViewInfo,
   onViewSession,
+  driveSync,
 }: Props) {
   const completedSessions = sessions.filter((s) => s.completed);
   const recentSessions = [...completedSessions]
@@ -134,6 +137,8 @@ export function Dashboard({
           </div>
         )}
       </div>
+
+      {driveSync}
     </div>
   );
 }

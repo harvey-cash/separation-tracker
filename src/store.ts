@@ -34,5 +34,9 @@ export function useSessions() {
     setSessions((prev) => prev.filter((s) => s.id !== id));
   };
 
-  return { sessions, addSession, updateSession, deleteSession };
+  const replaceSessions = (incoming: Session[]) => {
+    setSessions(incoming);
+  };
+
+  return { sessions, addSession, updateSession, deleteSession, replaceSessions };
 }
