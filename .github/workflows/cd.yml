@@ -1,0 +1,94 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Bump patch version
+        id: version
+        run: |
+          npm version patch --no-git-tag-version
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+      - name: Archive build output
+        run: zip -r dist.zip dist/
+      - name: Commit and push version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }} [skip ci]"
+          git push
+      - name: Create and push tag
+        run: |
+          git tag ${{ steps.version.outputs.version }}
+          git push origin ${{ steps.version.outputs.version }}
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          files: dist.zip
+          generate_release_notes: true
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  deploy:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Checkout website repo
+        uses: actions/checkout@v4
+        with:
+          repository: harvey-cash/harvey-cash.github.io
+          token: ${{ secrets.DEPLOY_TOKEN }}
+          path: website
+      - name: Update site files
+        run: |
+          rm -rf website/fermi/separation
+          mkdir -p website/fermi/separation
+          cp -r dist/* website/fermi/separation/
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.DEPLOY_TOKEN }}
+          path: website
+          branch: deploy/separation-${{ needs.release.outputs.version }}
+          title: "Deploy separation-tracker ${{ needs.release.outputs.version }}"
+          body: |
+            Automated deployment of separation-tracker ${{ needs.release.outputs.version }} to `/fermi/separation/`.
+          commit-message: "deploy separation-tracker ${{ needs.release.outputs.version }}"
