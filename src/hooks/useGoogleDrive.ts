@@ -118,7 +118,7 @@ export function useGoogleDrive(
   // ── Connect ────────────────────────────────────────────────────────────────
   const connect = useCallback(async () => {
     if (!CLIENT_ID) {
-      setSyncError('Google Client ID is not configured (VITE_GOOGLE_CLIENT_ID).');
+      setSyncError('Google Drive integration is not available.');
       setSyncStatus('error');
       return;
     }
