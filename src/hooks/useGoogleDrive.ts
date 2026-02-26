@@ -8,17 +8,11 @@ import {
   loadFolderId,
   saveLastSync,
   loadLastSync,
-  generateCodeVerifier,
-  generateCodeChallenge,
-  buildAuthUrl,
-  exchangeCodeForTokens,
-  refreshAccessToken,
+  tokensFromGISResponse,
   findOrCreateFolder,
   findFile,
   uploadFile,
   downloadFile,
-  CODE_VERIFIER_KEY,
-  REDIRECT_URI_KEY,
 } from '../utils/googleDrive';
 import { Session } from '../types';
 import { generateCSVContent, parseCSV } from '../utils/export';
@@ -47,50 +41,57 @@ export function useGoogleDrive(
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
-  const exchangeInProgress = useRef(false);
+  const tokenClientRef = useRef<TokenClient | null>(null);
 
   const isConnected = tokens !== null;
 
-  // ── Handle OAuth redirect callback ────────────────────────────────────────
+  // ── Initialise the GIS token client once the library has loaded ───────────
   useEffect(() => {
-    if (exchangeInProgress.current) return;
+    if (!CLIENT_ID) return;
 
-    const url = new URL(window.location.href);
-    const code = url.searchParams.get('code');
-    if (!code) return;
+    // The GIS script loads asynchronously; poll briefly until it's available.
+    const tryInit = () => {
+      if (typeof google === 'undefined' || !google?.accounts?.oauth2) return false;
 
-    // The code verifier and redirect URI are stored in localStorage so they
-    // reliably survive the full-page redirect to Google and back.
-    const codeVerifier = localStorage.getItem(CODE_VERIFIER_KEY);
-    const storedRedirectUri = localStorage.getItem(REDIRECT_URI_KEY);
-    if (!codeVerifier || !storedRedirectUri || !CLIENT_ID) return;
+      tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: (response: TokenResponse) => {
+          if (response.error !== undefined) {
+            console.error('GIS auth error:', response.error);
+            setSyncError(`Authentication failed: ${response.error_description ?? response.error}`);
+            setSyncStatus('error');
+            return;
+          }
 
-    exchangeInProgress.current = true;
+          const newTokens = tokensFromGISResponse(response.access_token, response.expires_in);
+          saveTokens(newTokens);
+          setTokens(newTokens);
+        },
+        error_callback: (err) => {
+          // Popup closed or blocked — only surface if user expects a result.
+          if (err.type === 'popup_closed') return;
+          console.error('GIS error:', err);
+          setSyncError('Could not open the Google sign-in popup.');
+          setSyncStatus('error');
+        },
+      });
+      return true;
+    };
 
-    // Clean up URL
-    url.searchParams.delete('code');
-    url.searchParams.delete('state');
-    url.searchParams.delete('scope');
-    window.history.replaceState({}, '', url.toString());
-    localStorage.removeItem(CODE_VERIFIER_KEY);
-    localStorage.removeItem(REDIRECT_URI_KEY);
+    if (tryInit()) return;
 
-    (async () => {
-      try {
-        const newTokens = await exchangeCodeForTokens(code, CLIENT_ID, storedRedirectUri, codeVerifier);
-        saveTokens(newTokens);
-        setTokens(newTokens);
-      } catch (e) {
-        console.error('Token exchange failed', e);
-        setSyncError('Authentication failed. Please try connecting again.');
-        setSyncStatus('error');
-      } finally {
-        exchangeInProgress.current = false;
-      }
-    })();
+    const MAX_INIT_ATTEMPTS = 25; // ~5 seconds at 200 ms intervals
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (tryInit() || attempts >= MAX_INIT_ATTEMPTS) clearInterval(interval);
+    }, 200);
+
+    return () => clearInterval(interval);
   }, []);
 
-  // ── Get a valid access token (refresh if needed) ───────────────────────────
+  // ── Get a valid access token (re-prompt via GIS if expired) ────────────────
   const getValidToken = useCallback(async (): Promise<string | null> => {
     if (!tokens) return null;
 
@@ -98,56 +99,51 @@ export function useGoogleDrive(
       return tokens.access_token;
     }
 
-    if (!tokens.refresh_token || !CLIENT_ID) {
-      clearTokens();
-      setTokens(null);
-      return null;
-    }
-
-    try {
-      const refreshed = await refreshAccessToken(tokens.refresh_token, CLIENT_ID);
-      const updated: DriveTokens = {
-        ...refreshed,
-        refresh_token: refreshed.refresh_token ?? tokens.refresh_token,
-      };
-      saveTokens(updated);
-      setTokens(updated);
-      return updated.access_token;
-    } catch {
-      clearTokens();
-      setTokens(null);
-      setSyncError('Session expired. Please reconnect Google Drive.');
-      setSyncStatus('error');
-      return null;
-    }
+    // Token expired — need to re-authenticate via GIS popup.
+    // This requires user gesture, so we can't silently refresh.
+    clearTokens();
+    setTokens(null);
+    setSyncError('Session expired. Please reconnect Google Drive.');
+    setSyncStatus('error');
+    return null;
   }, [tokens]);
 
   // ── Connect ────────────────────────────────────────────────────────────────
-  const connect = useCallback(async () => {
+  const connect = useCallback(() => {
     if (!CLIENT_ID) {
       setSyncError('Google Drive integration is not available.');
       setSyncStatus('error');
       return;
     }
-    const verifier = generateCodeVerifier();
-    const challenge = await generateCodeChallenge(verifier);
-    const redirectUri = `${window.location.origin}${window.location.pathname}`;
-    // Store verifier and redirect URI in localStorage so they reliably survive
-    // the full-page redirect to Google's consent screen and back.
-    localStorage.setItem(CODE_VERIFIER_KEY, verifier);
-    localStorage.setItem(REDIRECT_URI_KEY, redirectUri);
-    window.location.href = buildAuthUrl(CLIENT_ID, redirectUri, challenge);
+    if (!tokenClientRef.current) {
+      setSyncError('Google sign-in is still loading. Please try again.');
+      setSyncStatus('error');
+      return;
+    }
+
+    // Opens the Google consent popup; the callback above handles the response.
+    tokenClientRef.current.requestAccessToken({ prompt: 'consent' });
   }, []);
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   const disconnect = useCallback(() => {
+    // Best-effort revoke of the access token so the user sees a clean consent next time.
+    if (tokens?.access_token && typeof google !== 'undefined' && google?.accounts?.oauth2) {
+      try {
+        google.accounts.oauth2.revoke(tokens.access_token, () => {
+          /* revocation done — local state already cleared below */
+        });
+      } catch (e) {
+        console.warn('Token revocation failed:', e);
+      }
+    }
     clearTokens();
     setTokens(null);
     setFolderId(null);
     setSyncStatus('idle');
     setSyncError(null);
     setConflictData(null);
-  }, []);
+  }, [tokens]);
 
   // ── Core sync logic ────────────────────────────────────────────────────────
   const performUpload = useCallback(

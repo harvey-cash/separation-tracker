@@ -3,8 +3,6 @@ export const DRIVE_FOLDER_NAME = 'BravePaws_Data';
 
 const TOKENS_KEY = 'google_drive_tokens';
 const FOLDER_ID_KEY = 'google_drive_folder_id';
-export const CODE_VERIFIER_KEY = 'google_pkce_verifier';
-export const REDIRECT_URI_KEY = 'google_pkce_redirect_uri';
 export const LAST_SYNC_KEY = 'google_drive_last_sync';
 
 /**
@@ -15,7 +13,6 @@ const TOKEN_EXPIRY_BUFFER_SECONDS = 60;
 
 export type DriveTokens = {
   access_token: string;
-  refresh_token?: string;
   expires_at: number;
 };
 
@@ -23,27 +20,6 @@ export type DriveFileInfo = {
   id: string;
   modifiedTime: string;
 };
-
-// ── PKCE helpers ──────────────────────────────────────────────────────────────
-
-function base64URLEncode(buffer: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
-export function generateCodeVerifier(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return base64URLEncode(array.buffer);
-}
-
-export async function generateCodeChallenge(verifier: string): Promise<string> {
-  const data = new TextEncoder().encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return base64URLEncode(digest);
-}
 
 // ── Token persistence ─────────────────────────────────────────────────────────
 
@@ -65,9 +41,6 @@ export function clearTokens(): void {
   localStorage.removeItem(TOKENS_KEY);
   localStorage.removeItem(FOLDER_ID_KEY);
   localStorage.removeItem(LAST_SYNC_KEY);
-  // Clean up any leftover PKCE data from localStorage.
-  localStorage.removeItem(CODE_VERIFIER_KEY);
-  localStorage.removeItem(REDIRECT_URI_KEY);
 }
 
 export function saveFolderId(id: string): void {
@@ -86,89 +59,14 @@ export function loadLastSync(): number {
   return parseInt(localStorage.getItem(LAST_SYNC_KEY) ?? '0', 10) || 0;
 }
 
-// ── OAuth URL / token exchange ─────────────────────────────────────────────────
-
-export function buildAuthUrl(
-  clientId: string,
-  redirectUri: string,
-  codeChallenge: string,
-): string {
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    access_type: 'offline',
-    prompt: 'consent',
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
-  });
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-}
-
-export async function exchangeCodeForTokens(
-  code: string,
-  clientId: string,
-  redirectUri: string,
-  codeVerifier: string,
-): Promise<DriveTokens> {
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      grant_type: 'authorization_code',
-      code_verifier: codeVerifier,
-    }).toString(),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(`Token exchange failed (${response.status}): ${(err as { error?: string }).error ?? ''}`);
-  }
-
-  const data = await response.json() as {
-    access_token: string;
-    refresh_token?: string;
-    expires_in: number;
-  };
+/** Build a {@link DriveTokens} object from a GIS token response. */
+export function tokensFromGISResponse(
+  accessToken: string,
+  expiresIn: number,
+): DriveTokens {
   return {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: Date.now() + (data.expires_in - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000,
-  };
-}
-
-export async function refreshAccessToken(
-  refreshToken: string,
-  clientId: string,
-): Promise<DriveTokens> {
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id: clientId,
-      grant_type: 'refresh_token',
-    }).toString(),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(`Token refresh failed (${response.status}): ${(err as { error?: string }).error ?? ''}`);
-  }
-
-  const data = await response.json() as {
-    access_token: string;
-    refresh_token?: string;
-    expires_in: number;
-  };
-  return {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: Date.now() + (data.expires_in - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000,
+    access_token: accessToken,
+    expires_at: Date.now() + (expiresIn - TOKEN_EXPIRY_BUFFER_SECONDS) * 1000,
   };
 }
 
