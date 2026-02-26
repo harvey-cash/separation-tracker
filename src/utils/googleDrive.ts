@@ -4,6 +4,7 @@ export const DRIVE_FOLDER_NAME = 'BravePaws_Data';
 const TOKENS_KEY = 'google_drive_tokens';
 const FOLDER_ID_KEY = 'google_drive_folder_id';
 export const CODE_VERIFIER_KEY = 'google_pkce_verifier';
+export const REDIRECT_URI_KEY = 'google_pkce_redirect_uri';
 export const LAST_SYNC_KEY = 'google_drive_last_sync';
 
 /**
@@ -64,8 +65,9 @@ export function clearTokens(): void {
   localStorage.removeItem(TOKENS_KEY);
   localStorage.removeItem(FOLDER_ID_KEY);
   localStorage.removeItem(LAST_SYNC_KEY);
-  // CODE_VERIFIER_KEY is stored in sessionStorage (not localStorage) and is
-  // cleaned up immediately after the OAuth redirect in the hook.
+  // Clean up any leftover PKCE data from localStorage.
+  localStorage.removeItem(CODE_VERIFIER_KEY);
+  localStorage.removeItem(REDIRECT_URI_KEY);
 }
 
 export function saveFolderId(id: string): void {

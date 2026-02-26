@@ -42,6 +42,7 @@ import {
   findFile,
   uploadFile,
   CODE_VERIFIER_KEY,
+  REDIRECT_URI_KEY,
   LAST_SYNC_KEY,
 } from '../src/utils/googleDrive.ts';
 
@@ -93,10 +94,12 @@ test('clearTokens removes tokens, folderId and lastSync from localStorage', () =
   assert.equal(loadLastSync(), 0);
 });
 
-test('clearTokens does NOT clear the sessionStorage CODE_VERIFIER_KEY', () => {
-  sessionStore.set(CODE_VERIFIER_KEY, 'verifier-value');
+test('clearTokens also removes PKCE data from localStorage', () => {
+  localStore.set(CODE_VERIFIER_KEY, 'verifier-value');
+  localStore.set(REDIRECT_URI_KEY, 'https://example.com/');
   clearTokens();
-  assert.equal(sessionStore.get(CODE_VERIFIER_KEY), 'verifier-value');
+  assert.equal(localStore.get(CODE_VERIFIER_KEY), undefined);
+  assert.equal(localStore.get(REDIRECT_URI_KEY), undefined);
 });
 
 // ── Folder / last-sync persistence ────────────────────────────────────────────
