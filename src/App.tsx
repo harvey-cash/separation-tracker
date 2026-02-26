@@ -102,7 +102,6 @@ export default function App() {
           }}
           driveSync={
             <GoogleDriveSync
-              isClientIdConfigured={drive.isClientIdConfigured}
               isConnected={drive.isConnected}
               syncStatus={drive.syncStatus}
               syncError={drive.syncError}
@@ -112,7 +111,6 @@ export default function App() {
               onSyncNow={drive.syncNow}
               onAcceptRemote={drive.acceptRemote}
               onKeepLocal={drive.keepLocal}
-              onSetClientId={drive.setClientId}
             />
           }
         />

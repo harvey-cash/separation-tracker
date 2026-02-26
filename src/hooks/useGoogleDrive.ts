@@ -8,8 +8,6 @@ import {
   loadFolderId,
   saveLastSync,
   loadLastSync,
-  saveClientId,
-  loadClientId,
   generateCodeVerifier,
   generateCodeChallenge,
   buildAuthUrl,
@@ -30,7 +28,7 @@ const SUCCESS_MESSAGE_DURATION_MS = 3000;
 // Access Vite env at runtime. A `vite-env.d.ts` provides the proper type for
 // build-time checking; the double cast here guards against environments where
 // that augmentation isn't present.
-const ENV_CLIENT_ID = (import.meta as unknown as { env: Record<string, string> }).env
+const CLIENT_ID = (import.meta as unknown as { env: Record<string, string> }).env
   .VITE_GOOGLE_CLIENT_ID as string | undefined;
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
@@ -43,9 +41,6 @@ export function useGoogleDrive(
   sessions: Session[],
   onReplaceSessions: (sessions: Session[]) => void,
 ) {
-  const [clientId, setClientIdState] = useState<string | null>(
-    () => ENV_CLIENT_ID || loadClientId(),
-  );
   const [tokens, setTokens] = useState<DriveTokens | null>(() => loadTokens());
   const [folderId, setFolderId] = useState<string | null>(() => loadFolderId());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
@@ -53,11 +48,6 @@ export function useGoogleDrive(
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
 
   const isConnected = tokens !== null;
-
-  const setClientId = useCallback((id: string) => {
-    saveClientId(id);
-    setClientIdState(id);
-  }, []);
 
   // ── Handle OAuth redirect callback ────────────────────────────────────────
   useEffect(() => {
@@ -69,7 +59,7 @@ export function useGoogleDrive(
     // survives the redirect but is not accessible across tabs or persisted
     // beyond the browser session.
     const codeVerifier = sessionStorage.getItem(CODE_VERIFIER_KEY);
-    if (!codeVerifier || !clientId) return;
+    if (!codeVerifier || !CLIENT_ID) return;
 
     const redirectUri = `${window.location.origin}${window.location.pathname}`;
 
@@ -82,7 +72,7 @@ export function useGoogleDrive(
 
     (async () => {
       try {
-        const newTokens = await exchangeCodeForTokens(code, clientId, redirectUri, codeVerifier);
+        const newTokens = await exchangeCodeForTokens(code, CLIENT_ID, redirectUri, codeVerifier);
         saveTokens(newTokens);
         setTokens(newTokens);
       } catch (e) {
@@ -91,7 +81,7 @@ export function useGoogleDrive(
         setSyncStatus('error');
       }
     })();
-  }, [clientId]);
+  }, []);
 
   // ── Get a valid access token (refresh if needed) ───────────────────────────
   const getValidToken = useCallback(async (): Promise<string | null> => {
@@ -101,14 +91,14 @@ export function useGoogleDrive(
       return tokens.access_token;
     }
 
-    if (!tokens.refresh_token || !clientId) {
+    if (!tokens.refresh_token || !CLIENT_ID) {
       clearTokens();
       setTokens(null);
       return null;
     }
 
     try {
-      const refreshed = await refreshAccessToken(tokens.refresh_token, clientId);
+      const refreshed = await refreshAccessToken(tokens.refresh_token, CLIENT_ID);
       const updated: DriveTokens = {
         ...refreshed,
         refresh_token: refreshed.refresh_token ?? tokens.refresh_token,
@@ -123,12 +113,12 @@ export function useGoogleDrive(
       setSyncStatus('error');
       return null;
     }
-  }, [tokens, clientId]);
+  }, [tokens]);
 
   // ── Connect ────────────────────────────────────────────────────────────────
   const connect = useCallback(async () => {
-    if (!clientId) {
-      setSyncError('Google Client ID is not configured.');
+    if (!CLIENT_ID) {
+      setSyncError('Google Drive integration is not available.');
       setSyncStatus('error');
       return;
     }
@@ -137,8 +127,8 @@ export function useGoogleDrive(
     // Store verifier in sessionStorage so it survives the OAuth redirect.
     sessionStorage.setItem(CODE_VERIFIER_KEY, verifier);
     const redirectUri = `${window.location.origin}${window.location.pathname}`;
-    window.location.href = buildAuthUrl(clientId, redirectUri, challenge);
-  }, [clientId]);
+    window.location.href = buildAuthUrl(CLIENT_ID, redirectUri, challenge);
+  }, []);
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   const disconnect = useCallback(() => {
@@ -248,7 +238,7 @@ export function useGoogleDrive(
   }, [conflictData, getValidToken, folderId, sessions]);
 
   return {
-    isClientIdConfigured: !!clientId,
+    isClientIdConfigured: !!CLIENT_ID,
     isConnected,
     syncStatus,
     syncError,
@@ -258,6 +248,5 @@ export function useGoogleDrive(
     syncNow,
     acceptRemote,
     keepLocal,
-    setClientId,
   };
 }
