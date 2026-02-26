@@ -3,6 +3,7 @@ export const DRIVE_FOLDER_NAME = 'BravePaws_Data';
 
 const TOKENS_KEY = 'google_drive_tokens';
 const FOLDER_ID_KEY = 'google_drive_folder_id';
+const CLIENT_ID_KEY = 'google_drive_client_id';
 export const CODE_VERIFIER_KEY = 'google_pkce_verifier';
 export const LAST_SYNC_KEY = 'google_drive_last_sync';
 
@@ -66,6 +67,14 @@ export function clearTokens(): void {
   localStorage.removeItem(LAST_SYNC_KEY);
   // CODE_VERIFIER_KEY is stored in sessionStorage (not localStorage) and is
   // cleaned up immediately after the OAuth redirect in the hook.
+}
+
+export function saveClientId(id: string): void {
+  localStorage.setItem(CLIENT_ID_KEY, id);
+}
+
+export function loadClientId(): string | null {
+  return localStorage.getItem(CLIENT_ID_KEY);
 }
 
 export function saveFolderId(id: string): void {

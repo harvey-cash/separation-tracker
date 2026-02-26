@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { SyncStatus, ConflictData } from '../hooks/useGoogleDrive';
 
 type Props = {
+  isClientIdConfigured: boolean;
   isConnected: boolean;
   syncStatus: SyncStatus;
   syncError: string | null;
@@ -11,9 +13,11 @@ type Props = {
   onSyncNow: () => void;
   onAcceptRemote: () => void;
   onKeepLocal: () => void;
+  onSetClientId: (id: string) => void;
 };
 
 export function GoogleDriveSync({
+  isClientIdConfigured,
   isConnected,
   syncStatus,
   syncError,
@@ -23,7 +27,10 @@ export function GoogleDriveSync({
   onSyncNow,
   onAcceptRemote,
   onKeepLocal,
+  onSetClientId,
 }: Props) {
+  const [clientIdInput, setClientIdInput] = useState('');
+
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -39,41 +46,82 @@ export function GoogleDriveSync({
           </div>
         </div>
 
-        {isConnected ? (
-          <div className="flex items-center gap-2">
-            <SyncStatusBadge status={syncStatus} />
+        {isClientIdConfigured && (
+          isConnected ? (
+            <div className="flex items-center gap-2">
+              <SyncStatusBadge status={syncStatus} />
+              <button
+                onClick={onSyncNow}
+                disabled={syncStatus === 'syncing'}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Sync now"
+              >
+                {syncStatus === 'syncing' ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={15} />
+                )}
+                <span className="hidden sm:inline">Sync Now</span>
+              </button>
+              <button
+                onClick={onDisconnect}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-sm font-medium transition-colors"
+                title="Disconnect Google Drive"
+              >
+                <CloudOff size={15} />
+                <span className="hidden sm:inline">Disconnect</span>
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={onSyncNow}
-              disabled={syncStatus === 'syncing'}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Sync now"
+              onClick={onConnect}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
             >
-              {syncStatus === 'syncing' ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <RefreshCw size={15} />
-              )}
-              <span className="hidden sm:inline">Sync Now</span>
+              <Cloud size={15} />
+              Connect Drive
             </button>
-            <button
-              onClick={onDisconnect}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-sm font-medium transition-colors"
-              title="Disconnect Google Drive"
-            >
-              <CloudOff size={15} />
-              <span className="hidden sm:inline">Disconnect</span>
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={onConnect}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
-          >
-            <Cloud size={15} />
-            Connect Drive
-          </button>
+          )
         )}
       </div>
+
+      {!isClientIdConfigured && (
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-slate-500">
+            Enter your{' '}
+            <a
+              href="https://console.developers.google.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Google OAuth Client ID
+            </a>{' '}
+            to enable Drive backup.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={clientIdInput}
+              onChange={(e) => setClientIdInput(e.target.value)}
+              placeholder="xxxx.apps.googleusercontent.com"
+              className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+            <button
+              onClick={() => {
+                const trimmed = clientIdInput.trim();
+                if (trimmed) {
+                  onSetClientId(trimmed);
+                  setClientIdInput('');
+                }
+              }}
+              disabled={!clientIdInput.trim()}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
 
       {syncError && (
         <div className="flex items-start gap-2 mt-3 p-3 bg-red-50 border border-red-100 rounded-2xl text-sm text-red-700">
