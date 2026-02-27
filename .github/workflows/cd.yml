@@ -27,13 +27,13 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
       - name: Bump patch version
         id: version
         run: |
           npm version patch --no-git-tag-version
           VERSION=$(node -p "require('./package.json').version")
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
+      - run: npm run build
       - name: Archive build output
         run: zip -r dist.zip dist/
       - name: Commit and push version bump
