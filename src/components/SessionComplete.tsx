@@ -9,6 +9,8 @@ type Props = {
 
 export function SessionComplete({ session, onSave }: Props) {
   const [score, setScore] = useState<0 | 1 | 2 | undefined>(session.anxietyScore);
+  const [exercisedLevel, setExercisedLevel] = useState<0 | 1 | 2 | 3 | 4 | 5 | undefined>(session.exercisedLevel);
+  const [anyoneHome, setAnyoneHome] = useState(session.anyoneHome || '');
   const [notes, setNotes] = useState(session.notes || '');
 
   const handleSave = () => {
@@ -16,6 +18,8 @@ export function SessionComplete({ session, onSave }: Props) {
     onSave({
       ...session,
       anxietyScore: score,
+      exercisedLevel,
+      anyoneHome,
       notes,
       completed: true,
     });
@@ -71,6 +75,40 @@ export function SessionComplete({ session, onSave }: Props) {
               <span className="font-bold text-sm">Panicking</span>
             </button>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
+            Exercised Level (Optional)
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            {[0, 1, 2, 3, 4, 5].map((level) => (
+              <button
+                key={level}
+                onClick={() => setExercisedLevel(level as 0 | 1 | 2 | 3 | 4 | 5)}
+                className={`p-3 rounded-2xl border-2 font-bold transition-all ${
+                  exercisedLevel === level
+                    ? 'border-sky-400 bg-sky-50 text-sky-700 shadow-sm'
+                    : 'border-slate-100 hover:border-sky-200 text-slate-500 hover:text-sky-600'
+                }`}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
+            Anyone Home (Optional)
+          </label>
+          <input
+            type="text"
+            value={anyoneHome}
+            onChange={(e) => setAnyoneHome(e.target.value)}
+            placeholder="e.g. Neighbor visiting, spouse in office"
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:outline-none focus:ring-2 focus:ring-rose-400 transition-shadow"
+          />
         </div>
 
         <div>

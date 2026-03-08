@@ -16,6 +16,8 @@ export function SessionEditModal({
 }) {
   const [date, setDate] = useState(format(new Date(session.date), "yyyy-MM-dd"));
   const [anxietyScore, setAnxietyScore] = useState<0|1|2|undefined>(session.anxietyScore);
+  const [exercisedLevel, setExercisedLevel] = useState<0 | 1 | 2 | 3 | 4 | 5 | undefined>(session.exercisedLevel);
+  const [anyoneHome, setAnyoneHome] = useState(session.anyoneHome || '');
   const [notes, setNotes] = useState(session.notes || '');
   const [steps, setSteps] = useState<Step[]>(session.steps);
   const [newStepDuration, setNewStepDuration] = useState(30);
@@ -49,6 +51,8 @@ export function SessionEditModal({
       ...session, 
       date: new Date(date).toISOString(),
       anxietyScore, 
+      exercisedLevel,
+      anyoneHome,
       notes,
       steps,
       totalDurationSeconds,
@@ -154,6 +158,36 @@ export function SessionEditModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Exercised Level (Optional)</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2, 3, 4, 5].map(level => (
+                <button
+                  key={level}
+                  onClick={() => setExercisedLevel(level as 0 | 1 | 2 | 3 | 4 | 5)}
+                  className={`py-3 rounded-2xl border font-bold transition-all text-sm ${
+                    exercisedLevel === level
+                      ? 'ring-2 ring-sky-400 bg-sky-100 text-sky-700 border-sky-200'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-sky-600 hover:border-sky-200'
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Anyone Home (Optional)</p>
+            <input
+              type="text"
+              value={anyoneHome}
+              onChange={(e) => setAnyoneHome(e.target.value)}
+              placeholder="e.g. Neighbor visiting, spouse in office"
+              className="w-full p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-rose-400 outline-none bg-slate-50 transition-shadow"
+            />
           </div>
 
           <div>
