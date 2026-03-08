@@ -19,6 +19,8 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     date: '2024-06-15T09:30:00.000Z',
     totalDurationSeconds: 635,
     anxietyScore: 0,
+    exercisedLevel: 3,
+    anyoneHome: 'Neighbor in living room',
     notes: 'Good day',
     completed: true,
     steps: [
@@ -43,9 +45,11 @@ test('generateCSVContent produces the expected header row', () => {
   assert.equal(cols[1], 'Total Duration (s)');
   assert.equal(cols[5], 'Anxiety Score');
   assert.equal(cols[6], 'Notes');
-  assert.equal(cols[7], 'Step 1 Duration (s)');
-  // 17 columns total: 7 fixed + 10 step columns
-  assert.equal(cols.length, 17);
+  assert.equal(cols[7], 'Exercise Level');
+  assert.equal(cols[8], 'Anybody Home');
+  assert.equal(cols[9], 'Step 1 Duration (s)');
+  // 19 columns total: 9 fixed + 10 step columns
+  assert.equal(cols.length, 19);
 });
 
 test('generateCSVContent encodes anxiety scores as text labels', () => {
@@ -100,6 +104,18 @@ test('roundtrip preserves notes (including special characters)', () => {
   assert.equal(restored.notes, session.notes);
 });
 
+test('roundtrip preserves exercise level', () => {
+  const session = makeSession({ exercisedLevel: 5 });
+  const [restored] = parseCSV(generateCSVContent([session]));
+  assert.equal(restored.exercisedLevel, session.exercisedLevel);
+});
+
+test('roundtrip preserves anybody home field', () => {
+  const session = makeSession({ anyoneHome: 'Dog walker dropped in' });
+  const [restored] = parseCSV(generateCSVContent([session]));
+  assert.equal(restored.anyoneHome, session.anyoneHome);
+});
+
 test('roundtrip preserves notes containing double-quotes', () => {
   const session = makeSession({ notes: 'He said "good boy"' });
   const [restored] = parseCSV(generateCSVContent([session]));
@@ -117,13 +133,29 @@ test('roundtrip handles multiple sessions', () => {
   const session2 = makeSession({
     id: 'test-id-2',
     anxietyScore: 2,
+    exercisedLevel: undefined,
+    anyoneHome: '',
     notes: '',
     steps: [{ id: 'x', durationSeconds: 120, completed: false }],
   });
   const restored = parseCSV(generateCSVContent([SESSION, session2]));
   assert.equal(restored.length, 2);
   assert.equal(restored[1].anxietyScore, 2);
+  assert.equal(restored[1].exercisedLevel, undefined);
+  assert.equal(restored[1].anyoneHome, '');
   assert.equal(restored[1].steps[0].durationSeconds, 120);
+});
+
+test('parseCSV supports legacy format without exercise and anybody-home columns', () => {
+  const legacyCsv = [
+    'Date,Total Duration (s),Max Step Duration (s),Completed Steps,Total Steps,Anxiety Score,Notes,Step 1 Duration (s),Step 2 Duration (s),Step 3 Duration (s),Step 4 Duration (s),Step 5 Duration (s),Step 6 Duration (s),Step 7 Duration (s),Step 8 Duration (s),Step 9 Duration (s),Step 10 Duration (s)',
+    '2024-06-15 09:30:00,635,480,3,3,Calm,"Good day",30,60,480,,,,,,,',
+  ].join('\n');
+  const [restored] = parseCSV(legacyCsv);
+  assert.equal(restored.exercisedLevel, undefined);
+  assert.equal(restored.anyoneHome, '');
+  assert.equal(restored.steps.length, 3);
+  assert.equal(restored.steps[2].durationSeconds, 480);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

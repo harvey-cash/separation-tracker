@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Session, Step } from '../types';
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Activity, Calendar, FileText, Heart, Edit2, Check, X, Plus, Trash2, GripVertical } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Activity, Calendar, FileText, Heart, Edit2, Check, X, Plus, Trash2, GripVertical, House } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatDuration } from '../utils/format';
 import { DurationInput } from './DurationInput';
@@ -29,6 +29,8 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   const [isEditing, setIsEditing] = useState(false);
   const [draftDate, setDraftDate] = useState(format(new Date(session.date), "yyyy-MM-dd"));
   const [draftAnxietyScore, setDraftAnxietyScore] = useState<0|1|2|undefined>(session.anxietyScore);
+  const [draftExercisedLevel, setDraftExercisedLevel] = useState<0 | 1 | 2 | 3 | 4 | 5 | undefined>(session.exercisedLevel);
+  const [draftAnyoneHome, setDraftAnyoneHome] = useState(session.anyoneHome || '');
   const [draftNotes, setDraftNotes] = useState(session.notes || '');
   const [draftSteps, setDraftSteps] = useState<Step[]>(session.steps);
   const [draftTotalDuration, setDraftTotalDuration] = useState(session.totalDurationSeconds);
@@ -38,6 +40,8 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   useEffect(() => {
     setDraftDate(format(new Date(session.date), "yyyy-MM-dd"));
     setDraftAnxietyScore(session.anxietyScore);
+    setDraftExercisedLevel(session.exercisedLevel);
+    setDraftAnyoneHome(session.anyoneHome || '');
     setDraftNotes(session.notes || '');
     setDraftSteps(session.steps);
     setDraftTotalDuration(session.totalDurationSeconds);
@@ -81,6 +85,8 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
       ...session,
       date: new Date(draftDate).toISOString(),
       anxietyScore: draftAnxietyScore,
+      exercisedLevel: draftExercisedLevel,
+      anyoneHome: draftAnyoneHome,
       notes: draftNotes,
       steps: draftSteps,
       totalDurationSeconds: draftTotalDuration,
@@ -91,6 +97,8 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   const handleCancel = () => {
     setDraftDate(format(new Date(session.date), "yyyy-MM-dd"));
     setDraftAnxietyScore(session.anxietyScore);
+    setDraftExercisedLevel(session.exercisedLevel);
+    setDraftAnyoneHome(session.anyoneHome || '');
     setDraftNotes(session.notes || '');
     setDraftSteps(session.steps);
     setDraftTotalDuration(session.totalDurationSeconds);
@@ -285,6 +293,36 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
           </div>
 
           <div>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Exercise Level (Optional)</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2, 3, 4, 5].map(level => (
+                <button
+                  key={level}
+                  onClick={() => setDraftExercisedLevel(level as 0 | 1 | 2 | 3 | 4 | 5)}
+                  className={`py-3 rounded-2xl border font-bold transition-all text-sm ${
+                    draftExercisedLevel === level
+                      ? 'ring-2 ring-sky-400 bg-sky-100 text-sky-700 border-sky-200'
+                      : 'bg-slate-50 text-slate-500 border-slate-200 hover:text-sky-600 hover:border-sky-200'
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Anybody Home (Optional)</p>
+            <input
+              type="text"
+              value={draftAnyoneHome}
+              onChange={(e) => setDraftAnyoneHome(e.target.value)}
+              placeholder="e.g. Neighbor visiting, spouse in office"
+              className="w-full p-4 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-rose-400 outline-none bg-slate-50 transition-shadow"
+            />
+          </div>
+
+          <div>
             <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Notes</p>
             <textarea 
               value={draftNotes}
@@ -296,7 +334,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
           <Clock className="text-rose-400 mb-2" size={24} />
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Max Duration</p>
@@ -311,6 +349,11 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
           <Calendar className="text-rose-400 mb-2" size={24} />
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Steps</p>
           <p className="text-xl font-bold text-slate-800">{session.steps.filter(s => s.completed).length} / {session.steps.length}</p>
+        </div>
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+          <Activity className="text-sky-500 mb-2" size={24} />
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Exercise</p>
+          <p className="text-xl font-bold text-slate-800">{session.exercisedLevel ?? 'N/A'}</p>
         </div>
         <div className={`p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center ${anxietyInfo.color}`}>
           <Heart className="mb-2 opacity-80" size={24} fill="currentColor" />
@@ -380,6 +423,15 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
             <h2 className="text-lg font-bold text-slate-800">Notes</h2>
           </div>
           <p className="text-slate-600 italic leading-relaxed">"{session.notes}"</p>
+        </div>
+      )}
+      {session.anyoneHome && (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+          <div className="flex items-center gap-2 mb-4">
+            <House className="text-sky-500" size={20} />
+            <h2 className="text-lg font-bold text-slate-800">Anybody Home</h2>
+          </div>
+          <p className="text-slate-600 italic leading-relaxed">"{session.anyoneHome}"</p>
         </div>
       )}
       </>
