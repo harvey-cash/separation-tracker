@@ -1,4 +1,4 @@
-import { Cloud, CloudOff, RefreshCw, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, Check, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
 import { SyncStatus, ConflictData } from '../hooks/useGoogleDrive';
 
 type Props = {
@@ -6,6 +6,7 @@ type Props = {
   syncStatus: SyncStatus;
   syncError: string | null;
   conflictData: ConflictData | null;
+  spreadsheetUrl: string | null;
   onConnect: () => void;
   onDisconnect: () => void;
   onSyncNow: () => void;
@@ -18,6 +19,7 @@ export function GoogleDriveSync({
   syncStatus,
   syncError,
   conflictData,
+  spreadsheetUrl,
   onConnect,
   onDisconnect,
   onSyncNow,
@@ -32,9 +34,9 @@ export function GoogleDriveSync({
             {isConnected ? <Cloud size={20} /> : <CloudOff size={20} />}
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-sm">Google Drive Backup</h3>
+            <h3 className="font-bold text-slate-800 text-sm">Google Sheets Sync</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              {isConnected ? 'Connected — your data syncs to your Drive' : 'Back up your sessions to Google Drive'}
+              {isConnected ? 'Connected — your data syncs to a Google Sheet' : 'Sync sessions to a Google Sheet you can view & share'}
             </p>
           </div>
         </div>
@@ -70,10 +72,22 @@ export function GoogleDriveSync({
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
           >
             <Cloud size={15} />
-            Connect Drive
+            Connect
           </button>
         )}
       </div>
+
+      {isConnected && spreadsheetUrl && (
+        <a
+          href={spreadsheetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium mb-3 transition-colors"
+        >
+          <ExternalLink size={13} />
+          Open in Google Sheets
+        </a>
+      )}
 
       {syncError && (
         <div className="flex items-start gap-2 mt-3 p-3 bg-red-50 border border-red-100 rounded-2xl text-sm text-red-700">
@@ -84,17 +98,17 @@ export function GoogleDriveSync({
 
       {conflictData && (
         <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-          <p className="text-sm font-semibold text-amber-800 mb-1">Cloud data is newer</p>
+          <p className="text-sm font-semibold text-amber-800 mb-1">Google Sheet has newer data</p>
           <p className="text-xs text-amber-700 mb-3">
-            Google Drive has a more recent version ({conflictData.remoteSessions.length} sessions).
-            Would you like to overwrite your local data with the cloud version?
+            The Google Sheet has been updated since your last sync ({conflictData.remoteSessions.length} sessions).
+            Would you like to overwrite your local data with the sheet version?
           </p>
           <div className="flex gap-2">
             <button
               onClick={onAcceptRemote}
               className="flex-1 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition-colors"
             >
-              Use Cloud Data
+              Use Sheet Data
             </button>
             <button
               onClick={onKeepLocal}

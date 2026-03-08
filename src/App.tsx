@@ -106,6 +106,7 @@ export default function App() {
               syncStatus={drive.syncStatus}
               syncError={drive.syncError}
               conflictData={drive.conflictData}
+              spreadsheetUrl={drive.spreadsheetUrl}
               onConnect={drive.connect}
               onDisconnect={drive.disconnect}
               onSyncNow={drive.syncNow}
