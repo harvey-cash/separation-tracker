@@ -3,6 +3,12 @@ import { format } from 'date-fns';
 
 const EXTENDED_FORMAT_MIN_COLUMN_COUNT = 19;
 
+const ANXIETY_LABELS: Record<number, string> = { 0: 'Calm', 1: 'Coping', 2: 'Panicking' };
+
+function anxietyLabel(score: number | undefined, fallback: string): string {
+  return score !== undefined ? (ANXIETY_LABELS[score] ?? fallback) : fallback;
+}
+
 export function generateCSVContent(sessions: Session[]): string {
   const headers = [
     'Date',
@@ -19,7 +25,7 @@ export function generateCSVContent(sessions: Session[]): string {
 
   const rows = sessions.map(s => {
     const completedSteps = s.steps.filter(step => step.completed).length;
-    const score = s.anxietyScore === 0 ? 'Calm' : s.anxietyScore === 1 ? 'Coping' : s.anxietyScore === 2 ? 'Panicking' : 'N/A';
+    const score = anxietyLabel(s.anxietyScore, 'N/A');
     const notes = s.notes ? `"${s.notes.replace(/"/g, '""')}"` : '';
     const exercisedLevel = s.exercisedLevel ?? '';
     const anyoneHome = s.anyoneHome ? `"${s.anyoneHome.replace(/"/g, '""')}"` : '';
@@ -78,7 +84,7 @@ const SHEET_HEADERS = [
 export function sessionsToSheetRows(sessions: Session[]): (string | number)[][] {
   const rows = sessions.map(s => {
     const completedSteps = s.steps.filter(step => step.completed).length;
-    const score = s.anxietyScore === 0 ? 'Calm' : s.anxietyScore === 1 ? 'Coping' : s.anxietyScore === 2 ? 'Panicking' : '';
+    const score = anxietyLabel(s.anxietyScore, '');
     const maxDuration = s.steps.length > 0 ? Math.max(...s.steps.map(step => step.durationSeconds)) : 0;
 
     const stepDurations: (string | number)[] = Array.from({ length: 10 }, (_, i) =>

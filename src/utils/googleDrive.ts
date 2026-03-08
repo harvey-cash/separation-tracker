@@ -232,11 +232,12 @@ export async function writeSheetData(
   spreadsheetId: string,
   values: (string | number)[][],
 ): Promise<void> {
-  const range = `${SHEET_NAME}`;
+  const clearRange = SHEET_NAME;
+  const writeRange = `${SHEET_NAME}!A1`;
 
   // Clear any existing content so stale rows don't linger.
   const clearResp = await sheetsRequest(
-    `/${spreadsheetId}/values/${encodeURIComponent(range)}:clear`,
+    `/${spreadsheetId}/values/${encodeURIComponent(clearRange)}:clear`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -251,7 +252,7 @@ export async function writeSheetData(
 
   // Write the new data starting at A1.
   const updateResp = await sheetsRequest(
-    `/${spreadsheetId}/values/${encodeURIComponent(SHEET_NAME + '!A1')}?valueInputOption=RAW`,
+    `/${spreadsheetId}/values/${encodeURIComponent(writeRange)}?valueInputOption=RAW`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
