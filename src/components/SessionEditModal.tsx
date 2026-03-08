@@ -161,7 +161,7 @@ export function SessionEditModal({
           </div>
 
           <div>
-            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Exercise Level (Optional)</p>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Exercised Level (Optional)</p>
             <div className="grid grid-cols-3 gap-3">
               {[0, 1, 2, 3, 4, 5].map(level => (
                 <button
@@ -180,7 +180,7 @@ export function SessionEditModal({
           </div>
 
           <div>
-            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Anybody Home (Optional)</p>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Anyone Home (Optional)</p>
             <input
               type="text"
               value={anyoneHome}

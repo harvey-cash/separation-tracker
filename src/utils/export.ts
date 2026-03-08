@@ -1,6 +1,8 @@
 import { Session, Step } from '../types';
 import { format } from 'date-fns';
 
+const EXTENDED_FORMAT_MIN_COLUMN_COUNT = 19;
+
 export function generateCSVContent(sessions: Session[]): string {
   const headers = [
     'Date',
@@ -10,8 +12,8 @@ export function generateCSVContent(sessions: Session[]): string {
     'Total Steps',
     'Anxiety Score',
     'Notes',
-    'Exercise Level',
-    'Anybody Home',
+    'Exercised Level',
+    'Anyone Home',
     ...Array.from({ length: 10 }, (_, i) => `Step ${i + 1} Duration (s)`)
   ];
 
@@ -19,8 +21,8 @@ export function generateCSVContent(sessions: Session[]): string {
     const completedSteps = s.steps.filter(step => step.completed).length;
     const score = s.anxietyScore === 0 ? 'Calm' : s.anxietyScore === 1 ? 'Coping' : s.anxietyScore === 2 ? 'Panicking' : 'N/A';
     const notes = s.notes ? `"${s.notes.replace(/"/g, '""')}"` : '';
-    const exerciseLevel = s.exercisedLevel ?? '';
-    const anybodyHome = s.anyoneHome ? `"${s.anyoneHome.replace(/"/g, '""')}"` : '';
+    const exercisedLevel = s.exercisedLevel ?? '';
+    const anyoneHome = s.anyoneHome ? `"${s.anyoneHome.replace(/"/g, '""')}"` : '';
 
     const maxDuration = s.steps.length > 0 ? Math.max(...s.steps.map(step => step.durationSeconds)) : 0;
 
@@ -36,8 +38,8 @@ export function generateCSVContent(sessions: Session[]): string {
       s.steps.length,
       score,
       notes,
-      exerciseLevel,
-      anybodyHome,
+      exercisedLevel,
+      anyoneHome,
       ...stepDurations
     ].join(',');
   });
@@ -80,7 +82,7 @@ export function parseCSV(csvContent: string): Session[] {
 
     if (matches.length < 7) continue;
 
-    const hasExtendedColumns = matches.length >= 19;
+    const hasExtendedColumns = matches.length >= EXTENDED_FORMAT_MIN_COLUMN_COUNT;
 
     const [
       dateStr, 
@@ -93,8 +95,8 @@ export function parseCSV(csvContent: string): Session[] {
       ...restColumns
     ] = matches;
 
-    const exerciseLevelStr = hasExtendedColumns ? restColumns[0] ?? '' : '';
-    const anybodyHomeStr = hasExtendedColumns ? restColumns[1] ?? '' : '';
+    const exercisedLevelStr = hasExtendedColumns ? restColumns[0] ?? '' : '';
+    const anyoneHomeStr = hasExtendedColumns ? restColumns[1] ?? '' : '';
     const stepDurationStrs = hasExtendedColumns ? restColumns.slice(2) : restColumns;
     
     const date = new Date(dateStr);
@@ -110,7 +112,7 @@ export function parseCSV(csvContent: string): Session[] {
     else if (scoreStr === 'Panicking') anxietyScore = 2;
 
     let exercisedLevel: 0 | 1 | 2 | 3 | 4 | 5 | undefined = undefined;
-    const parsedExerciseLevel = parseInt(exerciseLevelStr, 10);
+    const parsedExerciseLevel = parseInt(exercisedLevelStr, 10);
     if (!isNaN(parsedExerciseLevel) && parsedExerciseLevel >= 0 && parsedExerciseLevel <= 5) {
       exercisedLevel = parsedExerciseLevel as 0 | 1 | 2 | 3 | 4 | 5;
     }
@@ -151,7 +153,7 @@ export function parseCSV(csvContent: string): Session[] {
       steps,
       anxietyScore,
       exercisedLevel,
-      anyoneHome: anybodyHomeStr || '',
+      anyoneHome: anyoneHomeStr || '',
       notes: notesStr || '',
       completed: true
     });

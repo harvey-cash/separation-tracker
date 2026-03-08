@@ -79,7 +79,7 @@ export function SessionComplete({ session, onSave }: Props) {
 
         <div>
           <label className="block text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
-            Exercise Level (Optional)
+            Exercised Level (Optional)
           </label>
           <div className="grid grid-cols-3 gap-3">
             {[0, 1, 2, 3, 4, 5].map((level) => (
@@ -100,7 +100,7 @@ export function SessionComplete({ session, onSave }: Props) {
 
         <div>
           <label className="block text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
-            Anybody Home (Optional)
+            Anyone Home (Optional)
           </label>
           <input
             type="text"

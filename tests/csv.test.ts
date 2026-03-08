@@ -33,6 +33,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 }
 
 const SESSION = makeSession();
+const EXTENDED_CSV_COLUMN_COUNT = 19;
 
 // ── generateCSVContent ────────────────────────────────────────────────────────
 
@@ -45,11 +46,11 @@ test('generateCSVContent produces the expected header row', () => {
   assert.equal(cols[1], 'Total Duration (s)');
   assert.equal(cols[5], 'Anxiety Score');
   assert.equal(cols[6], 'Notes');
-  assert.equal(cols[7], 'Exercise Level');
-  assert.equal(cols[8], 'Anybody Home');
+  assert.equal(cols[7], 'Exercised Level');
+  assert.equal(cols[8], 'Anyone Home');
   assert.equal(cols[9], 'Step 1 Duration (s)');
   // 19 columns total: 9 fixed + 10 step columns
-  assert.equal(cols.length, 19);
+  assert.equal(cols.length, EXTENDED_CSV_COLUMN_COUNT);
 });
 
 test('generateCSVContent encodes anxiety scores as text labels', () => {
@@ -110,7 +111,7 @@ test('roundtrip preserves exercise level', () => {
   assert.equal(restored.exercisedLevel, session.exercisedLevel);
 });
 
-test('roundtrip preserves anybody home field', () => {
+test('roundtrip preserves anyone home field', () => {
   const session = makeSession({ anyoneHome: 'Dog walker dropped in' });
   const [restored] = parseCSV(generateCSVContent([session]));
   assert.equal(restored.anyoneHome, session.anyoneHome);
@@ -146,7 +147,7 @@ test('roundtrip handles multiple sessions', () => {
   assert.equal(restored[1].steps[0].durationSeconds, 120);
 });
 
-test('parseCSV supports legacy format without exercise and anybody-home columns', () => {
+test('parseCSV supports legacy format without exercise and anyone-home columns', () => {
   const legacyCsv = [
     'Date,Total Duration (s),Max Step Duration (s),Completed Steps,Total Steps,Anxiety Score,Notes,Step 1 Duration (s),Step 2 Duration (s),Step 3 Duration (s),Step 4 Duration (s),Step 5 Duration (s),Step 6 Duration (s),Step 7 Duration (s),Step 8 Duration (s),Step 9 Duration (s),Step 10 Duration (s)',
     '2024-06-15 09:30:00,635,480,3,3,Calm,"Good day",30,60,480,,,,,,,',

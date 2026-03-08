@@ -293,7 +293,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
           </div>
 
           <div>
-            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Exercise Level (Optional)</p>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Exercised Level (Optional)</p>
             <div className="grid grid-cols-3 gap-3">
               {[0, 1, 2, 3, 4, 5].map(level => (
                 <button
@@ -312,7 +312,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
           </div>
 
           <div>
-            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Anybody Home (Optional)</p>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Anyone Home (Optional)</p>
             <input
               type="text"
               value={draftAnyoneHome}
@@ -334,7 +334,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
           <Clock className="text-rose-400 mb-2" size={24} />
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Max Duration</p>
@@ -429,7 +429,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
           <div className="flex items-center gap-2 mb-4">
             <House className="text-sky-500" size={20} />
-            <h2 className="text-lg font-bold text-slate-800">Anybody Home</h2>
+            <h2 className="text-lg font-bold text-slate-800">Anyone Home</h2>
           </div>
           <p className="text-slate-600 italic leading-relaxed">"{session.anyoneHome}"</p>
         </div>
