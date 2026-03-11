@@ -205,34 +205,54 @@ test('findSpreadsheet throws on API error', async () => {
 
 // ── createSpreadsheet ────────────────────────────────────────────────────────
 
-test('createSpreadsheet creates a spreadsheet and renames the sheet tab', async () => {
+test('createSpreadsheet creates a spreadsheet via Sheets API and moves it to the target folder', async () => {
   let callCount = 0;
   const capturedUrls: string[] = [];
-  (global as Record<string, unknown>).fetch = async (url: unknown) => {
+  const capturedMethods: string[] = [];
+  (global as Record<string, unknown>).fetch = async (url: unknown, opts?: RequestInit) => {
     callCount++;
     capturedUrls.push(String(url));
+    capturedMethods.push(opts?.method ?? 'GET');
     if (callCount === 1) {
-      // Drive API: create file
-      return { ok: true, status: 200, json: async () => ({ id: 'new-sheet-id' }) } as unknown as Response;
+      // Sheets API: create spreadsheet
+      return { ok: true, status: 200, json: async () => ({ spreadsheetId: 'new-sheet-id' }) } as unknown as Response;
     }
-    // Sheets API: rename tab
+    // Drive API: move to target folder
     return { ok: true, status: 200, json: async () => ({}) } as unknown as Response;
   };
 
   const id = await createSpreadsheet('token', 'folder-id');
 
   assert.equal(id, 'new-sheet-id');
-  assert.equal(callCount, 2, 'should make a Drive create call then a Sheets rename call');
-  assert.ok(capturedUrls[0].includes('googleapis.com/drive/'), 'first call is Drive API');
-  assert.ok(capturedUrls[1].includes('sheets.googleapis.com'), 'second call is Sheets API');
+  assert.equal(callCount, 2, 'should make a Sheets create call then a Drive move call');
+  assert.ok(capturedUrls[0].startsWith('https://sheets.googleapis.com/v4/spreadsheets'), 'first call is Sheets API');
+  assert.ok(capturedUrls[1].startsWith('https://www.googleapis.com/drive/v3/'), 'second call is Drive API');
+  assert.equal(capturedMethods[0], 'POST', 'create uses POST');
+  assert.equal(capturedMethods[1], 'PATCH', 'move uses PATCH');
 });
 
-test('createSpreadsheet throws when Drive create fails', async () => {
+test('createSpreadsheet throws when Sheets create fails', async () => {
   (global as Record<string, unknown>).fetch = makeFetch({}, 500);
 
   await assert.rejects(
     () => createSpreadsheet('token', 'folder-id'),
     /Spreadsheet creation failed \(500\)/,
+  );
+});
+
+test('createSpreadsheet throws when Drive move fails', async () => {
+  let callCount = 0;
+  (global as Record<string, unknown>).fetch = async () => {
+    callCount++;
+    if (callCount === 1) {
+      return { ok: true, status: 200, json: async () => ({ spreadsheetId: 'new-sheet-id' }) } as unknown as Response;
+    }
+    return { ok: false, status: 403 } as unknown as Response;
+  };
+
+  await assert.rejects(
+    () => createSpreadsheet('token', 'folder-id'),
+    /Spreadsheet move failed \(403\)/,
   );
 });
 
