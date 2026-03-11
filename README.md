@@ -20,6 +20,7 @@ Brave Paws turns that protocol into a guided workflow:
 All session data is stored locally in the browser (`localStorage`), so no account or server is required.
 
 > For a deeper introduction to the training method, see [INFO.md](INFO.md).
+> For webcam integration recommendations and feasibility notes, see [WEBCAM_INTEGRATION_RESEARCH.md](WEBCAM_INTEGRATION_RESEARCH.md).
 
 ---
 
