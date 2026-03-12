@@ -9,7 +9,7 @@ Write-Host "========================================================" -Foregroun
 Write-Host ""
 
 # 1. Ensure required binaries exist or download them
-$go2rtcUrl = "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_windows_amd64.exe"
+$go2rtcUrl = "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_win64.zip"
 $cloudflaredUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
 
 # 1.1 Force TLS 1.2 for GitHub downloads (prevents "connection was closed unexpectedly" errors)
@@ -17,7 +17,9 @@ $cloudflaredUrl = "https://github.com/cloudflare/cloudflared/releases/latest/dow
 
 if (-Not (Test-Path "$baseDir\go2rtc.exe")) {
     Write-Host "Downloading go2rtc (WebRTC Server)..."
-    Invoke-WebRequest -Uri $go2rtcUrl -OutFile "$baseDir\go2rtc.exe"
+    Invoke-WebRequest -Uri $go2rtcUrl -OutFile "$baseDir\go2rtc.zip"
+    Expand-Archive -Path "$baseDir\go2rtc.zip" -DestinationPath "$baseDir" -Force
+    Remove-Item -Path "$baseDir\go2rtc.zip"
 }
 
 if (-Not (Test-Path "$baseDir\cloudflared.exe")) {
@@ -93,28 +95,39 @@ if ($secureUrl) {
     Write-Host ""
     Write-Host "Instructions:" -ForegroundColor Yellow
     Write-Host "1. Keep your laptop open and pointing at your dog's bed."
-    Write-Host "2. Open Brave Paws on your phone and start a session."
-    Write-Host "3. Tap 'Link Camera' and type the URL above exactly."
+    Write-Host "2. IMPORTANT: First visit the link in your phone's browser and click 'I Agree' on the Cloudflare warning page." -ForegroundColor Red
+    Write-Host "3. Open Brave Paws on your phone and start a session."
+    Write-Host "4. Tap 'Link Camera' and paste the URL from above."
     Write-Host ""
     Write-Host "==========================================================" -ForegroundColor Green
     Write-Host "Keep this window open. Close it to shut down the feed and " -ForegroundColor White
     Write-Host "destroy the secure tunnel when you return home." -ForegroundColor White
     Write-Host "==========================================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Press any key to politely stop services and exit..."
+    Write-Host "Press CTRL+C to politely stop services and exit..."
     
-    # Wait for key press
-    $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") | Out-Null
+    try {
+        # Wait indefinitely until user cancels via Ctrl+C
+        while ($true) {
+            Start-Sleep -Seconds 1
+        }
+    } finally {
+        # Cleanup upon user exit
+        Write-Host "Shutting down camera and closing tunnel..."
+        Stop-Process -Id $cfProc.Id -ErrorAction SilentlyContinue
+        Stop-Process -Id $go2rtcProc.Id -ErrorAction SilentlyContinue
+        Write-Host "Goodbye!"
+    }
 } else {
     Write-Host "Failed to establish secure tunnel. Output from cloudflared.log:" -ForegroundColor Red
     if (Test-Path "$baseDir\cloudflared.log") {
         Get-Content "$baseDir\cloudflared.log" | Select-Object -Last 10
     }
     Start-Sleep -Seconds 10
+    
+    # Cleanup upon user exit
+    Write-Host "Shutting down camera and closing tunnel..."
+    Stop-Process -Id $cfProc.Id -ErrorAction SilentlyContinue
+    Stop-Process -Id $go2rtcProc.Id -ErrorAction SilentlyContinue
+    Write-Host "Goodbye!"
 }
-
-# 8. Cleanup upon user exit
-Write-Host "Shutting down camera and closing tunnel..."
-Stop-Process -Id $cfProc.Id -ErrorAction SilentlyContinue
-Stop-Process -Id $go2rtcProc.Id -ErrorAction SilentlyContinue
-Write-Host "Goodbye!"

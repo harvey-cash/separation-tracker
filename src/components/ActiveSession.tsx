@@ -122,12 +122,20 @@ export function ActiveSession({ session: initialSession, cameraUrl = '', onCamer
         {cameraUrl && !isEditingCamera ? (
           <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800 relative group">
              <iframe
-               // Remove trailing slashes and append the go2rtc specific path
-               src={`${cameraUrl.replace(/\/+$/, '')}/webrtc.html?src=camera&media=video+audio`}
+                 // Remove trailing slashes and append the go2rtc specific path with MSE mode specifically for Cloudflare tunnel compatibility
+                 src={`${cameraUrl.replace(/\/+$/, '')}/stream.html?src=camera&mode=mse`}
                className="w-full h-full border-0 absolute inset-0"
                allow="autoplay; fullscreen; microphone"
              />
-             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+               <a
+                 href={`${cameraUrl.replace(/\/+$/, '')}/stream.html?src=camera&mode=mse`}
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm flex items-center"
+               >
+                 Popout
+               </a>
                <button
                  onClick={() => setIsEditingCamera(true)}
                  className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm"

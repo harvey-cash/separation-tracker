@@ -1,0 +1,4 @@
+streams:
+  camera:
+    # Captures the default Windows webcam and microphone
+    - ffmpeg:device?video=0&audio=0
