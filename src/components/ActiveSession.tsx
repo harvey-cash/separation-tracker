@@ -1,17 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Session } from '../types';
-import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart } from 'lucide-react';
+import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
+import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
+import { CameraLinkInput } from './CameraLinkInput';
 import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTimer } from '../utils/timer';
 
 type Props = {
   session: Session;
+  cameraUrl?: string;
+  onCameraUrlChange?: (url: string) => void;
   onCompleteSession: (session: Session) => void;
   onCancel: () => void;
 };
 
-export function ActiveSession({ session: initialSession, onCompleteSession, onCancel }: Props) {
+export function ActiveSession({ session: initialSession, cameraUrl = '', onCameraUrlChange, onCompleteSession, onCancel }: Props) {
   const [session, setSession] = useState<Session>(initialSession);
+  const [isEditingCamera, setIsEditingCamera] = useState(!isCameraUrlValid(cameraUrl));
   
   // Overall session stopwatch
   const [isSessionRunning, setIsSessionRunning] = useState(true);
@@ -200,6 +205,8 @@ export function ActiveSession({ session: initialSession, onCompleteSession, onCa
 
   const currentStep = session.steps[currentStepIndex];
   const isFinished = currentStepIndex >= session.steps.length - 1 && session.steps[session.steps.length - 1].completed;
+  const streamUrl = buildCameraStreamUrl(cameraUrl);
+  const hasValidCameraUrl = streamUrl.length > 0;
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] flex flex-col">
@@ -225,9 +232,52 @@ export function ActiveSession({ session: initialSession, onCompleteSession, onCa
         </button>
       </header>
 
-      <main className="flex-1 max-w-md w-full mx-auto p-6 flex flex-col">
+      <main className="flex-1 max-w-md w-full mx-auto p-4 flex flex-col gap-4">
+        {/* Webcam Area */}
+        {hasValidCameraUrl && !isEditingCamera ? (
+          <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800 relative group">
+             <iframe
+               src={streamUrl}
+               className="w-full h-full border-0 absolute inset-0"
+               allow="autoplay; fullscreen; microphone"
+             />
+             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+               <a
+                 href={streamUrl}
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm flex items-center"
+               >
+                 Popout
+               </a>
+               <button
+                 onClick={() => setIsEditingCamera(true)}
+                 className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm"
+               >
+                 Change Camera
+               </button>
+             </div>
+          </div>
+        ) : (
+          <div className="w-full bg-slate-100 rounded-xl border border-slate-200 border-dashed p-4 flex flex-col items-center justify-center text-slate-500 gap-3">
+            <div className="flex items-center gap-2 text-slate-400">
+               <VideoOff size={20} />
+               <span className="text-sm font-medium">Link Remote Camera</span>
+            </div>
+            <div className="w-full">
+              <CameraLinkInput
+                cameraUrl={cameraUrl}
+                onCameraUrlChange={(url) => onCameraUrlChange?.(url)}
+                onDone={() => setIsEditingCamera(false)}
+                onCancel={hasValidCameraUrl ? () => setIsEditingCamera(false) : undefined}
+                compact
+              />
+            </div>
+          </div>
+        )}
+
         {/* Central Countdown */}
-        <div className="flex-1 flex flex-col items-center justify-center py-12">
+        <div className="flex-1 flex flex-col items-center justify-center py-6">
           {!isFinished ? (
             <>
               <div className="text-rose-400 font-bold mb-4 uppercase tracking-widest text-sm flex items-center gap-2">

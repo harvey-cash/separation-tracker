@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { Session, Step } from '../types';
-import { Plus, Trash2, Play, ArrowLeft, GripVertical, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Play, ArrowLeft, GripVertical, Sparkles, Video } from 'lucide-react';
 import { formatDuration } from '../utils/format';
 import { DurationInput } from './DurationInput';
+import { CameraLinkInput } from './CameraLinkInput';
 
 type Props = {
   initialSession: Session;
+  cameraUrl?: string;
+  onCameraUrlChange?: (url: string) => void;
   onStart: (session: Session) => void;
   onCancel: () => void;
 };
 
-export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
+export function SessionConfig({ initialSession, cameraUrl = '', onCameraUrlChange, onStart, onCancel }: Props) {
   const [session, setSession] = useState<Session>(initialSession);
   const [newStepDuration, setNewStepDuration] = useState(30);
 
@@ -121,6 +124,20 @@ export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
             Add Step
           </button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Video className="text-emerald-400" size={20} />
+          <h2 className="text-lg font-bold text-slate-800">Remote Stream Link (Optional)</h2>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          Scan the QR code from Brave Paws Streamer, or paste a pairing link manually if needed.
+        </p>
+        <CameraLinkInput
+          cameraUrl={cameraUrl}
+          onCameraUrlChange={(url) => onCameraUrlChange?.(url)}
+        />
       </div>
 
       <button

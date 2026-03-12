@@ -8,3 +8,5 @@ coverage/
 !.env.example
 test-results/
 playwright-report/
+.venv/
+*.exe

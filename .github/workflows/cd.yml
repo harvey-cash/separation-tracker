@@ -1,6 +1,9 @@
 name: CD
 
 on:
+  push:
+    branches:
+      - main
   workflow_run:
     workflows: ["CI"]
     types:
@@ -9,8 +12,28 @@ on:
       - main
 
 jobs:
+  streamer-bundle:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run camera-helper:bundle
+      - name: Upload portable streamer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: brave-paws-streamer
+          path: dist/brave-paws-streamer.zip
+          if-no-files-found: error
+
   release:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,7 +47,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Bump patch version
@@ -62,6 +85,7 @@ jobs:
 
   deploy:
     needs: release
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
