@@ -6,19 +6,16 @@ import {
   clearTokens,
   saveFolderId,
   loadFolderId,
-  saveSpreadsheetId,
-  loadSpreadsheetId,
   saveLastSync,
   loadLastSync,
   tokensFromGISResponse,
   findOrCreateFolder,
-  findSpreadsheet,
-  createSpreadsheet,
-  writeSheetData,
-  readSheetData,
+  findFile,
+  uploadFile,
+  downloadFile,
 } from '../utils/googleDrive';
 import { Session } from '../types';
-import { sessionsToSheetRows, sheetRowsToSessions } from '../utils/export';
+import { generateCSVContent, parseCSV } from '../utils/export';
 
 /** Duration (ms) to show the "Synced" success badge before returning to idle. */
 const SUCCESS_MESSAGE_DURATION_MS = 3000;
@@ -151,32 +148,28 @@ export function useGoogleDrive(
   // ── Core sync logic ────────────────────────────────────────────────────────
   const performUpload = useCallback(
     async (accessToken: string, currentFolderId: string) => {
-      const remoteSheet = await findSpreadsheet(accessToken, currentFolderId);
+      const remoteFile = await findFile(accessToken, currentFolderId);
 
-      if (remoteSheet) {
-        saveSpreadsheetId(remoteSheet.id);
-
-        const remoteModifiedMs = new Date(remoteSheet.modifiedTime).getTime();
+      if (remoteFile) {
+        const remoteModifiedMs = new Date(remoteFile.modifiedTime).getTime();
         const lastSyncMs = loadLastSync();
 
         if (remoteModifiedMs > lastSyncMs) {
           // Remote was updated since our last sync — prompt conflict resolution
-          const remoteRows = await readSheetData(accessToken, remoteSheet.id);
-          const remoteSessions = sheetRowsToSessions(remoteRows);
+          const remoteCSV = await downloadFile(accessToken, remoteFile.id);
+          const remoteSessions = parseCSV(remoteCSV);
           setConflictData({ remoteSessions });
           setSyncStatus('idle');
           return;
         }
 
         // Remote is not newer — overwrite it with local data
-        const values = sessionsToSheetRows(sessions);
-        await writeSheetData(accessToken, remoteSheet.id, values);
+        const csv = generateCSVContent(sessions);
+        await uploadFile(accessToken, currentFolderId, remoteFile.id, csv);
       } else {
-        // No remote spreadsheet yet — create one and populate it
-        const spreadsheetId = await createSpreadsheet(accessToken, currentFolderId);
-        saveSpreadsheetId(spreadsheetId);
-        const values = sessionsToSheetRows(sessions);
-        await writeSheetData(accessToken, spreadsheetId, values);
+        // No remote file yet — create it
+        const csv = generateCSVContent(sessions);
+        await uploadFile(accessToken, currentFolderId, null, csv);
       }
 
       saveLastSync(Date.now());
@@ -237,15 +230,9 @@ export function useGoogleDrive(
     if (!accessToken || !folderId) return;
     setSyncStatus('syncing');
     try {
-      const remoteSheet = await findSpreadsheet(accessToken, folderId);
-      const values = sessionsToSheetRows(sessions);
-      if (remoteSheet) {
-        await writeSheetData(accessToken, remoteSheet.id, values);
-      } else {
-        const spreadsheetId = await createSpreadsheet(accessToken, folderId);
-        saveSpreadsheetId(spreadsheetId);
-        await writeSheetData(accessToken, spreadsheetId, values);
-      }
+      const remoteFile = await findFile(accessToken, folderId);
+      const csv = generateCSVContent(sessions);
+      await uploadFile(accessToken, folderId, remoteFile?.id ?? null, csv);
       saveLastSync(Date.now());
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), SUCCESS_MESSAGE_DURATION_MS);
@@ -255,19 +242,12 @@ export function useGoogleDrive(
     }
   }, [conflictData, getValidToken, folderId, sessions]);
 
-  // ── Spreadsheet URL (for "Open in Sheets" link) ─────────────────────────────
-  const spreadsheetId = loadSpreadsheetId();
-  const spreadsheetUrl = spreadsheetId
-    ? `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
-    : null;
-
   return {
     isClientIdConfigured: !!CLIENT_ID,
     isConnected,
     syncStatus,
     syncError,
     conflictData,
-    spreadsheetUrl,
     connect,
     disconnect,
     syncNow,

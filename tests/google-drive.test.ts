@@ -33,16 +33,12 @@ import {
   clearTokens,
   saveFolderId,
   loadFolderId,
-  saveSpreadsheetId,
-  loadSpreadsheetId,
   saveLastSync,
   loadLastSync,
   tokensFromGISResponse,
   findOrCreateFolder,
-  findSpreadsheet,
-  createSpreadsheet,
-  writeSheetData,
-  readSheetData,
+  findFile,
+  uploadFile,
   LAST_SYNC_KEY,
 } from '../src/utils/googleDrive.ts';
 
@@ -82,21 +78,19 @@ test('loadTokens returns null for malformed JSON', () => {
   assert.equal(loadTokens(), null);
 });
 
-test('clearTokens removes tokens, folderId, spreadsheetId and lastSync from localStorage', () => {
+test('clearTokens removes tokens, folderId and lastSync from localStorage', () => {
   saveTokens({ access_token: 'a', expires_at: 1 });
   saveFolderId('folder-1');
-  saveSpreadsheetId('sheet-1');
   saveLastSync(12345);
 
   clearTokens();
 
   assert.equal(loadTokens(), null);
   assert.equal(loadFolderId(), null);
-  assert.equal(loadSpreadsheetId(), null);
   assert.equal(loadLastSync(), 0);
 });
 
-// ── Folder / spreadsheet / last-sync persistence ─────────────────────────────
+// ── Folder / last-sync persistence ────────────────────────────────────────────
 
 test('saveFolderId / loadFolderId roundtrip', () => {
   saveFolderId('my-folder-id');
@@ -105,15 +99,6 @@ test('saveFolderId / loadFolderId roundtrip', () => {
 
 test('loadFolderId returns null when nothing is stored', () => {
   assert.equal(loadFolderId(), null);
-});
-
-test('saveSpreadsheetId / loadSpreadsheetId roundtrip', () => {
-  saveSpreadsheetId('my-sheet-id');
-  assert.equal(loadSpreadsheetId(), 'my-sheet-id');
-});
-
-test('loadSpreadsheetId returns null when nothing is stored', () => {
-  assert.equal(loadSpreadsheetId(), null);
 });
 
 test('saveLastSync / loadLastSync roundtrip', () => {
@@ -175,135 +160,59 @@ test('findOrCreateFolder throws when search request fails', async () => {
   );
 });
 
-// ── findSpreadsheet ──────────────────────────────────────────────────────────
+// ── findFile ──────────────────────────────────────────────────────────────────
 
-test('findSpreadsheet returns null when no matching spreadsheet exists', async () => {
+test('findFile returns null when no matching file exists', async () => {
   (global as Record<string, unknown>).fetch = makeFetch({ files: [] });
 
-  const result = await findSpreadsheet('access-token', 'folder-id');
+  const result = await findFile('access-token', 'folder-id');
 
   assert.equal(result, null);
 });
 
-test('findSpreadsheet returns spreadsheet metadata when found', async () => {
-  const sheetInfo = { id: 'sheet-123', modifiedTime: '2024-01-01T00:00:00.000Z' };
-  (global as Record<string, unknown>).fetch = makeFetch({ files: [sheetInfo] });
+test('findFile returns file metadata when file is found', async () => {
+  const fileInfo = { id: 'file-123', modifiedTime: '2024-01-01T00:00:00.000Z' };
+  (global as Record<string, unknown>).fetch = makeFetch({ files: [fileInfo] });
 
-  const result = await findSpreadsheet('access-token', 'folder-id');
+  const result = await findFile('access-token', 'folder-id');
 
-  assert.deepEqual(result, sheetInfo);
+  assert.deepEqual(result, fileInfo);
 });
 
-test('findSpreadsheet throws on API error', async () => {
-  (global as Record<string, unknown>).fetch = makeFetch({}, 403);
+// ── uploadFile ────────────────────────────────────────────────────────────────
 
-  await assert.rejects(
-    () => findSpreadsheet('access-token', 'folder-id'),
-    /Spreadsheet search failed \(403\)/,
-  );
-});
-
-// ── createSpreadsheet ────────────────────────────────────────────────────────
-
-test('createSpreadsheet creates a spreadsheet and renames the sheet tab', async () => {
-  let callCount = 0;
-  const capturedUrls: string[] = [];
-  (global as Record<string, unknown>).fetch = async (url: unknown) => {
-    callCount++;
-    capturedUrls.push(String(url));
-    if (callCount === 1) {
-      // Drive API: create file
-      return { ok: true, status: 200, json: async () => ({ id: 'new-sheet-id' }) } as unknown as Response;
-    }
-    // Sheets API: rename tab
-    return { ok: true, status: 200, json: async () => ({}) } as unknown as Response;
-  };
-
-  const id = await createSpreadsheet('token', 'folder-id');
-
-  assert.equal(id, 'new-sheet-id');
-  assert.equal(callCount, 2, 'should make a Drive create call then a Sheets rename call');
-  assert.ok(capturedUrls[0].includes('googleapis.com/drive/'), 'first call is Drive API');
-  assert.ok(capturedUrls[1].includes('sheets.googleapis.com'), 'second call is Sheets API');
-});
-
-test('createSpreadsheet throws when Drive create fails', async () => {
-  (global as Record<string, unknown>).fetch = makeFetch({}, 500);
-
-  await assert.rejects(
-    () => createSpreadsheet('token', 'folder-id'),
-    /Spreadsheet creation failed \(500\)/,
-  );
-});
-
-// ── writeSheetData ───────────────────────────────────────────────────────────
-
-test('writeSheetData clears then writes data', async () => {
-  let callCount = 0;
-  const capturedMethods: string[] = [];
+test('uploadFile uses POST when no fileId is provided (new file)', async () => {
+  let capturedMethod: string | undefined;
   (global as Record<string, unknown>).fetch = async (_url: unknown, opts: RequestInit) => {
-    callCount++;
-    capturedMethods.push(opts.method ?? 'GET');
-    return { ok: true, status: 200, json: async () => ({}) } as unknown as Response;
+    capturedMethod = opts.method;
+    return { ok: true, status: 200, json: async () => ({ id: 'created-id' }) } as unknown as Response;
   };
 
-  await writeSheetData('token', 'sheet-id', [['Header'], ['Row1']]);
+  const id = await uploadFile('token', 'folder-id', null, 'csv,data');
 
-  assert.equal(callCount, 2, 'should clear then write');
-  assert.equal(capturedMethods[0], 'POST', 'clear uses POST');
-  assert.equal(capturedMethods[1], 'PUT', 'write uses PUT');
+  assert.equal(capturedMethod, 'POST');
+  assert.equal(id, 'created-id');
 });
 
-test('writeSheetData throws when clear fails', async () => {
+test('uploadFile uses PATCH when a fileId is provided (update)', async () => {
+  let capturedMethod: string | undefined;
+  (global as Record<string, unknown>).fetch = async (_url: unknown, opts: RequestInit) => {
+    capturedMethod = opts.method;
+    return { ok: true, status: 200, json: async () => ({ id: 'updated-id' }) } as unknown as Response;
+  };
+
+  const id = await uploadFile('token', 'folder-id', 'existing-file-id', 'new,csv');
+
+  assert.equal(capturedMethod, 'PATCH');
+  assert.equal(id, 'updated-id');
+});
+
+test('uploadFile throws on API error', async () => {
   (global as Record<string, unknown>).fetch = async () =>
-    ({ ok: false, status: 403 }) as unknown as Response;
+    ({ ok: false, status: 403, text: async () => 'Forbidden' }) as unknown as Response;
 
   await assert.rejects(
-    () => writeSheetData('token', 'sheet-id', [['data']]),
-    /Sheet clear failed \(403\)/,
-  );
-});
-
-test('writeSheetData throws when write fails', async () => {
-  let callCount = 0;
-  (global as Record<string, unknown>).fetch = async () => {
-    callCount++;
-    if (callCount === 1) {
-      return { ok: true, status: 200, json: async () => ({}) } as unknown as Response;
-    }
-    return { ok: false, status: 400, text: async () => 'Bad Request' } as unknown as Response;
-  };
-
-  await assert.rejects(
-    () => writeSheetData('token', 'sheet-id', [['data']]),
-    /Sheet write failed \(400\)/,
-  );
-});
-
-// ── readSheetData ────────────────────────────────────────────────────────────
-
-test('readSheetData returns values from the sheet', async () => {
-  const values = [['Date', 'Duration'], ['2024-01-01', '60']];
-  (global as Record<string, unknown>).fetch = makeFetch({ values });
-
-  const result = await readSheetData('token', 'sheet-id');
-
-  assert.deepEqual(result, values);
-});
-
-test('readSheetData returns empty array when sheet is empty', async () => {
-  (global as Record<string, unknown>).fetch = makeFetch({});
-
-  const result = await readSheetData('token', 'sheet-id');
-
-  assert.deepEqual(result, []);
-});
-
-test('readSheetData throws on API error', async () => {
-  (global as Record<string, unknown>).fetch = makeFetch({}, 500);
-
-  await assert.rejects(
-    () => readSheetData('token', 'sheet-id'),
-    /Sheet read failed \(500\)/,
+    () => uploadFile('token', 'folder-id', null, 'data'),
+    /File upload failed \(403\)/,
   );
 });
