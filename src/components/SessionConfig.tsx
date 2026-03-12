@@ -3,6 +3,7 @@ import { Session, Step } from '../types';
 import { Plus, Trash2, Play, ArrowLeft, GripVertical, Sparkles, Video } from 'lucide-react';
 import { formatDuration } from '../utils/format';
 import { DurationInput } from './DurationInput';
+import { CameraLinkInput } from './CameraLinkInput';
 
 type Props = {
   initialSession: Session;
@@ -131,14 +132,11 @@ export function SessionConfig({ initialSession, cameraUrl = '', onCameraUrlChang
           <h2 className="text-lg font-bold text-slate-800">Remote Webcam Link (Optional)</h2>
         </div>
         <p className="text-sm text-slate-500 mb-4">
-          Paste the secure Cloudflare tunnel link (e.g. <span className="font-mono text-xs">https://name.trycloudflare.com</span>) from your computer to watch your dog remotely.
+          Scan the QR code from the Windows camera helper, or paste the secure Cloudflare tunnel link if needed.
         </p>
-        <input
-          type="url"
-          value={cameraUrl}
-          onChange={(e) => onCameraUrlChange?.(e.target.value)}
-          placeholder="https://..."
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-mono text-sm"
+        <CameraLinkInput
+          cameraUrl={cameraUrl}
+          onCameraUrlChange={(url) => onCameraUrlChange?.(url)}
         />
       </div>
 

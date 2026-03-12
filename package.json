@@ -7,10 +7,21 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node_modules/.bin/tsx --test tests/*.test.js tests/*.test.ts",
+    "test": "tsx --test tests/*.test.js tests/*.test.ts",
+    "camera-helper:gui": "node windows-camera-helper-ui/server.cjs",
+    "camera-helper:health": "node windows-camera-helper-ui/health-check.mjs",
+    "camera-helper:bundle": "node windows-camera-helper-ui/package-portable.mjs",
     "clean": "rm -rf dist",
     "lint": "npm install --prefer-offline --silent && tsc --noEmit",
     "test:e2e": "playwright test"
+  },
+  "pkg": {
+    "assets": [
+      "windows-camera-helper-ui/public/**/*"
+    ],
+    "scripts": [
+      "windows-camera-helper-ui/server.cjs"
+    ]
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -21,6 +32,7 @@
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.7.0",
@@ -31,6 +43,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
+    "pkg": "^5.8.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

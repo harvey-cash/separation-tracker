@@ -8,7 +8,29 @@ on:
         required: true
 
 jobs:
+  camera-helper:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run camera-helper:bundle
+      - name: Upload helper artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: brave-paws-camera-helper
+          path: dist/brave-paws-camera-helper.zip
+          if-no-files-found: error
+
   release:
+    needs: camera-helper
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -18,19 +40,26 @@ jobs:
           ref: main
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm run build
       - name: Archive build output
         run: zip -r dist.zip dist/
+      - name: Download helper artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: brave-paws-camera-helper
+          path: release-artifacts/
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: ${{ github.event.inputs.version }}
-          files: dist.zip
+          files: |
+            dist.zip
+            release-artifacts/brave-paws-camera-helper.zip
           generate_release_notes: true
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4

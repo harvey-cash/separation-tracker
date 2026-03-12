@@ -21,6 +21,7 @@ Session data is stored locally in the browser by default, with optional Google D
 
 > For a deeper introduction to the training method, see [INFO.md](INFO.md).
 > For instructions on streaming a Windows laptop webcam into Brave Paws, see [windows-camera-helper/README.md](windows-camera-helper/README.md).
+> For release and distribution notes, see [RELEASE.md](RELEASE.md).
 
 ---
 

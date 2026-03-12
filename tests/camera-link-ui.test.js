@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+test('SessionConfig and ActiveSession use the shared camera link input', () => {
+  const sessionConfig = readFileSync(resolve(process.cwd(), 'src/components/SessionConfig.tsx'), 'utf8');
+  const activeSession = readFileSync(resolve(process.cwd(), 'src/components/ActiveSession.tsx'), 'utf8');
+
+  assert.match(sessionConfig, /CameraLinkInput/);
+  assert.match(activeSession, /CameraLinkInput/);
+});
+
+test('shared camera link input exposes scan and Cloudflare approval messaging', () => {
+  const cameraLinkInput = readFileSync(resolve(process.cwd(), 'src/components/CameraLinkInput.tsx'), 'utf8');
+
+  assert.match(cameraLinkInput, /Scan QR Code/);
+  assert.match(cameraLinkInput, /tap I Agree on Cloudflare/i);
+  assert.match(cameraLinkInput, /Use This Link/);
+});
