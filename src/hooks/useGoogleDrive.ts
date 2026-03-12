@@ -72,17 +72,8 @@ export function useGoogleDrive(
           setTokens(newTokens);
         },
         error_callback: (err) => {
-          // User dismissed the popup — not an error worth surfacing.
+          // Popup closed or blocked — only surface if user expects a result.
           if (err.type === 'popup_closed') return;
-          // Browser blocked the popup — ask the user to allow popups.
-          // Note: browsers with Cross-Origin-Opener-Policy: same-origin may
-          // log a "window.closed" warning from the GIS library; this does not
-          // prevent the OAuth flow from succeeding.
-          if (err.type === 'popup_blocked') {
-            setSyncError('The sign-in popup was blocked by the browser. Please allow popups for this site and try again.');
-            setSyncStatus('error');
-            return;
-          }
           console.error('GIS error:', err);
           setSyncError('Could not open the Google sign-in popup.');
           setSyncStatus('error');
