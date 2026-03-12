@@ -1,10 +1,8 @@
-export const SPREADSHEET_NAME = 'Brave Paws Sessions';
-export const SHEET_NAME = 'Sessions';
+export const DRIVE_FILE_NAME = 'brave_paws_sessions.csv';
 export const DRIVE_FOLDER_NAME = 'BravePaws_Data';
 
 const TOKENS_KEY = 'google_drive_tokens';
 const FOLDER_ID_KEY = 'google_drive_folder_id';
-const SPREADSHEET_ID_KEY = 'google_sheets_spreadsheet_id';
 export const LAST_SYNC_KEY = 'google_drive_last_sync';
 
 /**
@@ -42,7 +40,6 @@ export function loadTokens(): DriveTokens | null {
 export function clearTokens(): void {
   localStorage.removeItem(TOKENS_KEY);
   localStorage.removeItem(FOLDER_ID_KEY);
-  localStorage.removeItem(SPREADSHEET_ID_KEY);
   localStorage.removeItem(LAST_SYNC_KEY);
 }
 
@@ -52,14 +49,6 @@ export function saveFolderId(id: string): void {
 
 export function loadFolderId(): string | null {
   return localStorage.getItem(FOLDER_ID_KEY);
-}
-
-export function saveSpreadsheetId(id: string): void {
-  localStorage.setItem(SPREADSHEET_ID_KEY, id);
-}
-
-export function loadSpreadsheetId(): string | null {
-  return localStorage.getItem(SPREADSHEET_ID_KEY);
 }
 
 export function saveLastSync(ts: number): void {
@@ -89,20 +78,6 @@ async function driveRequest(
   accessToken: string,
 ): Promise<Response> {
   return fetch(`https://www.googleapis.com/drive/v3${path}`, {
-    ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-}
-
-async function sheetsRequest(
-  path: string,
-  options: RequestInit,
-  accessToken: string,
-): Promise<Response> {
-  return fetch(`https://sheets.googleapis.com/v4/spreadsheets${path}`, {
     ...options,
     headers: {
       ...options.headers,
@@ -152,11 +127,12 @@ export async function findOrCreateFolder(
   return createData.id;
 }
 
-export async function findSpreadsheet(
+export async function findFile(
   accessToken: string,
   folderId: string,
+  fileName: string = DRIVE_FILE_NAME,
 ): Promise<DriveFileInfo | null> {
-  const query = `name='${SPREADSHEET_NAME}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
+  const query = `name='${fileName}' and '${folderId}' in parents and trashed=false`;
   const resp = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)`,
     { method: 'GET' },
@@ -164,7 +140,7 @@ export async function findSpreadsheet(
   );
 
   if (!resp.ok) {
-    throw new Error(`Spreadsheet search failed (${resp.status})`);
+    throw new Error(`File search failed (${resp.status})`);
   }
 
   const data = await resp.json() as { files: DriveFileInfo[] };
@@ -174,114 +150,65 @@ export async function findSpreadsheet(
   return null;
 }
 
-export async function createSpreadsheet(
+export async function uploadFile(
   accessToken: string,
   folderId: string,
+  fileId: string | null,
+  content: string,
+  fileName: string = DRIVE_FILE_NAME,
 ): Promise<string> {
-  // Create the spreadsheet in the target folder via Drive API so the parent
-  // is set in a single call — no separate move required.
+  const metadata = {
+    name: fileName,
+    mimeType: 'text/csv',
+    ...(fileId ? {} : { parents: [folderId] }),
+  };
+
+  // Use a unique boundary per request to avoid any collision with CSV content.
+  const boundary = `brave_paws_${crypto.randomUUID().replace(/-/g, '')}`;
+  const body =
+    `\r\n--${boundary}\r\n` +
+    'Content-Type: application/json\r\n\r\n' +
+    JSON.stringify(metadata) +
+    `\r\n--${boundary}\r\n` +
+    'Content-Type: text/csv\r\n\r\n' +
+    content +
+    `\r\n--${boundary}--`;
+
+  const url = fileId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
+    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+
+  const response = await fetch(url, {
+    method: fileId ? 'PATCH' : 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': `multipart/related; boundary="${boundary}"`,
+    },
+    body,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`File upload failed (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as { id: string };
+  return data.id;
+}
+
+export async function downloadFile(
+  accessToken: string,
+  fileId: string,
+): Promise<string> {
   const resp = await driveRequest(
-    '/files',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: SPREADSHEET_NAME,
-        mimeType: 'application/vnd.google-apps.spreadsheet',
-        parents: [folderId],
-      }),
-    },
-    accessToken,
-  );
-
-  if (!resp.ok) {
-    throw new Error(`Spreadsheet creation failed (${resp.status})`);
-  }
-
-  const data = await resp.json() as { id: string };
-  const spreadsheetId = data.id;
-
-  // Rename the default sheet tab from "Sheet1" to our canonical name so that
-  // range references (e.g. "Sessions!A1") work consistently.
-  const renameResp = await sheetsRequest(
-    `/${spreadsheetId}:batchUpdate`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{
-          updateSheetProperties: {
-            properties: { sheetId: 0, title: SHEET_NAME },
-            fields: 'title',
-          },
-        }],
-      }),
-    },
-    accessToken,
-  );
-
-  if (!renameResp.ok) {
-    throw new Error(`Sheet tab rename failed (${renameResp.status})`);
-  }
-
-  return spreadsheetId;
-}
-
-export async function writeSheetData(
-  accessToken: string,
-  spreadsheetId: string,
-  values: (string | number)[][],
-): Promise<void> {
-  const clearRange = SHEET_NAME;
-  const writeRange = `${SHEET_NAME}!A1`;
-
-  // Clear any existing content so stale rows don't linger.
-  const clearResp = await sheetsRequest(
-    `/${spreadsheetId}/values/${encodeURIComponent(clearRange)}:clear`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    },
-    accessToken,
-  );
-
-  if (!clearResp.ok) {
-    throw new Error(`Sheet clear failed (${clearResp.status})`);
-  }
-
-  // Write the new data starting at A1.
-  const updateResp = await sheetsRequest(
-    `/${spreadsheetId}/values/${encodeURIComponent(writeRange)}?valueInputOption=RAW`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values }),
-    },
-    accessToken,
-  );
-
-  if (!updateResp.ok) {
-    const errorText = await updateResp.text();
-    throw new Error(`Sheet write failed (${updateResp.status}): ${errorText}`);
-  }
-}
-
-export async function readSheetData(
-  accessToken: string,
-  spreadsheetId: string,
-): Promise<string[][]> {
-  const range = `${SHEET_NAME}`;
-  const resp = await sheetsRequest(
-    `/${spreadsheetId}/values/${encodeURIComponent(range)}`,
+    `/files/${fileId}?alt=media`,
     { method: 'GET' },
     accessToken,
   );
 
   if (!resp.ok) {
-    throw new Error(`Sheet read failed (${resp.status})`);
+    throw new Error(`File download failed (${resp.status})`);
   }
 
-  const data = await resp.json() as { values?: string[][] };
-  return data.values ?? [];
+  return resp.text();
 }
