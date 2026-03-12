@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { Session, Step } from '../types';
-import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart } from 'lucide-react';
+import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
 
 type Props = {
   session: Session;
+  cameraUrl?: string;
+  onCameraUrlChange?: (url: string) => void;
   onCompleteSession: (session: Session) => void;
   onCancel: () => void;
 };
 
-export function ActiveSession({ session: initialSession, onCompleteSession, onCancel }: Props) {
+export function ActiveSession({ session: initialSession, cameraUrl = '', onCameraUrlChange, onCompleteSession, onCancel }: Props) {
   const [session, setSession] = useState<Session>(initialSession);
+  const [isEditingCamera, setIsEditingCamera] = useState(!cameraUrl);
   
   // Overall session stopwatch
   const [isSessionRunning, setIsSessionRunning] = useState(true);
@@ -116,14 +119,48 @@ export function ActiveSession({ session: initialSession, onCompleteSession, onCa
 
       <main className="flex-1 max-w-md w-full mx-auto p-4 flex flex-col gap-4">
         {/* Webcam Area */}
-        <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border-2 border-slate-800">
-           {/* Hardcoded strictly for this prototyping step */}
-           <iframe
-             src="http://127.0.0.1:1984/webrtc.html?src=camera&media=video+audio"
-             className="w-full h-full border-0"
-             allow="autoplay; fullscreen; microphone"
-           />
-        </div>
+        {cameraUrl && !isEditingCamera ? (
+          <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800 relative group">
+             <iframe
+               // Remove trailing slashes and append the go2rtc specific path
+               src={`${cameraUrl.replace(/\/+$/, '')}/webrtc.html?src=camera&media=video+audio`}
+               className="w-full h-full border-0 absolute inset-0"
+               allow="autoplay; fullscreen; microphone"
+             />
+             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+               <button
+                 onClick={() => setIsEditingCamera(true)}
+                 className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm"
+               >
+                 Change Camera
+               </button>
+             </div>
+          </div>
+        ) : (
+          <div className="w-full bg-slate-100 rounded-xl border border-slate-200 border-dashed p-4 flex flex-col items-center justify-center text-slate-500 gap-3">
+            <div className="flex items-center gap-2 text-slate-400">
+               <VideoOff size={20} />
+               <span className="text-sm font-medium">Link Remote Camera</span>
+            </div>
+            <div className="flex w-full gap-2">
+              <input
+                 type="url"
+                 placeholder="Paste Cloudflare URL here..."
+                 value={cameraUrl}
+                 onChange={(e) => onCameraUrlChange?.(e.target.value)}
+                 className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 font-mono"
+              />
+              {cameraUrl && (
+                <button
+                  onClick={() => setIsEditingCamera(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors shrink-0"
+                >
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Central Countdown */}
         <div className="flex-1 flex flex-col items-center justify-center py-6">

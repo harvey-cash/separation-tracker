@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { Session, Step } from '../types';
-import { Plus, Trash2, Play, ArrowLeft, GripVertical, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Play, ArrowLeft, GripVertical, Sparkles, Video } from 'lucide-react';
 import { formatDuration } from '../utils/format';
 import { DurationInput } from './DurationInput';
 
 type Props = {
   initialSession: Session;
+  cameraUrl?: string;
+  onCameraUrlChange?: (url: string) => void;
   onStart: (session: Session) => void;
   onCancel: () => void;
 };
 
-export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
+export function SessionConfig({ initialSession, cameraUrl = '', onCameraUrlChange, onStart, onCancel }: Props) {
   const [session, setSession] = useState<Session>(initialSession);
   const [newStepDuration, setNewStepDuration] = useState(30);
 
@@ -121,6 +123,23 @@ export function SessionConfig({ initialSession, onStart, onCancel }: Props) {
             Add Step
           </button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Video className="text-emerald-400" size={20} />
+          <h2 className="text-lg font-bold text-slate-800">Remote Webcam Link (Optional)</h2>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          Paste the secure Cloudflare tunnel link (e.g. <span className="font-mono text-xs">https://name.trycloudflare.com</span>) from your computer to watch your dog remotely.
+        </p>
+        <input
+          type="url"
+          value={cameraUrl}
+          onChange={(e) => onCameraUrlChange?.(e.target.value)}
+          placeholder="https://..."
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-mono text-sm"
+        />
       </div>
 
       <button

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSessions } from './store';
 import { Session, Step } from './types';
 import { Dashboard } from './components/Dashboard';
@@ -30,6 +30,12 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
   const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [cameraUrl, setCameraUrl] = useState(() => localStorage.getItem('csa_camera_url') || '');
+
+  // Keep cameraUrl in sync with local storage
+  useEffect(() => {
+    localStorage.setItem('csa_camera_url', cameraUrl);
+  }, [cameraUrl]);
 
   const handleImportSessions = (imported: Session[]) => {
     replaceSessions(imported);
@@ -119,6 +125,8 @@ export default function App() {
       {currentView === 'config' && activeSession && (
         <SessionConfig
           initialSession={activeSession}
+          cameraUrl={cameraUrl}
+          onCameraUrlChange={setCameraUrl}
           onStart={handleStartSession}
           onCancel={() => setCurrentView('dashboard')}
         />
@@ -127,6 +135,8 @@ export default function App() {
       {currentView === 'active' && activeSession && (
         <ActiveSession
           session={activeSession}
+          cameraUrl={cameraUrl}
+          onCameraUrlChange={setCameraUrl}
           onCompleteSession={handleCompleteSession}
           onCancel={handleCancelSession}
         />
