@@ -35,15 +35,81 @@ if (-Not (Get-Command ffmpeg.exe -ErrorAction SilentlyContinue) -and -Not (Test-
     Write-Host ""
 }
 
+$ffmpegCmd = "ffmpeg"
+if (Test-Path "$baseDir\ffmpeg.exe") {
+    $ffmpegCmd = "$baseDir\ffmpeg.exe"
+}
+
+# Fix encoding issues for devices with trademarks/symbols in their name (like "Intel®")
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+$videoDevices = @()
+$audioDevices = @()
+
+if (Get-Command $ffmpegCmd -ErrorAction SilentlyContinue) {
+    Write-Host "Scanning for available cameras and microphones..." -ForegroundColor Cyan
+    $output = cmd.exe /c "`"$ffmpegCmd`" -list_devices true -f dshow -i dummy 2>&1"
+    $currentType = "none"
+
+    foreach ($line in $output) {
+        if ($line -match "DirectShow video devices") { 
+            $currentType = "video" 
+        } elseif ($line -match "DirectShow audio devices") { 
+            $currentType = "audio" 
+        } elseif ($line -match '\]\s*"([^"]+)" \((video|audio)\)') {
+            $name = $matches[1]
+            if ($matches[2] -eq "video") { $videoDevices += $name }
+            if ($matches[2] -eq "audio") { $audioDevices += $name }
+        } elseif ($line -match '\]\s*"([^"]+)"' -and $line -notmatch "Alternative name") {
+            $name = $matches[1]
+            if ($currentType -eq "video") { $videoDevices += $name }
+            if ($currentType -eq "audio") { $audioDevices += $name }
+        }
+    }
+}
+
+$selectedVideo = "0"
+$selectedAudio = "0"
+
+if ($videoDevices.Length -gt 0) {
+    Write-Host "`nAvailable Video Devices:" -ForegroundColor Yellow
+    for ($i = 0; $i -lt $videoDevices.Length; $i++) {
+        Write-Host "  $($i + 1). $($videoDevices[$i])"
+    }
+    $vIndex = Read-Host "Select Video Device (1-$($videoDevices.Length)) [Default: 1]"
+    if ([string]::IsNullOrWhiteSpace($vIndex)) { $vIndex = 1 }
+    $vIndex = [int]$vIndex - 1
+    if ($vIndex -ge 0 -and $vIndex -lt $videoDevices.Length) {
+        $selectedVideo = $videoDevices[$vIndex]
+    }
+}
+
+if ($audioDevices.Length -gt 0) {
+    Write-Host "`nAvailable Audio Devices:" -ForegroundColor Yellow
+    for ($i = 0; $i -lt $audioDevices.Length; $i++) {
+        Write-Host "  $($i + 1). $($audioDevices[$i])"
+    }
+    $aIndex = Read-Host "Select Audio Device (1-$($audioDevices.Length)) [Default: 1]"
+    if ([string]::IsNullOrWhiteSpace($aIndex)) { $aIndex = 1 }
+    $aIndex = [int]$aIndex - 1
+    if ($aIndex -ge 0 -and $aIndex -lt $audioDevices.Length) {
+        $selectedAudio = $audioDevices[$aIndex]
+    }
+}
+
 # 3. Create the minimal configuration for go2rtc
 $yamlContent = @"
 streams:
   camera:
-    # Captures the default Windows webcam and microphone
-    - ffmpeg:device?video=0&audio=0
+    # Captures the selected Windows webcam and microphone, transcoded to H.264 so MSE can play it
+    # We use software encoding because hardware encoding (NVENC/AMF) can fail on some systems depending on driver/GPU support
+    - "ffmpeg:device?video=$selectedVideo&audio=$selectedAudio#video=h264#audio=aac"
 "@
-Set-Content -Path "$baseDir\go2rtc.yaml" -Value $yamlContent
-Write-Host "Written default config (go2rtc.yaml)"
+Set-Content -Path "$baseDir\go2rtc.yaml" -Value $yamlContent -Encoding UTF8
+Write-Host "`nWritten default config (go2rtc.yaml)"
+Write-Host "Selected Video: $selectedVideo"
+Write-Host "Selected Audio: $selectedAudio`n"
+
 
 # 4. Clean up previous runs
 Write-Host "Cleaning up old background processes..."

@@ -1,4 +1,5 @@
-streams:
+﻿streams:
   camera:
-    # Captures the default Windows webcam and microphone
-    - ffmpeg:device?video=0&audio=0
+    # Captures the selected Windows webcam and microphone, transcoded to H.264 so MSE can play it
+    # We use software encoding because hardware encoding (NVENC/AMF) can fail on some systems depending on driver/GPU support
+    - "ffmpeg:device?video=HD Webcam&audio=Microphone Array (Intel® Smart Sound Technology for Digital Microphones)#video=h264#audio=aac"
