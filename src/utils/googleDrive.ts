@@ -178,40 +178,50 @@ export async function createSpreadsheet(
   accessToken: string,
   folderId: string,
 ): Promise<string> {
-  // Create the spreadsheet via the Sheets API so the sheet tab title can be
-  // set in the creation payload — this avoids a separate batchUpdate call
-  // which returns 403 with the drive.file scope on freshly-created files.
-  const createResp = await sheetsRequest(
-    '',
+  // Create the spreadsheet in the target folder via Drive API so the parent
+  // is set in a single call — no separate move required.
+  const resp = await driveRequest(
+    '/files',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        properties: { title: SPREADSHEET_NAME },
-        sheets: [{ properties: { sheetId: 0, title: SHEET_NAME } }],
+        name: SPREADSHEET_NAME,
+        mimeType: 'application/vnd.google-apps.spreadsheet',
+        parents: [folderId],
       }),
     },
     accessToken,
   );
 
-  if (!createResp.ok) {
-    throw new Error(`Spreadsheet creation failed (${createResp.status})`);
+  if (!resp.ok) {
+    throw new Error(`Spreadsheet creation failed (${resp.status})`);
   }
 
-  const data = await createResp.json() as { spreadsheetId: string };
-  const spreadsheetId = data.spreadsheetId;
+  const data = await resp.json() as { id: string };
+  const spreadsheetId = data.id;
 
-  // Move the new file into the target folder via Drive API.  The Sheets API
-  // places new files in the Drive root by default; removing "root" as a
-  // parent keeps the user's Drive tidy.
-  const moveResp = await driveRequest(
-    `/files/${spreadsheetId}?addParents=${encodeURIComponent(folderId)}&removeParents=root&fields=id`,
-    { method: 'PATCH' },
+  // Rename the default sheet tab from "Sheet1" to our canonical name so that
+  // range references (e.g. "Sessions!A1") work consistently.
+  const renameResp = await sheetsRequest(
+    `/${spreadsheetId}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          updateSheetProperties: {
+            properties: { sheetId: 0, title: SHEET_NAME },
+            fields: 'title',
+          },
+        }],
+      }),
+    },
     accessToken,
   );
 
-  if (!moveResp.ok) {
-    throw new Error(`Spreadsheet move failed (${moveResp.status})`);
+  if (!renameResp.ok) {
+    throw new Error(`Sheet tab rename failed (${renameResp.status})`);
   }
 
   return spreadsheetId;
