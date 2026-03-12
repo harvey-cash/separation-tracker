@@ -12,6 +12,7 @@ import { InfoView } from './components/InfoView';
 import { GoogleDriveSync } from './components/GoogleDriveSync';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
 import { exportToCSV, parseCSV } from './utils/export';
+import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
 import { ArrowLeft } from 'lucide-react';
 
 type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view' | 'info';
@@ -30,11 +31,24 @@ export default function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
   const [activeSession, setActiveSession] = useState<Session | null>(null);
-  const [cameraUrl, setCameraUrl] = useState(() => localStorage.getItem('csa_camera_url') || '');
+  const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
+
+  useEffect(() => {
+    const pairedCameraUrl = getCameraUrlFromSearch(window.location.search);
+    if (!pairedCameraUrl) {
+      return;
+    }
+
+    setCameraUrl((currentUrl) => (currentUrl === pairedCameraUrl ? currentUrl : pairedCameraUrl));
+
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.delete('cameraUrl');
+    window.history.replaceState({}, document.title, currentUrl.toString());
+  }, []);
 
   // Keep cameraUrl in sync with local storage
   useEffect(() => {
-    localStorage.setItem('csa_camera_url', cameraUrl);
+    localStorage.setItem(CAMERA_URL_STORAGE_KEY, cameraUrl);
   }, [cameraUrl]);
 
   const handleImportSessions = (imported: Session[]) => {

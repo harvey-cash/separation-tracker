@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Camera, CheckCircle2, ExternalLink, Keyboard, Link2, ScanLine, X } from 'lucide-react';
-import { buildCameraStreamUrl, getCameraUrlValidationMessage, isCameraUrlValid, sanitizeCameraUrl } from '../utils/cameraUrl';
+import { buildCameraStreamUrl, extractCameraUrlFromValue, getCameraUrlValidationMessage, isCameraUrlValid, sanitizeCameraUrl } from '../utils/cameraUrl';
 
 type Props = {
   cameraUrl: string;
@@ -124,7 +124,7 @@ export function CameraLinkInput({
                 return;
               }
 
-              const nextUrl = sanitizeCameraUrl(detected.rawValue);
+              const nextUrl = extractCameraUrlFromValue(detected.rawValue);
               if (!nextUrl) {
                 setScanError('That QR code did not contain a usable Brave Paws camera link.');
                 return;

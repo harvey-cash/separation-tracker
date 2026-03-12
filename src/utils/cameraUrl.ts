@@ -1,3 +1,7 @@
+export const CAMERA_URL_STORAGE_KEY = 'csa_camera_url';
+export const CAMERA_URL_QUERY_PARAM = 'cameraUrl';
+export const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/fermi/separation';
+
 export function sanitizeCameraUrl(value: string): string {
   const trimmed = value.trim();
 
@@ -24,18 +28,48 @@ export function sanitizeCameraUrl(value: string): string {
   }
 }
 
+export function extractCameraUrlFromValue(value: string): string {
+  try {
+    const url = new URL(value.trim());
+    const candidate = url.searchParams.get(CAMERA_URL_QUERY_PARAM);
+    if (candidate) {
+      return sanitizeCameraUrl(candidate);
+    }
+  } catch {
+    return sanitizeCameraUrl(value);
+  }
+
+  return sanitizeCameraUrl(value);
+}
+
 export function isCameraUrlValid(value: string): boolean {
-  return sanitizeCameraUrl(value).length > 0;
+  return extractCameraUrlFromValue(value).length > 0;
 }
 
 export function buildCameraStreamUrl(value: string): string {
-  const sanitized = sanitizeCameraUrl(value);
+  const sanitized = extractCameraUrlFromValue(value);
 
   if (!sanitized) {
     return '';
   }
 
   return `${sanitized}/stream.html?src=camera&mode=mse`;
+}
+
+export function buildCameraPairingUrl(cameraUrl: string, appUrl = BRAVE_PAWS_PAIRING_URL): string {
+  const sanitizedCameraUrl = sanitizeCameraUrl(cameraUrl);
+  if (!sanitizedCameraUrl) {
+    return '';
+  }
+
+  const pairingUrl = new URL(appUrl);
+  pairingUrl.searchParams.set(CAMERA_URL_QUERY_PARAM, sanitizedCameraUrl);
+  return pairingUrl.toString();
+}
+
+export function getCameraUrlFromSearch(search: string): string {
+  const params = new URLSearchParams(search);
+  return sanitizeCameraUrl(params.get(CAMERA_URL_QUERY_PARAM) || '');
 }
 
 export function getCameraUrlValidationMessage(value: string): string {

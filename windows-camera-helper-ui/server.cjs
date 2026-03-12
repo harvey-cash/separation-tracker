@@ -19,6 +19,7 @@ const isMockMode = process.env.CAMERA_HELPER_MOCK === '1';
 const GO2RTC_ZIP_URL = 'https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_win64.zip';
 const CLOUDFLARED_URL = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe';
 const MOCK_SECURE_URL = 'https://mock-brave-paws-camera.trycloudflare.com';
+const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/fermi/separation';
 const MOCK_DEVICES = {
   video: ['Mock Windows Camera'],
   audio: ['Mock Windows Microphone'],
@@ -57,7 +58,10 @@ async function updateQrCodeDataUrl() {
     return;
   }
 
-  state.qrCodeDataUrl = await QRCode.toDataURL(state.secureUrl, {
+  const pairingUrl = new URL(BRAVE_PAWS_PAIRING_URL);
+  pairingUrl.searchParams.set('cameraUrl', state.secureUrl);
+
+  state.qrCodeDataUrl = await QRCode.toDataURL(pairingUrl.toString(), {
     errorCorrectionLevel: 'M',
     margin: 2,
     width: 360,
