@@ -114,9 +114,19 @@ export function ActiveSession({ session: initialSession, onCompleteSession, onCa
         </button>
       </header>
 
-      <main className="flex-1 max-w-md w-full mx-auto p-6 flex flex-col">
+      <main className="flex-1 max-w-md w-full mx-auto p-4 flex flex-col gap-4">
+        {/* Webcam Area */}
+        <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border-2 border-slate-800">
+           {/* Hardcoded strictly for this prototyping step */}
+           <iframe
+             src="http://127.0.0.1:1984/webrtc.html?src=camera&media=video+audio"
+             className="w-full h-full border-0"
+             allow="autoplay; fullscreen; microphone"
+           />
+        </div>
+
         {/* Central Countdown */}
-        <div className="flex-1 flex flex-col items-center justify-center py-12">
+        <div className="flex-1 flex flex-col items-center justify-center py-6">
           {!isFinished ? (
             <>
               <div className="text-rose-400 font-bold mb-4 uppercase tracking-widest text-sm flex items-center gap-2">
