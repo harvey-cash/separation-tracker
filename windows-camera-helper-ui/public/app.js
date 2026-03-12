@@ -1,9 +1,9 @@
 const elements = {
   videoDevice: document.querySelector('#video-device'),
   audioDevice: document.querySelector('#audio-device'),
+  statusCard: document.querySelector('#status-card'),
   statusText: document.querySelector('#status-text'),
   statusPill: document.querySelector('#status-pill'),
-  ffmpegText: document.querySelector('#ffmpeg-text'),
   startButton: document.querySelector('#start-stream'),
   stopButton: document.querySelector('#stop-stream'),
   refreshButton: document.querySelector('#refresh-devices'),
@@ -18,17 +18,44 @@ const elements = {
   previewIframe: document.querySelector('#preview-iframe'),
   previewEmpty: document.querySelector('#preview-empty'),
   previewPanel: document.querySelector('#preview-panel'),
+  logCard: document.querySelector('#log-card'),
+  toggleLogsButton: document.querySelector('#toggle-logs'),
   logList: document.querySelector('#log-list'),
 };
 
 let currentState = null;
+let areLogsExpanded = false;
+
+function arraysEqual(left = [], right = []) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((value, index) => value === right[index]);
+}
 
 function setStatus(status, detail) {
   elements.statusText.textContent = detail;
   elements.statusPill.textContent = status;
 }
 
+function renderLogCardState() {
+  elements.logCard.classList.toggle('collapsed', !areLogsExpanded);
+  elements.toggleLogsButton.textContent = areLogsExpanded ? 'Hide Logs' : 'Show Logs';
+  elements.toggleLogsButton.setAttribute('aria-expanded', String(areLogsExpanded));
+}
+
 function populateSelect(select, options, fallbackLabel) {
+  const currentOptions = Array.from(select.options).map((option) => option.value);
+  const nextOptions = options.length ? options : [''];
+
+  if (arraysEqual(currentOptions, nextOptions)) {
+    if (!options.length && select.options[0]?.textContent !== fallbackLabel) {
+      select.options[0].textContent = fallbackLabel;
+    }
+    return;
+  }
+
   select.innerHTML = '';
 
   if (!options.length) {
@@ -48,7 +75,13 @@ function populateSelect(select, options, fallbackLabel) {
 }
 
 function setLogs(logs) {
+  const nextLogSignature = logs.join('\n');
+  if (elements.logList.dataset.signature === nextLogSignature) {
+    return;
+  }
+
   elements.logList.innerHTML = '';
+  elements.logList.dataset.signature = nextLogSignature;
 
   if (!logs.length) {
     const item = document.createElement('div');
@@ -70,13 +103,17 @@ function applyPreview(url) {
   if (!url) {
     elements.previewIframe.classList.add('hidden');
     elements.previewEmpty.classList.remove('hidden');
-    elements.previewIframe.removeAttribute('src');
+    if (elements.previewIframe.getAttribute('src')) {
+      elements.previewIframe.removeAttribute('src');
+    }
     elements.openLocalPreview.disabled = true;
     elements.fullscreenPreview.disabled = true;
     return;
   }
 
-  elements.previewIframe.src = url;
+  if (elements.previewIframe.getAttribute('src') !== url) {
+    elements.previewIframe.src = url;
+  }
   elements.previewIframe.classList.remove('hidden');
   elements.previewEmpty.classList.add('hidden');
   elements.openLocalPreview.disabled = false;
@@ -86,8 +123,12 @@ function applyPreview(url) {
 function applyQr(url, remotePreviewUrl, qrCodeDataUrl) {
   if (!url) {
     elements.qrCard.classList.add('hidden');
-    elements.secureUrl.textContent = '';
-    elements.qrImage.removeAttribute('src');
+    if (elements.secureUrl.textContent) {
+      elements.secureUrl.textContent = '';
+    }
+    if (elements.qrImage.getAttribute('src')) {
+      elements.qrImage.removeAttribute('src');
+    }
     elements.openLink.disabled = true;
     elements.copyLink.disabled = true;
     elements.openRemotePreview.disabled = true;
@@ -95,8 +136,12 @@ function applyQr(url, remotePreviewUrl, qrCodeDataUrl) {
   }
 
   elements.qrCard.classList.remove('hidden');
-  elements.secureUrl.textContent = url;
-  elements.qrImage.src = qrCodeDataUrl || '';
+  if (elements.secureUrl.textContent !== url) {
+    elements.secureUrl.textContent = url;
+  }
+  if ((elements.qrImage.getAttribute('src') || '') !== (qrCodeDataUrl || '')) {
+    elements.qrImage.src = qrCodeDataUrl || '';
+  }
   elements.openLink.disabled = false;
   elements.copyLink.disabled = false;
   elements.openRemotePreview.disabled = !remotePreviewUrl;
@@ -119,9 +164,10 @@ function render(state) {
     : 'Ready to start.');
 
   setStatus(statusLabel, detail);
-  elements.ffmpegText.textContent = state.ffmpegAvailable
-    ? `Using ${state.ffmpegPath}`
-    : 'FFmpeg was not found. Place ffmpeg.exe in windows-camera-helper or install it on PATH.';
+  elements.statusCard.classList.toggle(
+    'compact',
+    state.status === 'running' || (state.status === 'idle' && !state.error),
+  );
 
   populateSelect(elements.videoDevice, state.devices.video || [], 'No camera found');
   populateSelect(elements.audioDevice, state.devices.audio || [], 'No microphone found');
@@ -211,6 +257,10 @@ async function pollStatus() {
 elements.refreshButton.addEventListener('click', refreshDevices);
 elements.startButton.addEventListener('click', startStream);
 elements.stopButton.addEventListener('click', stopStream);
+elements.toggleLogsButton.addEventListener('click', () => {
+  areLogsExpanded = !areLogsExpanded;
+  renderLogCardState();
+});
 elements.copyLink.addEventListener('click', async () => {
   if (!currentState?.secureUrl) {
     return;
@@ -242,5 +292,6 @@ elements.fullscreenPreview.addEventListener('click', async () => {
   await elements.previewPanel.requestFullscreen();
 });
 
+renderLogCardState();
 bootstrap();
 setInterval(pollStatus, 3000);

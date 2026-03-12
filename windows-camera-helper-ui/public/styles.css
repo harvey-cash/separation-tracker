@@ -35,7 +35,7 @@ body {
 .shell {
   display: grid;
   grid-template-columns: minmax(360px, 440px) 1fr;
-  min-height: 100vh;
+  height: 100vh;
   gap: 20px;
   padding: 20px;
 }
@@ -50,10 +50,13 @@ body {
 
 .controls-panel {
   border-radius: 28px;
-  padding: 24px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
+  height: calc(100vh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .brand-block h1,
@@ -65,7 +68,7 @@ body {
 }
 
 .brand-block h1 {
-  font-size: clamp(2rem, 3vw, 2.6rem);
+  font-size: clamp(1.55rem, 2.1vw, 2rem);
 }
 
 .lede,
@@ -74,6 +77,11 @@ body {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.brand-block .lede {
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
 .eyebrow,
@@ -86,7 +94,6 @@ body {
 }
 
 .status-card,
-.notice,
 .qr-card,
 .log-card,
 .field select,
@@ -97,44 +104,61 @@ body {
 }
 
 .status-card,
-.notice,
 .qr-card,
 .log-card {
   background: var(--panel-strong);
   border: 1px solid var(--line);
-  padding: 18px;
+  padding: 12px;
 }
 
 .status-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .status-line {
   margin: 4px 0 0;
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 700;
+  line-height: 1.3;
+}
+
+.status-card.compact {
+  padding: 9px 12px;
+  align-items: center;
+}
+
+.status-card.compact .label {
+  display: none;
+}
+
+.status-card.compact .status-line {
+  margin: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-pill {
   background: rgba(23, 128, 109, 0.12);
   color: var(--sage-dark);
-  padding: 10px 12px;
+  padding: 7px 9px;
   border-radius: 999px;
 }
 
 .grid.two-up {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 8px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   font-weight: 500;
 }
 
@@ -142,15 +166,16 @@ body {
   width: 100%;
   border: 1px solid var(--line);
   background: #fff;
-  padding: 14px 16px;
+  padding: 10px 12px;
   font: inherit;
+  font-size: 0.92rem;
   color: var(--ink);
 }
 
 .actions-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
 }
 
 .actions-row.compact {
@@ -159,11 +184,17 @@ body {
 
 .button {
   border: 0;
-  padding: 14px 18px;
+  padding: 10px 11px;
   font: inherit;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
   transition: transform 120ms ease, background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.actions-row > .button {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .button:hover:not(:disabled) {
@@ -194,24 +225,18 @@ body {
   color: var(--sage-dark);
 }
 
-.notice {
+.qr-card {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.qr-card {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
 .qr-card img {
-  width: min(100%, 280px);
+  width: min(100%, 185px);
   aspect-ratio: 1;
   align-self: center;
   background: white;
-  padding: 10px;
+  padding: 6px;
   border-radius: 24px;
   border: 1px solid var(--line);
 }
@@ -232,26 +257,40 @@ body {
 
 .mono-link {
   margin: 0;
-  padding: 12px 14px;
+  padding: 8px 10px;
   border-radius: 18px;
   background: rgba(21, 32, 43, 0.04);
   overflow-wrap: anywhere;
+  font-size: 0.76rem;
 }
 
 .log-card {
-  flex: 1;
-  min-height: 220px;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.log-card.collapsed {
+  padding: 10px 12px;
 }
 
 .log-list {
-  margin-top: 12px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 280px;
+  gap: 6px;
+  max-height: 240px;
   overflow: auto;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   color: var(--muted);
+}
+
+.log-card.collapsed .log-list {
+  display: none;
+}
+
+.toggle-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .log-item {
@@ -261,10 +300,11 @@ body {
 
 .preview-panel {
   min-width: 0;
+  height: calc(100vh - 40px);
 }
 
 .preview-frame-wrap {
-  height: calc(100vh - 40px);
+  height: 100%;
   border-radius: 32px;
   padding: 24px;
   display: flex;
@@ -306,8 +346,26 @@ body {
 }
 
 @media (max-width: 1100px) {
+  body {
+    overflow: auto;
+  }
+
   .shell {
     grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .actions-row {
+    flex-wrap: wrap;
+  }
+
+  .controls-panel,
+  .preview-panel {
+    height: auto;
+  }
+
+  .controls-panel {
+    overflow: visible;
   }
 
   .preview-frame-wrap {
@@ -324,6 +382,10 @@ body {
   .preview-frame-wrap {
     padding: 18px;
     border-radius: 24px;
+  }
+
+  .status-card.compact .status-line {
+    white-space: normal;
   }
 
   .grid.two-up {

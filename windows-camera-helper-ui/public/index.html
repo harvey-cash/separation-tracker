@@ -43,11 +43,6 @@
           <button id="stop-stream" class="button button-ghost" disabled>Stop</button>
         </div>
 
-        <div class="notice" id="ffmpeg-notice">
-          <p class="label">FFmpeg</p>
-          <p id="ffmpeg-text">Checking local FFmpeg availability…</p>
-        </div>
-
         <div class="qr-card hidden" id="qr-card">
           <div class="qr-header">
             <div>
@@ -65,10 +60,15 @@
           <p class="hint">Scan with the phone running Brave Paws, open the link once, and tap I Agree on Cloudflare if it appears.</p>
         </div>
 
-        <div class="log-card">
+        <div class="log-card collapsed" id="log-card">
           <div class="log-header">
-            <p class="label">Activity</p>
-            <span class="log-meta">Latest 120 lines</span>
+            <div>
+              <p class="label">Activity</p>
+              <span class="log-meta">Latest 120 lines</span>
+            </div>
+            <button id="toggle-logs" class="button button-secondary toggle-button" type="button" aria-expanded="false">
+              Show Logs
+            </button>
           </div>
           <div class="log-list" id="log-list"></div>
         </div>
