@@ -74,10 +74,10 @@ export function getCameraUrlFromSearch(search: string): string {
 
 export function getCameraUrlValidationMessage(value: string): string {
   if (!value.trim()) {
-    return 'Add a Cloudflare camera link or scan the QR code from your Windows helper.';
+    return 'Add a stream link or scan the QR code from Brave Paws Streamer.';
   }
 
   return isCameraUrlValid(value)
     ? 'Link looks good. Brave Paws will use it for remote preview.'
-    : 'Use an https link, or http only for localhost testing.';
+    : 'Use a Brave Paws pairing link, a direct https stream link, or http only for localhost testing.';
 }

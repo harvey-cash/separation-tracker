@@ -8,7 +8,7 @@ const { pipeline } = require('node:stream/promises');
 const QRCode = require('qrcode');
 
 const repoRoot = process.pkg ? path.dirname(process.execPath) : path.resolve(__dirname, '..');
-const helperDir = path.join(repoRoot, 'windows-camera-helper');
+const helperDir = path.join(repoRoot, process.pkg ? 'brave-paws-streamer' : 'windows-camera-helper');
 const publicDir = process.pkg
   ? path.join(repoRoot, 'windows-camera-helper-ui', 'public')
   : path.join(__dirname, 'public');
@@ -33,7 +33,6 @@ const state = {
   status: 'idle',
   secureUrl: '',
   localPreviewUrl: '',
-  remotePreviewUrl: '',
   qrCodeDataUrl: '',
   selectedVideo: '',
   selectedAudio: '',
@@ -281,7 +280,6 @@ function attachProcessLogs(proc, label) {
     const urlMatch = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
     if (urlMatch) {
       state.secureUrl = urlMatch[0];
-      state.remotePreviewUrl = `${urlMatch[0]}/stream.html?src=camera&mode=mse`;
       void updateQrCodeDataUrl();
       addLog(`Secure tunnel ready: ${urlMatch[0]}`);
     }
@@ -324,7 +322,6 @@ async function stopStreaming() {
   state.status = 'idle';
   state.secureUrl = '';
   state.localPreviewUrl = '';
-  state.remotePreviewUrl = '';
   state.qrCodeDataUrl = '';
   state.error = '';
   addLog('Streaming stopped.');
@@ -335,12 +332,11 @@ async function startStreaming(videoDevice, audioDevice) {
   state.status = 'bootstrapping';
   state.error = '';
   state.secureUrl = '';
-  state.remotePreviewUrl = '';
   state.qrCodeDataUrl = '';
   state.localPreviewUrl = '';
   state.selectedVideo = videoDevice || '';
   state.selectedAudio = audioDevice || '';
-  addLog('Preparing camera helper...');
+  addLog('Preparing Brave Paws Streamer...');
 
   await ensureDependencies();
 
@@ -349,7 +345,7 @@ async function startStreaming(videoDevice, audioDevice) {
   state.ffmpegAvailable = Boolean(ffmpegPath);
 
   if (!ffmpegPath) {
-    throw new Error('FFmpeg was not found. Install ffmpeg.exe or place it in windows-camera-helper.');
+    throw new Error('FFmpeg was not found. Install ffmpeg.exe or place it in the Brave Paws Streamer folder.');
   }
 
   if (isMockMode) {
@@ -357,9 +353,8 @@ async function startStreaming(videoDevice, audioDevice) {
     state.status = 'starting';
     state.localPreviewUrl = 'http://127.0.0.1:1984/stream.html?src=camera&mode=mse';
     state.secureUrl = MOCK_SECURE_URL;
-    state.remotePreviewUrl = `${MOCK_SECURE_URL}/stream.html?src=camera&mode=mse`;
     await updateQrCodeDataUrl();
-    addLog('Mock mode enabled. Skipping go2rtc and cloudflared startup.');
+    addLog('Mock mode enabled. Skipping live stream startup.');
     addLog(`Secure tunnel ready: ${MOCK_SECURE_URL}`);
     state.status = 'running';
     return buildStatePayload();
@@ -377,7 +372,7 @@ async function startStreaming(videoDevice, audioDevice) {
   });
   attachProcessLogs(go2rtcProc, 'go2rtc');
 
-  addLog('Starting Cloudflare tunnel...');
+  addLog('Starting secure stream link...');
   cloudflaredProc = spawn(path.join(helperDir, 'cloudflared.exe'), ['tunnel', '--url', 'http://127.0.0.1:1984'], {
     cwd: helperDir,
     windowsHide: true,
@@ -389,7 +384,7 @@ async function startStreaming(videoDevice, audioDevice) {
 
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error('Timed out waiting for a Cloudflare URL.'));
+      reject(new Error('Timed out waiting for a secure stream link.'));
     }, 30000);
 
     const poll = setInterval(() => {
@@ -403,7 +398,7 @@ async function startStreaming(videoDevice, audioDevice) {
       if (cloudflaredProc?.exitCode !== null) {
         clearTimeout(timeout);
         clearInterval(poll);
-        reject(new Error('Cloudflared exited before a public URL was ready.'));
+        reject(new Error('Secure stream process exited before a public URL was ready.'));
       }
     }, 250);
   });
@@ -417,7 +412,6 @@ function buildStatePayload() {
     status: state.status,
     secureUrl: state.secureUrl,
     localPreviewUrl: state.localPreviewUrl,
-    remotePreviewUrl: state.remotePreviewUrl,
     qrCodeDataUrl: state.qrCodeDataUrl,
     selectedVideo: state.selectedVideo,
     selectedAudio: state.selectedAudio,
@@ -482,11 +476,11 @@ app.post('/api/stop', async (_request, response) => {
 });
 
 app.listen(port, () => {
-  addLog(`Camera helper UI listening on http://127.0.0.1:${port}`);
+  addLog(`Brave Paws Streamer listening on http://127.0.0.1:${port}`);
   if (isMockMode) {
-    addLog('Camera helper mock mode is enabled.');
+    addLog('Brave Paws Streamer mock mode is enabled.');
   }
-  console.log(`Brave Paws Camera Helper UI running at http://127.0.0.1:${port}`);
+  console.log(`Brave Paws Streamer running at http://127.0.0.1:${port}`);
 
   if (shouldOpenBrowser) {
     spawn('cmd.exe', ['/c', 'start', '', `http://127.0.0.1:${port}`], {

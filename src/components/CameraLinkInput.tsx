@@ -267,10 +267,8 @@ export function CameraLinkInput({
               <Camera size={18} />
             </div>
             <div>
-              <p className="font-medium text-slate-800">Point your phone at the QR code shown on the Windows camera helper.</p>
-              <p className={`${descriptionClass} text-slate-500 mt-1`}>
-                After scanning, open the link once in your browser and tap I Agree on Cloudflare if prompted.
-              </p>
+              <p className="font-medium text-slate-800">Point your phone at the QR code shown by Brave Paws Streamer.</p>
+              <p className={`${descriptionClass} text-slate-500 mt-1`}>Brave Paws will save the paired stream automatically after scanning.</p>
             </div>
           </div>
 
@@ -333,26 +331,18 @@ export function CameraLinkInput({
               <div className="flex items-start gap-2 text-emerald-700">
                 <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium">Camera link detected</p>
+                  <p className="font-medium">Stream link detected</p>
                   <p className="text-xs sm:text-sm break-all font-mono mt-1">{scannedUrl}</p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => window.open(scannedUrl, '_blank', 'noopener,noreferrer')}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-medium text-slate-700 border border-emerald-200 hover:border-emerald-300 transition-colors"
-                >
-                  <ExternalLink size={16} />
-                  Open Link
-                </button>
-                <button
-                  type="button"
                   onClick={applyScannedUrl}
                   className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
                 >
                   <Link2 size={16} />
-                  Use This Link
+                  Use This Stream
                 </button>
               </div>
             </div>
@@ -361,7 +351,7 @@ export function CameraLinkInput({
       ) : (
         <div className="space-y-3">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Cloudflare Camera Link</label>
+            <label className="text-sm font-medium text-slate-700">Stream Link</label>
             <input
               type="url"
               value={manualUrl}
@@ -372,7 +362,7 @@ export function CameraLinkInput({
                   commitManualUrl();
                 }
               }}
-              placeholder="https://name.trycloudflare.com"
+              placeholder="https://harvey.cash/fermi/separation?cameraUrl=..."
               className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-700 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-mono text-sm"
             />
             <p className={`${descriptionClass} ${isCameraUrlValid(manualUrl) ? 'text-emerald-700' : 'text-slate-500'}`}>

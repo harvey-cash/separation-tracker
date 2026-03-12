@@ -68,7 +68,7 @@ test('getCameraUrlFromSearch extracts and sanitizes the deep-link query paramete
 });
 
 test('getCameraUrlValidationMessage explains empty and invalid values', () => {
-  assert.match(getCameraUrlValidationMessage(''), /scan the QR code/i);
-  assert.match(getCameraUrlValidationMessage('invalid'), /https link/i);
+  assert.match(getCameraUrlValidationMessage(''), /Brave Paws Streamer/i);
+  assert.match(getCameraUrlValidationMessage('invalid'), /pairing link/i);
   assert.match(getCameraUrlValidationMessage('https://demo.trycloudflare.com'), /looks good/i);
 });

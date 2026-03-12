@@ -20,7 +20,7 @@ Brave Paws turns that protocol into a guided workflow:
 Session data is stored locally in the browser by default, with optional Google Drive backup if you connect your account.
 
 > For a deeper introduction to the training method, see [INFO.md](INFO.md).
-> For instructions on streaming a Windows laptop webcam into Brave Paws, see [windows-camera-helper/README.md](windows-camera-helper/README.md).
+> For instructions on using Brave Paws Streamer with a Windows laptop webcam, see [windows-camera-helper/README.md](windows-camera-helper/README.md).
 > For release and distribution notes, see [RELEASE.md](RELEASE.md).
 
 ---
@@ -76,7 +76,7 @@ separation-tracker/
 │   ├── csv.test.ts
 │   ├── dashboard-info-button.test.js
 │   └── google-drive.test.ts
-├── windows-camera-helper/        # Windows webcam streaming helper
+├── windows-camera-helper/        # Windows streamer launcher and sidecars
 │   ├── README.md
 │   ├── go2rtc.yaml
 │   ├── setup-and-run.ps1
@@ -131,7 +131,7 @@ The dev server runs on port 3000 with hot-module replacement (HMR) enabled by de
 
 If you want to watch your dog during a training session, Brave Paws can store a camera URL and show that stream during session setup and active training.
 
-For Windows laptops, use the helper in [windows-camera-helper/README.md](windows-camera-helper/README.md). It automates a `go2rtc` plus Cloudflare Tunnel setup, helps you select your webcam and microphone, and gives you a temporary HTTPS URL to paste into the app.
+For Windows laptops, use Brave Paws Streamer in [windows-camera-helper/README.md](windows-camera-helper/README.md). It helps you select your webcam and microphone, starts the live stream, and gives you a QR code that pairs the stream directly with Brave Paws.
 
 Prerequisites for the helper:
 

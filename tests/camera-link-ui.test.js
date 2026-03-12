@@ -11,10 +11,10 @@ test('SessionConfig and ActiveSession use the shared camera link input', () => {
   assert.match(activeSession, /CameraLinkInput/);
 });
 
-test('shared camera link input exposes scan and Cloudflare approval messaging', () => {
+test('shared camera link input exposes Brave Paws Streamer scan messaging', () => {
   const cameraLinkInput = readFileSync(resolve(process.cwd(), 'src/components/CameraLinkInput.tsx'), 'utf8');
 
   assert.match(cameraLinkInput, /Scan QR Code/);
-  assert.match(cameraLinkInput, /tap I Agree on Cloudflare/i);
-  assert.match(cameraLinkInput, /Use This Link/);
+  assert.match(cameraLinkInput, /Brave Paws Streamer/);
+  assert.match(cameraLinkInput, /Use This Stream/);
 });

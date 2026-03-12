@@ -3,20 +3,20 @@
 This repository now produces two kinds of distributable output:
 
 1. The Brave Paws web app build in `dist/`
-2. The Windows camera helper portable bundle in `dist/brave-paws-camera-helper.zip`
+2. The Brave Paws Streamer portable bundle in `dist/brave-paws-streamer.zip`
 
-## For Non-Technical Windows Helper Users
+## For Non-Technical Windows Streamer Users
 
-If you only need the Windows camera helper, use the portable zip:
+If you only need the Windows streamer, use the portable zip:
 
-- [dist/brave-paws-camera-helper.zip](dist/brave-paws-camera-helper.zip)
+- [dist/brave-paws-streamer.zip](dist/brave-paws-streamer.zip)
 
-That zip contains the helper-only files plus the single executable launcher. After extracting it on the Windows laptop:
+That zip contains the streamer files plus the single executable launcher. After extracting it on the Windows laptop:
 
-1. Open the extracted `windows-camera-helper` folder.
+1. Open the extracted `brave-paws-streamer` folder.
 2. Double-click `start-camera-gui.bat`.
 
-The helper opens a local browser UI, lets you start the camera stream, and shows a QR code that Brave Paws can scan directly. The portable zip includes `BravePawsCameraHelper.exe`, so end users do not need Node.js installed separately.
+Brave Paws Streamer opens a local browser UI, lets you start the camera stream, and shows a QR code that Brave Paws can scan directly. The portable zip includes `BravePawsStreamer.exe`, so end users do not need Node.js installed separately.
 
 ## Local Release Commands
 

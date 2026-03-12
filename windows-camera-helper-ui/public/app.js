@@ -9,10 +9,6 @@ const elements = {
   refreshButton: document.querySelector('#refresh-devices'),
   qrCard: document.querySelector('#qr-card'),
   qrImage: document.querySelector('#qr-image'),
-  secureUrl: document.querySelector('#secure-url'),
-  copyLink: document.querySelector('#copy-link'),
-  openLink: document.querySelector('#open-link'),
-  openRemotePreview: document.querySelector('#open-remote-preview'),
   openLocalPreview: document.querySelector('#open-local-preview'),
   fullscreenPreview: document.querySelector('#fullscreen-preview'),
   previewIframe: document.querySelector('#preview-iframe'),
@@ -123,28 +119,16 @@ function applyPreview(url) {
 function applyQr(url, remotePreviewUrl, qrCodeDataUrl) {
   if (!url) {
     elements.qrCard.classList.add('hidden');
-    if (elements.secureUrl.textContent) {
-      elements.secureUrl.textContent = '';
-    }
     if (elements.qrImage.getAttribute('src')) {
       elements.qrImage.removeAttribute('src');
     }
-    elements.openLink.disabled = true;
-    elements.copyLink.disabled = true;
-    elements.openRemotePreview.disabled = true;
     return;
   }
 
   elements.qrCard.classList.remove('hidden');
-  if (elements.secureUrl.textContent !== url) {
-    elements.secureUrl.textContent = url;
-  }
   if ((elements.qrImage.getAttribute('src') || '') !== (qrCodeDataUrl || '')) {
     elements.qrImage.src = qrCodeDataUrl || '';
   }
-  elements.openLink.disabled = false;
-  elements.copyLink.disabled = false;
-  elements.openRemotePreview.disabled = !remotePreviewUrl;
 }
 
 function render(state) {
@@ -158,9 +142,9 @@ function render(state) {
     : 'Idle';
 
   const detail = state.error || (state.status === 'running'
-    ? 'Camera live and QR ready.'
+    ? 'Stream live and pairing QR ready.'
     : state.status === 'starting' || state.status === 'bootstrapping'
-    ? 'Starting camera services and waiting for Cloudflare…'
+    ? 'Starting stream services and preparing your pairing QR…'
     : 'Ready to start.');
 
   setStatus(statusLabel, detail);
@@ -260,23 +244,6 @@ elements.stopButton.addEventListener('click', stopStream);
 elements.toggleLogsButton.addEventListener('click', () => {
   areLogsExpanded = !areLogsExpanded;
   renderLogCardState();
-});
-elements.copyLink.addEventListener('click', async () => {
-  if (!currentState?.secureUrl) {
-    return;
-  }
-
-  await navigator.clipboard.writeText(currentState.secureUrl);
-});
-elements.openLink.addEventListener('click', () => {
-  if (currentState?.secureUrl) {
-    window.open(currentState.secureUrl, '_blank', 'noopener,noreferrer');
-  }
-});
-elements.openRemotePreview.addEventListener('click', () => {
-  if (currentState?.remotePreviewUrl) {
-    window.open(currentState.remotePreviewUrl, '_blank', 'noopener,noreferrer');
-  }
 });
 elements.openLocalPreview.addEventListener('click', () => {
   if (currentState?.localPreviewUrl) {

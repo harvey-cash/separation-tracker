@@ -129,10 +129,10 @@ export function SessionConfig({ initialSession, cameraUrl = '', onCameraUrlChang
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-4">
           <Video className="text-emerald-400" size={20} />
-          <h2 className="text-lg font-bold text-slate-800">Remote Webcam Link (Optional)</h2>
+          <h2 className="text-lg font-bold text-slate-800">Remote Stream Link (Optional)</h2>
         </div>
         <p className="text-sm text-slate-500 mb-4">
-          Scan the QR code from the Windows camera helper, or paste the secure Cloudflare tunnel link if needed.
+          Scan the QR code from Brave Paws Streamer, or paste a pairing link manually if needed.
         </p>
         <CameraLinkInput
           cameraUrl={cameraUrl}

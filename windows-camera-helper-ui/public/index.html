@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Brave Paws Camera Helper</title>
+    <title>Brave Paws Streamer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -14,8 +14,8 @@
       <aside class="panel controls-panel">
         <div class="brand-block">
           <p class="eyebrow">Brave Paws</p>
-          <h1>Camera Helper</h1>
-          <p class="lede">A cleaner one-click flow for your Windows laptop camera, Cloudflare tunnel, QR link, and live preview.</p>
+          <h1>Streamer</h1>
+          <p class="lede">A one-click streamer for your Windows laptop camera, local preview, and Brave Paws pairing QR code.</p>
         </div>
 
         <div class="status-card" id="status-card">
@@ -46,18 +46,12 @@
         <div class="qr-card hidden" id="qr-card">
           <div class="qr-header">
             <div>
-              <p class="label">Phone Pairing</p>
-              <h2>Scan this QR code</h2>
+              <p class="label">Brave Paws Pairing</p>
+              <h2>Scan to connect</h2>
             </div>
-            <button id="copy-link" class="button button-secondary">Copy Link</button>
           </div>
           <img id="qr-image" alt="Camera link QR code" />
-          <p class="mono-link" id="secure-url"></p>
-          <div class="actions-row compact">
-            <button id="open-link" class="button button-secondary">Open Link</button>
-            <button id="open-remote-preview" class="button button-secondary">Open Remote Preview</button>
-          </div>
-          <p class="hint">Scan with the phone running Brave Paws, open the link once, and tap I Agree on Cloudflare if it appears.</p>
+          <p class="hint">Scan with Brave Paws on your phone and the app will save this stream automatically.</p>
         </div>
 
         <div class="log-card collapsed" id="log-card">
@@ -90,7 +84,7 @@
             <div class="preview-placeholder">
               <p class="label">Not live yet</p>
               <h3>Start the camera to see the full-screen preview here.</h3>
-              <p>The preview uses your local go2rtc feed for lower latency while the QR code shares the secure Cloudflare link.</p>
+              <p>The preview stays local on this laptop while Brave Paws uses the paired stream on your phone.</p>
             </div>
           </div>
           <iframe id="preview-iframe" class="preview-iframe hidden" allow="autoplay; fullscreen; microphone"></iframe>

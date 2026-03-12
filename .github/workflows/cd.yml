@@ -12,7 +12,7 @@ on:
       - main
 
 jobs:
-  camera-helper-bundle:
+  streamer-bundle:
     if: ${{ github.event_name == 'push' }}
     runs-on: windows-latest
     permissions:
@@ -25,11 +25,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run camera-helper:bundle
-      - name: Upload portable helper artifact
+      - name: Upload portable streamer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: brave-paws-camera-helper
-          path: dist/brave-paws-camera-helper.zip
+          name: brave-paws-streamer
+          path: dist/brave-paws-streamer.zip
           if-no-files-found: error
 
   release:

@@ -152,7 +152,7 @@ while ($null -eq $secureUrl -and $elapsed -lt $timeout) {
 if ($secureUrl) {
     Clear-Host
     Write-Host "==========================================================" -ForegroundColor Green
-    Write-Host " BRAVE PAWS CAMERA IS LIVE! " -ForegroundColor Green
+    Write-Host " BRAVE PAWS STREAMER IS LIVE! " -ForegroundColor Green
     Write-Host "==========================================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "Your temporary, secure link for this session is:" -ForegroundColor White
@@ -161,9 +161,8 @@ if ($secureUrl) {
     Write-Host ""
     Write-Host "Instructions:" -ForegroundColor Yellow
     Write-Host "1. Keep your laptop open and pointing at your dog's bed."
-    Write-Host "2. IMPORTANT: First visit the link in your phone's browser and click 'I Agree' on the Cloudflare warning page." -ForegroundColor Red
-    Write-Host "3. Open Brave Paws on your phone and start a session."
-    Write-Host "4. Tap 'Link Camera' and paste the URL from above."
+    Write-Host "2. Open Brave Paws on your phone and start a session."
+    Write-Host "3. Paste the URL from above into the remote stream link field."
     Write-Host ""
     Write-Host "==========================================================" -ForegroundColor Green
     Write-Host "Keep this window open. Close it to shut down the feed and " -ForegroundColor White

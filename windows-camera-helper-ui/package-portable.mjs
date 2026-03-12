@@ -8,10 +8,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const distRoot = path.join(repoRoot, 'dist');
-const bundleName = 'brave-paws-camera-helper';
+const legacyBundleName = 'brave-paws-camera-helper';
+const bundleName = 'brave-paws-streamer';
+const legacyBundleRoot = path.join(distRoot, legacyBundleName);
 const bundleRoot = path.join(distRoot, bundleName);
+const legacyZipPath = path.join(distRoot, `${legacyBundleName}.zip`);
 const zipPath = path.join(distRoot, `${bundleName}.zip`);
-const exeName = 'BravePawsCameraHelper.exe';
+const exeName = 'BravePawsStreamer.exe';
 
 function runProcess(command, args, cwd) {
   return new Promise((resolve, reject) => {
@@ -47,10 +50,12 @@ async function main() {
   const rootPackageJson = JSON.parse(await fs.readFile(rootPackageJsonPath, 'utf8'));
 
   await fs.mkdir(distRoot, { recursive: true });
+  await fs.rm(legacyBundleRoot, { recursive: true, force: true });
+  await fs.rm(legacyZipPath, { force: true });
   await fs.rm(bundleRoot, { recursive: true, force: true });
   await fs.rm(zipPath, { force: true });
 
-  await fs.mkdir(path.join(bundleRoot, 'windows-camera-helper'), { recursive: true });
+  await fs.mkdir(path.join(bundleRoot, 'brave-paws-streamer'), { recursive: true });
   await fs.mkdir(path.join(bundleRoot, 'windows-camera-helper-ui'), { recursive: true });
 
   const helperFiles = [
@@ -67,7 +72,7 @@ async function main() {
   for (const fileName of helperFiles) {
     await copyIfExists(
       path.join(repoRoot, 'windows-camera-helper', fileName),
-      path.join(bundleRoot, 'windows-camera-helper', fileName),
+      path.join(bundleRoot, 'brave-paws-streamer', fileName),
     );
   }
 
@@ -89,7 +94,7 @@ async function main() {
   ], repoRoot);
 
   const bundlePackageJson = {
-    name: 'brave-paws-camera-helper',
+    name: 'brave-paws-streamer',
     private: true,
     version: rootPackageJson.version,
   };
@@ -98,17 +103,17 @@ async function main() {
   await fs.writeFile(
     path.join(bundleRoot, 'README.md'),
     [
-      '# Brave Paws Camera Helper Portable Bundle',
+      '# Brave Paws Streamer Portable Bundle',
       '',
-      'This folder contains the Windows camera helper as a single executable launcher plus sidecar streaming binaries.',
+      'This folder contains Brave Paws Streamer as a single executable launcher plus sidecar streaming binaries.',
       '',
       '## Run',
       '',
-      '1. Open the windows-camera-helper folder.',
+      '1. Open the brave-paws-streamer folder.',
       '2. Double-click start-camera-gui.bat.',
       '',
       `The batch launcher starts ${exeName}, which already bundles the Node runtime and helper app.`,
-      'go2rtc.exe, cloudflared.exe, and ffmpeg.exe remain normal sidecar files in the windows-camera-helper folder.',
+      'go2rtc.exe, cloudflared.exe, and ffmpeg.exe remain normal sidecar files in the brave-paws-streamer folder.',
       '',
     ].join('\n'),
     'utf8',
@@ -122,10 +127,10 @@ async function main() {
     ], repoRoot);
   }
 
-  console.log(`Portable helper bundle created at ${bundleRoot}`);
+  console.log(`Portable streamer bundle created at ${bundleRoot}`);
   console.log(`Single-file launcher created at ${path.join(bundleRoot, exeName)}`);
   if (process.platform === 'win32') {
-    console.log(`Portable helper zip created at ${zipPath}`);
+    console.log(`Portable streamer zip created at ${zipPath}`);
   }
 }
 
