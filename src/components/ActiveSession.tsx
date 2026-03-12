@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Session } from '../types';
 import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
@@ -31,13 +31,34 @@ export function ActiveSession({ session: initialSession, onCompleteSession, onCa
     startedAt: null,
     accumulatedMs: 0,
   });
+  const sessionRef = useRef(session);
+  const sessionClockRef = useRef(sessionClock);
+  const currentStepIndexRef = useRef(currentStepIndex);
+  const isStepRunningRef = useRef(isStepRunning);
+  const stepClockRef = useRef(stepClock);
+
+  sessionRef.current = session;
+  sessionClockRef.current = sessionClock;
+  currentStepIndexRef.current = currentStepIndex;
+  isStepRunningRef.current = isStepRunning;
+  stepClockRef.current = stepClock;
+
+  const updateSessionClock = useCallback((clock: TimerClock) => {
+    sessionClockRef.current = clock;
+    setSessionClock(clock);
+  }, []);
+
+  const updateStepClock = useCallback((clock: TimerClock) => {
+    stepClockRef.current = clock;
+    setStepClock(clock);
+  }, []);
 
   const syncSessionElapsed = useCallback((now = Date.now()) => {
-    setSessionElapsed(getElapsedSeconds(sessionClock, now));
-  }, [sessionClock]);
+    setSessionElapsed(getElapsedSeconds(sessionClockRef.current, now));
+  }, []);
 
   const completeStep = useCallback((index: number, now = Date.now()) => {
-    setStepClock({ startedAt: null, accumulatedMs: 0 });
+    updateStepClock({ startedAt: null, accumulatedMs: 0 });
     setStepRemaining(0);
 
     setSession((prev) => {
@@ -46,33 +67,37 @@ export function ActiveSession({ session: initialSession, onCompleteSession, onCa
       return { ...prev, steps: newSteps };
     });
     
-    if (index < session.steps.length - 1) {
-      setCurrentStepIndex(index + 1);
-      setStepRemaining(session.steps[index + 1].durationSeconds);
+    if (index < sessionRef.current.steps.length - 1) {
+      const nextStepIndex = index + 1;
+      currentStepIndexRef.current = nextStepIndex;
+      setCurrentStepIndex(nextStepIndex);
+      setStepRemaining(sessionRef.current.steps[nextStepIndex].durationSeconds);
+      isStepRunningRef.current = false;
       setIsStepRunning(false);
     } else {
       // All steps completed
-      const pausedSessionClock = pauseTimer(sessionClock, now);
-      setSessionClock(pausedSessionClock);
+      const pausedSessionClock = pauseTimer(sessionClockRef.current, now);
+      updateSessionClock(pausedSessionClock);
       setSessionElapsed(getElapsedSeconds(pausedSessionClock, now));
+      isStepRunningRef.current = false;
       setIsStepRunning(false);
       setIsSessionRunning(false);
     }
-  }, [session.steps, sessionClock]);
+  }, [updateSessionClock, updateStepClock]);
 
   const syncStepRemaining = useCallback((now = Date.now()) => {
-    const currentStep = session.steps[currentStepIndex];
+    const currentStep = sessionRef.current.steps[currentStepIndexRef.current];
     if (!currentStep) {
       return;
     }
 
-    const remaining = getRemainingSeconds(currentStep.durationSeconds, stepClock, now);
+    const remaining = getRemainingSeconds(currentStep.durationSeconds, stepClockRef.current, now);
     setStepRemaining(remaining);
 
-    if (isStepRunning && remaining === 0) {
-      completeStep(currentStepIndex, now);
+    if (isStepRunningRef.current && remaining === 0) {
+      completeStep(currentStepIndexRef.current, now);
     }
-  }, [completeStep, currentStepIndex, isStepRunning, session.steps, stepClock]);
+  }, [completeStep]);
 
   // Background Stopwatch
   useEffect(() => {
@@ -133,37 +158,37 @@ export function ActiveSession({ session: initialSession, onCompleteSession, onCa
   const handleToggleSession = () => {
     const now = Date.now();
     if (isSessionRunning) {
-      const pausedClock = pauseTimer(sessionClock, now);
-      setSessionClock(pausedClock);
+      const pausedClock = pauseTimer(sessionClockRef.current, now);
+      updateSessionClock(pausedClock);
       setSessionElapsed(getElapsedSeconds(pausedClock, now));
       setIsSessionRunning(false);
       return;
     }
 
-    setSessionClock((prev) => startTimer(prev, now));
+    updateSessionClock(startTimer(sessionClockRef.current, now));
     setIsSessionRunning(true);
   };
 
   const handleToggleStep = () => {
     const now = Date.now();
     if (isStepRunning) {
-      const pausedClock = pauseTimer(stepClock, now);
-      setStepClock(pausedClock);
+      const pausedClock = pauseTimer(stepClockRef.current, now);
+      updateStepClock(pausedClock);
       setStepRemaining(
-        getRemainingSeconds(session.steps[currentStepIndex]?.durationSeconds || 0, pausedClock, now)
+        getRemainingSeconds(sessionRef.current.steps[currentStepIndexRef.current]?.durationSeconds || 0, pausedClock, now)
       );
       setIsStepRunning(false);
       return;
     }
 
-    setStepClock((prev) => startTimer(prev, now));
+    updateStepClock(startTimer(stepClockRef.current, now));
     setIsStepRunning(true);
   };
 
   const handleFinishSession = () => {
     const now = Date.now();
-    const finalSessionClock = isSessionRunning ? pauseTimer(sessionClock, now) : sessionClock;
-    setSessionClock(finalSessionClock);
+    const finalSessionClock = isSessionRunning ? pauseTimer(sessionClockRef.current, now) : sessionClockRef.current;
+    updateSessionClock(finalSessionClock);
     setSessionElapsed(getElapsedSeconds(finalSessionClock, now));
     setIsSessionRunning(false);
     setIsStepRunning(false);
