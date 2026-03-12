@@ -12,6 +12,9 @@ Write-Host ""
 $go2rtcUrl = "https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_windows_amd64.exe"
 $cloudflaredUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
 
+# 1.1 Force TLS 1.2 for GitHub downloads (prevents "connection was closed unexpectedly" errors)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 if (-Not (Test-Path "$baseDir\go2rtc.exe")) {
     Write-Host "Downloading go2rtc (WebRTC Server)..."
     Invoke-WebRequest -Uri $go2rtcUrl -OutFile "$baseDir\go2rtc.exe"
