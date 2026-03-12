@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
-import { Session, Step } from '../types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Session } from '../types';
 import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
 import { CameraLinkInput } from './CameraLinkInput';
+import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTimer } from '../utils/timer';
 
 type Props = {
   session: Session;
@@ -20,6 +21,10 @@ export function ActiveSession({ session: initialSession, cameraUrl = '', onCamer
   // Overall session stopwatch
   const [isSessionRunning, setIsSessionRunning] = useState(true);
   const [sessionElapsed, setSessionElapsed] = useState(0);
+  const [sessionClock, setSessionClock] = useState<TimerClock>(() => ({
+    startedAt: Date.now(),
+    accumulatedMs: 0,
+  }));
 
   // Current step countdown
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -27,68 +32,174 @@ export function ActiveSession({ session: initialSession, cameraUrl = '', onCamer
   const [stepRemaining, setStepRemaining] = useState(
     session.steps[0]?.durationSeconds || 0
   );
+  const [stepClock, setStepClock] = useState<TimerClock>({
+    startedAt: null,
+    accumulatedMs: 0,
+  });
+  const sessionRef = useRef(session);
+  const sessionClockRef = useRef(sessionClock);
+  const currentStepIndexRef = useRef(currentStepIndex);
+  const isStepRunningRef = useRef(isStepRunning);
+  const stepClockRef = useRef(stepClock);
 
-  const sessionTimerRef = useRef<number | null>(null);
-  const stepTimerRef = useRef<number | null>(null);
+  sessionRef.current = session;
+  sessionClockRef.current = sessionClock;
+  currentStepIndexRef.current = currentStepIndex;
+  isStepRunningRef.current = isStepRunning;
+  stepClockRef.current = stepClock;
 
-  // Background Stopwatch
-  useEffect(() => {
-    if (isSessionRunning) {
-      sessionTimerRef.current = window.setInterval(() => {
-        setSessionElapsed((prev) => prev + 1);
-      }, 1000);
-    } else if (sessionTimerRef.current) {
-      clearInterval(sessionTimerRef.current);
-    }
-    return () => {
-      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
-    };
-  }, [isSessionRunning]);
+  const updateSessionClock = useCallback((clock: TimerClock) => {
+    sessionClockRef.current = clock;
+    setSessionClock(clock);
+  }, []);
 
-  // Step Countdown
-  useEffect(() => {
-    if (isStepRunning && stepRemaining > 0) {
-      stepTimerRef.current = window.setInterval(() => {
-        setStepRemaining((prev) => {
-          if (prev <= 1) {
-            setIsStepRunning(false);
-            handleStepComplete(currentStepIndex);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (stepTimerRef.current) {
-      clearInterval(stepTimerRef.current);
-    }
-    return () => {
-      if (stepTimerRef.current) clearInterval(stepTimerRef.current);
-    };
-  }, [isStepRunning, stepRemaining, currentStepIndex]);
+  const updateStepClock = useCallback((clock: TimerClock) => {
+    stepClockRef.current = clock;
+    setStepClock(clock);
+  }, []);
 
-  const handleStepComplete = (index: number) => {
+  const syncSessionElapsed = useCallback((now = Date.now()) => {
+    setSessionElapsed(getElapsedSeconds(sessionClockRef.current, now));
+  }, []);
+
+  const completeStep = useCallback((index: number, now = Date.now()) => {
+    updateStepClock({ startedAt: null, accumulatedMs: 0 });
+    setStepRemaining(0);
+
     setSession((prev) => {
       const newSteps = [...prev.steps];
       newSteps[index] = { ...newSteps[index], completed: true };
       return { ...prev, steps: newSteps };
     });
     
-    if (index < session.steps.length - 1) {
-      setCurrentStepIndex(index + 1);
-      setStepRemaining(session.steps[index + 1].durationSeconds);
+    if (index < sessionRef.current.steps.length - 1) {
+      const nextStepIndex = index + 1;
+      currentStepIndexRef.current = nextStepIndex;
+      setCurrentStepIndex(nextStepIndex);
+      setStepRemaining(sessionRef.current.steps[nextStepIndex].durationSeconds);
+      isStepRunningRef.current = false;
       setIsStepRunning(false);
     } else {
       // All steps completed
+      const pausedSessionClock = pauseTimer(sessionClockRef.current, now);
+      updateSessionClock(pausedSessionClock);
+      setSessionElapsed(getElapsedSeconds(pausedSessionClock, now));
+      isStepRunningRef.current = false;
+      setIsStepRunning(false);
       setIsSessionRunning(false);
     }
+  }, [updateSessionClock, updateStepClock]);
+
+  const syncStepRemaining = useCallback((now = Date.now()) => {
+    const currentStep = sessionRef.current.steps[currentStepIndexRef.current];
+    if (!currentStep) {
+      return;
+    }
+
+    const remaining = getRemainingSeconds(currentStep.durationSeconds, stepClockRef.current, now);
+    setStepRemaining(remaining);
+
+    if (isStepRunningRef.current && remaining === 0) {
+      completeStep(currentStepIndexRef.current, now);
+    }
+  }, [completeStep]);
+
+  // Background Stopwatch
+  useEffect(() => {
+    syncSessionElapsed();
+    if (!isSessionRunning) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      syncSessionElapsed();
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isSessionRunning, syncSessionElapsed]);
+
+  // Step Countdown
+  useEffect(() => {
+    syncStepRemaining();
+    if (!isStepRunning) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      syncStepRemaining();
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isStepRunning, syncStepRemaining]);
+
+  useEffect(() => {
+    const syncTimers = () => {
+      const now = Date.now();
+      syncSessionElapsed(now);
+      syncStepRemaining(now);
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        syncTimers();
+      }
+    };
+
+    window.addEventListener('focus', syncTimers);
+    window.addEventListener('pageshow', syncTimers);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', syncTimers);
+      window.removeEventListener('pageshow', syncTimers);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [syncSessionElapsed, syncStepRemaining]);
+
+  const handleToggleSession = () => {
+    const now = Date.now();
+    if (isSessionRunning) {
+      const pausedClock = pauseTimer(sessionClockRef.current, now);
+      updateSessionClock(pausedClock);
+      setSessionElapsed(getElapsedSeconds(pausedClock, now));
+      setIsSessionRunning(false);
+      return;
+    }
+
+    updateSessionClock(startTimer(sessionClockRef.current, now));
+    setIsSessionRunning(true);
+  };
+
+  const handleToggleStep = () => {
+    const now = Date.now();
+    if (isStepRunning) {
+      const pausedClock = pauseTimer(stepClockRef.current, now);
+      updateStepClock(pausedClock);
+      setStepRemaining(
+        getRemainingSeconds(sessionRef.current.steps[currentStepIndexRef.current]?.durationSeconds || 0, pausedClock, now)
+      );
+      setIsStepRunning(false);
+      return;
+    }
+
+    updateStepClock(startTimer(stepClockRef.current, now));
+    setIsStepRunning(true);
   };
 
   const handleFinishSession = () => {
+    const now = Date.now();
+    const finalSessionClock = isSessionRunning ? pauseTimer(sessionClockRef.current, now) : sessionClockRef.current;
+    updateSessionClock(finalSessionClock);
+    setSessionElapsed(getElapsedSeconds(finalSessionClock, now));
     setIsSessionRunning(false);
     setIsStepRunning(false);
     onCompleteSession({
       ...session,
-      totalDurationSeconds: sessionElapsed,
+      totalDurationSeconds: getElapsedSeconds(finalSessionClock, now),
     });
   };
 
@@ -103,7 +214,7 @@ export function ActiveSession({ session: initialSession, cameraUrl = '', onCamer
       <header className="bg-rose-900 text-rose-100 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsSessionRunning(!isSessionRunning)}
+            onClick={handleToggleSession}
             className="p-1.5 hover:bg-rose-800 rounded-md transition-colors"
           >
             {isSessionRunning ? <Pause size={18} /> : <Play size={18} />}
@@ -179,7 +290,7 @@ export function ActiveSession({ session: initialSession, cameraUrl = '', onCamer
               
               <div className="flex items-center gap-6">
                 <button
-                  onClick={() => setIsStepRunning(!isStepRunning)}
+                  onClick={handleToggleStep}
                   className="w-24 h-24 flex items-center justify-center bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-lg shadow-rose-200 transition-all active:scale-95"
                 >
                   {isStepRunning ? <Pause size={36} /> : <Play size={36} className="ml-2" fill="currentColor" />}
@@ -188,7 +299,7 @@ export function ActiveSession({ session: initialSession, cameraUrl = '', onCamer
                 <button
                   onClick={() => {
                     setIsStepRunning(false);
-                    handleStepComplete(currentStepIndex);
+                    completeStep(currentStepIndex);
                   }}
                   className="w-16 h-16 flex items-center justify-center bg-white border-2 border-slate-200 hover:border-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 text-slate-400 rounded-full shadow-sm transition-all active:scale-95"
                   title="Mark step complete"
