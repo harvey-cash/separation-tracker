@@ -22,7 +22,6 @@ All Brave Paws App session data is persisted in **browser `localStorage`** with 
 | Icons | Lucide React |
 | Animations | Motion |
 | Date helpers | date-fns |
-| AI (optional) | Google Gemini API via `@google/genai` |
 | Persistence | Browser `localStorage` (key: `csa_tracker_sessions`) |
 
 ---
@@ -85,6 +84,8 @@ type Session = {
   steps: Step[];
   totalDurationSeconds: number;
   anxietyScore?: 0 | 1 | 2;   // 0 = Calm, 1 = Coping, 2 = Panicking
+  exercisedLevel?: 0 | 1 | 2 | 3 | 4 | 5;
+  anyoneHome?: string;
   notes?: string;
   completed: boolean;
 };
@@ -125,7 +126,7 @@ Only `App.tsx` calls `useSessions()`; all child components receive data and call
 
 ### Prerequisites
 
-Node.js 18 or later.
+Node.js 18 or later (CI runs on Node.js 22).
 
 ### Setup
 
@@ -150,6 +151,7 @@ Set `DISABLE_HMR=true` in the environment to disable hot-module replacement (use
 | `npm run camera-helper:gui` | Start Brave Paws Streamer locally |
 | `npm run camera-helper:health` | Run Brave Paws Streamer health check |
 | `npm run camera-helper:bundle` | Build Brave Paws Streamer bundle → `apps/brave-paws-streamer/dist/` |
+| `npm run streamer:test` | Run Brave Paws Streamer unit tests |
 | `npm run clean` | Remove workspace build outputs |
 
 ### Linting / Type Checking
@@ -170,10 +172,8 @@ Validate web-app changes with `npm test`, `npm run lint`, `npm run build`, and o
 
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | For AI features | Google Gemini API key. Inlined into the client bundle by Vite via `process.env.GEMINI_API_KEY`. In AI Studio it is injected automatically. |
 | `APP_URL` | No | Hosting URL for self-referential links. Injected by AI Studio at runtime. |
-
-`GEMINI_API_KEY` is exposed to the browser — **never commit a real key to source control**.
+| `VITE_GOOGLE_CLIENT_ID` | No | OAuth 2.0 Client ID for Google Drive sync. Defaults to the bundled Brave Paws client ID when unset. |
 
 ---
 
@@ -198,8 +198,8 @@ Validate web-app changes with `npm test`, `npm run lint`, `npm run build`, and o
 3. Update `SessionComplete.tsx` (capture the value) and `SessionView.tsx` / `HistoryList.tsx` (display the value).
 4. Update `src/utils/export.ts` if the field should appear in CSV exports.
 
-### Using the Gemini API
-Access the key via `process.env.GEMINI_API_KEY` (inlined at build time by Vite). Import the client from `@google/genai`.
+### Build-time constants
+The Vite config injects `__APP_VERSION__` from the root `package.json` and defines `import.meta.env.VITE_GOOGLE_CLIENT_ID` at build time.
 
 ---
 
@@ -207,7 +207,7 @@ Access the key via `process.env.GEMINI_API_KEY` (inlined at build time by Vite).
 
 - **No router** — Brave Paws App deep-linking to a specific view is not supported; the app always opens on the dashboard.
 - **localStorage only** — data does not persist across browsers or devices.
-- **`GEMINI_API_KEY` is a client-side secret** — it is inlined into the JS bundle; treat it as a low-trust key.
+- **Google Drive sync is client-side OAuth** — keep `VITE_GOOGLE_CLIENT_ID` aligned with the hosted origin if you deploy your own Google Cloud project.
 - **Tailwind v4** — the `@tailwindcss/vite` plugin is used instead of PostCSS. Do not add a `tailwind.config.js` or `postcss.config.js` unless migrating away from v4.
 - **HMR** — disabled when `DISABLE_HMR=true` (AI Studio environment). This is intentional.
 - **Streamer paths are package-local** — keep Brave Paws Streamer path resolution rooted in `apps/brave-paws-streamer`, not the repo root, so packaging and CI remain stable.
