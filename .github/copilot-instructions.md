@@ -7,7 +7,7 @@ This repository is an **npm workspaces monorepo** containing two related applica
 1. **Brave Paws App** in `apps/brave-paws-app`, a client-side React + TypeScript SPA for planning timed training sessions, running countdowns, rating outcomes, and reviewing progress.
 2. **Brave Paws Streamer** in `apps/brave-paws-streamer`, a Windows camera-streaming companion that publishes a secure live stream and pairing QR code for the app.
 
-All Brave Paws App session data is persisted in **browser `localStorage`** — there is no back-end database or server-side API for the web app.
+All Brave Paws App session data is persisted in **browser `localStorage`** with optional Google Drive Cloud sync — there is no back-end database or server-side API for the web app.
 
 ---
 

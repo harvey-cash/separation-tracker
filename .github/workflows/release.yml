@@ -1,4 +1,4 @@
-name: Release
+name: App Release
 
 on:
   workflow_dispatch:
@@ -8,29 +8,7 @@ on:
         required: true
 
 jobs:
-  streamer:
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run camera-helper:bundle
-      - name: Upload streamer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: brave-paws-streamer
-          path: apps/brave-paws-streamer/dist/brave-paws-streamer.zip
-          if-no-files-found: error
-
   release:
-    needs: streamer
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,19 +25,12 @@ jobs:
       - run: npm run build
       - name: Archive build output
         run: cd apps/brave-paws-app && zip -r ../../dist.zip dist/
-      - name: Download streamer artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: brave-paws-streamer
-          path: release-artifacts/
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: ${{ github.event.inputs.version }}
-          files: |
-            dist.zip
-            release-artifacts/brave-paws-streamer.zip
+          files: dist.zip
           generate_release_notes: true
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4

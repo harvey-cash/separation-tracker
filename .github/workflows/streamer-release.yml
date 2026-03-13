@@ -1,0 +1,56 @@
+name: Streamer Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional streamer release tag override (for example streamer-v1.2.3)"
+        required: false
+
+jobs:
+  release:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run camera-helper:bundle
+      - name: Compute release metadata
+        id: release_meta
+        shell: bash
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          TARGET_SHA="${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${TARGET_SHA:0:7}"
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="streamer-v${BASE_VERSION}-${SHORT_SHA}"
+          fi
+          NAME="Brave Paws Streamer ${TAG#streamer-}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.name }}
+          target_commitish: ${{ steps.release_meta.outputs.target_sha }}
+          files: apps/brave-paws-streamer/dist/brave-paws-streamer.zip
+          make_latest: false
+          generate_release_notes: true
