@@ -8,4 +8,6 @@ test('Dashboard includes prominent and subtle info entry points', () => {
 
   assert.match(dashboard, /recentSessions\.length === 0[\s\S]*New to separation anxiety training\?/);
   assert.match(dashboard, /recentSessions\.length > 0[\s\S]*About separation anxiety training/);
+  assert.match(dashboard, /Brave Paws Streamer/);
+  assert.match(dashboard, /https:\/\/github\.com\/harvey-cash\/separation-tracker\/releases\/latest/);
 });

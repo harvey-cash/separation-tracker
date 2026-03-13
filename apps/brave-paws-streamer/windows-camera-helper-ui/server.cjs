@@ -2,13 +2,14 @@ const express = require('express');
 const https = require('node:https');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { createWriteStream, existsSync } = require('node:fs');
+const { createWriteStream, existsSync, readFileSync } = require('node:fs');
 const fs = require('node:fs/promises');
 const { pipeline } = require('node:stream/promises');
 const QRCode = require('qrcode');
 const { STREAMER_DEPENDENCIES } = require('./streamer-assets.cjs');
 
 const packageRoot = process.pkg ? path.dirname(process.execPath) : path.resolve(__dirname, '..');
+const workspaceRoot = process.pkg ? packageRoot : path.resolve(packageRoot, '..', '..');
 const helperDir = path.join(packageRoot, process.pkg ? 'brave-paws-streamer' : 'windows-camera-helper');
 const publicDir = process.pkg
   ? path.join(packageRoot, 'windows-camera-helper-ui', 'public')
@@ -16,6 +17,7 @@ const publicDir = process.pkg
 const port = Number(process.env.CAMERA_HELPER_PORT || 4380);
 const shouldOpenBrowser = process.env.CAMERA_HELPER_NO_OPEN !== '1';
 const isMockMode = process.env.CAMERA_HELPER_MOCK === '1';
+const appVersion = getAppVersion();
 
 const MOCK_SECURE_URL = 'https://mock-brave-paws-camera.trycloudflare.com';
 const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/fermi/separation';
@@ -48,6 +50,16 @@ const state = {
 function addLog(message) {
   const line = `[${new Date().toLocaleTimeString()}] ${message}`;
   state.logs = [line, ...state.logs].slice(0, 120);
+}
+
+function getAppVersion() {
+  try {
+    const packageJsonPath = path.join(workspaceRoot, 'package.json');
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+    return packageJson.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 async function updateQrCodeDataUrl() {
@@ -456,6 +468,7 @@ async function startStreaming(videoDevice, audioDevice) {
 
 function buildStatePayload() {
   return {
+    appVersion,
     status: state.status,
     secureUrl: state.secureUrl,
     localPreviewUrl: state.localPreviewUrl,
