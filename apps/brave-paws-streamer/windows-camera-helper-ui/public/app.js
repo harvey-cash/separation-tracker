@@ -23,13 +23,14 @@ const elements = {
 
 let currentState = null;
 let areLogsExpanded = false;
+const clockFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
 
 function renderClock() {
-  elements.currentTime.textContent = new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date());
+  elements.currentTime.textContent = clockFormatter.format(new Date());
 }
 
 function arraysEqual(left = [], right = []) {
