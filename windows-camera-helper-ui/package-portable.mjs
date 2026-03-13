@@ -47,6 +47,10 @@ async function copyIfExists(sourcePath, destinationPath) {
   await fs.cp(sourcePath, destinationPath, { recursive: true });
 }
 
+function isMainModule() {
+  return Boolean(process.argv[1]) && path.resolve(process.argv[1]) === __filename;
+}
+
 async function main() {
   const rootPackageJsonPath = path.join(repoRoot, 'package.json');
   const rootPackageJson = JSON.parse(await fs.readFile(rootPackageJsonPath, 'utf8'));
@@ -110,7 +114,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+if (isMainModule()) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;

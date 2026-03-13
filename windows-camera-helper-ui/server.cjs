@@ -132,24 +132,28 @@ function escapePowerShellPath(filePath) {
 }
 
 async function extractFileFromZip(zipPath, extractedFileName, destinationPath) {
-  const extractDir = path.join(helperDir, `${path.basename(extractedFileName, path.extname(extractedFileName))}-extract`);
+  const tempExtractionDir = path.join(
+    helperDir,
+    `${path.basename(extractedFileName, path.extname(extractedFileName))}-extract-${Date.now()}-${process.pid}`,
+  );
+  const escapedExtractedFileName = escapePowerShellPath(extractedFileName);
 
-  await fs.rm(extractDir, { recursive: true, force: true });
-  await fs.mkdir(extractDir, { recursive: true });
+  await fs.rm(tempExtractionDir, { recursive: true, force: true });
+  await fs.mkdir(tempExtractionDir, { recursive: true });
 
   try {
     await runProcess('powershell.exe', [
       '-NoProfile',
       '-Command',
-      `Expand-Archive -Path '${escapePowerShellPath(zipPath)}' -DestinationPath '${escapePowerShellPath(extractDir)}' -Force`,
+      `Expand-Archive -Path '${escapePowerShellPath(zipPath)}' -DestinationPath '${escapePowerShellPath(tempExtractionDir)}' -Force`,
     ]);
 
     const { stdout } = await runProcess('powershell.exe', [
       '-NoProfile',
       '-Command',
       [
-        `$file = Get-ChildItem -Path '${escapePowerShellPath(extractDir)}' -Recurse -File -Filter '${escapePowerShellPath(extractedFileName)}' | Select-Object -First 1 -ExpandProperty FullName`,
-        `if (-not $file) { throw 'Unable to locate ${extractedFileName} in downloaded archive.' }`,
+        `$file = Get-ChildItem -Path '${escapePowerShellPath(tempExtractionDir)}' -Recurse -File -Filter '${escapedExtractedFileName}' | Select-Object -First 1 -ExpandProperty FullName`,
+        `if (-not $file) { throw "Unable to locate ${escapedExtractedFileName} in the downloaded archive. Check your internet connection and try again." }`,
         'Write-Output $file',
       ].join('; '),
     ]);
@@ -160,13 +164,13 @@ async function extractFileFromZip(zipPath, extractedFileName, destinationPath) {
       .find(Boolean);
 
     if (!extractedPath) {
-      throw new Error(`Unable to locate ${extractedFileName} in downloaded archive.`);
+      throw new Error(`Unable to locate ${extractedFileName} in the downloaded archive. Check your internet connection and try again.`);
     }
 
     await fs.copyFile(extractedPath, destinationPath);
   } finally {
     await fs.rm(zipPath, { force: true });
-    await fs.rm(extractDir, { recursive: true, force: true });
+    await fs.rm(tempExtractionDir, { recursive: true, force: true });
   }
 }
 
@@ -183,7 +187,7 @@ async function ensureDependencies() {
       continue;
     }
 
-    if (dependency.name === 'ffmpeg') {
+    if (dependency.checkSystemPath) {
       const existingFfmpegPath = await resolveFfmpegPath();
       if (existingFfmpegPath) {
         continue;
@@ -388,7 +392,7 @@ async function startStreaming(videoDevice, audioDevice) {
   state.ffmpegAvailable = Boolean(ffmpegPath);
 
   if (!ffmpegPath) {
-    throw new Error('FFmpeg was not available after the Brave Paws Streamer setup completed.');
+    throw new Error('Failed to download or locate FFmpeg after setup. Check your internet connection and try again.');
   }
 
   if (isMockMode) {

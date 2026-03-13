@@ -13,7 +13,10 @@ const {
 test('portable bundle keeps BravePawsStreamer.exe as the only launch entry point', () => {
   assert.equal(STREAMER_EXE_NAME, 'BravePawsStreamer.exe');
   assert.deepEqual(STREAMER_SUPPORT_FILES, ['README.md', 'go2rtc.yaml']);
-  assert.equal(STREAMER_SUPPORT_FILES.some((fileName) => /\.(bat|ps1)$/i.test(fileName)), false);
+  assert.ok(
+    !STREAMER_SUPPORT_FILES.some((fileName) => /\.(bat|ps1)$/i.test(fileName)),
+    'Support files should not include .bat or .ps1 launcher scripts',
+  );
 });
 
 test('streamer dependency manifest auto-downloads go2rtc, cloudflared, and ffmpeg', () => {

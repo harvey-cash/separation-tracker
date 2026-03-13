@@ -21,6 +21,7 @@ const STREAMER_DEPENDENCIES = [
     downloadUrl: 'https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip',
     archiveFileName: 'ffmpeg.zip',
     extractedFileName: 'ffmpeg.exe',
+    checkSystemPath: true,
     logLabel: 'FFmpeg',
   },
 ];
@@ -38,7 +39,7 @@ function getPortableBundleReadmeLines(exeName = STREAMER_EXE_NAME) {
     `1. Double-click ${exeName}.`,
     '2. Wait for the local Brave Paws Streamer page to open in your browser.',
     '',
-    'On first launch, Brave Paws Streamer creates the brave-paws-streamer helper folder automatically and downloads go2rtc, cloudflared, and ffmpeg there if they are missing.',
+    'On first launch, Brave Paws Streamer creates a brave-paws-streamer helper subfolder next to the executable and downloads go2rtc, cloudflared, and ffmpeg there if they are missing.',
     '',
   ];
 }
