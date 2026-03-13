@@ -90,33 +90,8 @@ body {
   line-height: 1.4;
 }
 
-.brand-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.meta-card {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid var(--line);
-}
-
-.clock-display,
 .version-text {
   margin: 0;
-}
-
-.clock-display {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.3rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
 }
 
 .version-text {
@@ -291,6 +266,27 @@ body {
   align-items: flex-start;
 }
 
+.preview-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.preview-clock {
+  margin: 0;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
 .mono-link,
 .log-list {
   font-family: 'JetBrains Mono', monospace;
@@ -431,10 +427,5 @@ body {
 
   .grid.two-up {
     grid-template-columns: 1fr;
-  }
-
-  .brand-meta {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
