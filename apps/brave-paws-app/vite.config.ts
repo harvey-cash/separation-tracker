@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
-const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
+const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf-8'));
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -17,7 +17,7 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(__dirname, 'src'),
       },
     },
     define: {

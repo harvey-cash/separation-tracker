@@ -29,7 +29,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: brave-paws-streamer
-          path: dist/brave-paws-streamer.zip
+          path: apps/brave-paws-streamer/dist/brave-paws-streamer.zip
           if-no-files-found: error
 
   release:
@@ -58,7 +58,7 @@ jobs:
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
       - run: npm run build
       - name: Archive build output
-        run: zip -r dist.zip dist/
+        run: cd apps/brave-paws-app && zip -r ../../dist.zip dist/
       - name: Commit and push version bump
         run: |
           git config user.name "github-actions[bot]"
@@ -81,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: apps/brave-paws-app/dist/
 
   deploy:
     needs: release
@@ -94,7 +94,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: site-dist/
       - name: Checkout website repo
         uses: actions/checkout@v4
         with:
@@ -105,7 +105,7 @@ jobs:
         run: |
           rm -rf website/fermi/separation
           mkdir -p website/fermi/separation
-          cp -r dist/* website/fermi/separation/
+          cp -r site-dist/* website/fermi/separation/
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:

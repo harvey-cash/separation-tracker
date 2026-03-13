@@ -8,10 +8,10 @@ const { pipeline } = require('node:stream/promises');
 const QRCode = require('qrcode');
 const { STREAMER_DEPENDENCIES } = require('./streamer-assets.cjs');
 
-const repoRoot = process.pkg ? path.dirname(process.execPath) : path.resolve(__dirname, '..');
-const helperDir = path.join(repoRoot, process.pkg ? 'brave-paws-streamer' : 'windows-camera-helper');
+const packageRoot = process.pkg ? path.dirname(process.execPath) : path.resolve(__dirname, '..');
+const helperDir = path.join(packageRoot, process.pkg ? 'brave-paws-streamer' : 'windows-camera-helper');
 const publicDir = process.pkg
-  ? path.join(repoRoot, 'windows-camera-helper-ui', 'public')
+  ? path.join(packageRoot, 'windows-camera-helper-ui', 'public')
   : path.join(__dirname, 'public');
 const port = Number(process.env.CAMERA_HELPER_PORT || 4380);
 const shouldOpenBrowser = process.env.CAMERA_HELPER_NO_OPEN !== '1';
@@ -531,7 +531,7 @@ app.listen(port, () => {
 
   if (shouldOpenBrowser) {
     spawn('cmd.exe', ['/c', 'start', '', `http://127.0.0.1:${port}`], {
-      cwd: repoRoot,
+      cwd: packageRoot,
       detached: true,
       windowsHide: true,
       shell: false,

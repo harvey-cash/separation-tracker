@@ -13,13 +13,13 @@ Brave Paws Streamer:
 4. Renders the QR code locally on the laptop, so the streamer UI does not depend on any external QR image service.
 5. Automatically downloads `go2rtc`, `cloudflared`, and `ffmpeg` into the helper folder on first launch if they are missing.
 
-Note: during local development the streamer runs from the repo root with `node windows-camera-helper-ui/server.cjs` or `npm run camera-helper:gui`. The packaged bundle includes `BravePawsStreamer.exe`, so end users do not need Node.js installed separately.
+Note: during local development the streamer runs from the `apps/brave-paws-streamer/` workspace with `node windows-camera-helper-ui/server.cjs` or, from the repo root, `npm run camera-helper:gui`. The packaged bundle includes `BravePawsStreamer.exe`, so end users do not need Node.js installed separately.
 
 ## Packaging And Validation
 
-From the repo root, you can now run:
+From the repo root, you can run:
 1. `npm run camera-helper:health` to boot the streamer, start a real tunnel with the first detected devices, verify the QR payload, and stop everything again.
-2. `npm run camera-helper:bundle` to build `dist/brave-paws-streamer` and a matching zip containing the single executable entry point.
+2. `npm run camera-helper:bundle` to build `apps/brave-paws-streamer/dist/brave-paws-streamer` and a matching zip containing the single executable entry point.
 
 The portable bundle removes the need for both a repo checkout and a separate Node.js install on the target laptop.
 

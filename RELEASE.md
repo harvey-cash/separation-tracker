@@ -2,14 +2,14 @@
 
 This repository now produces two kinds of distributable output:
 
-1. The Brave Paws web app build in `dist/`
-2. The Brave Paws Streamer portable bundle in `dist/brave-paws-streamer.zip`
+1. The Brave Paws web app build in `apps/brave-paws-app/dist/`
+2. The Brave Paws Streamer portable bundle in `apps/brave-paws-streamer/dist/brave-paws-streamer.zip`
 
 ## For Non-Technical Windows Streamer Users
 
 If you only need the Windows streamer, use the portable zip:
 
-- [dist/brave-paws-streamer.zip](dist/brave-paws-streamer.zip)
+- [apps/brave-paws-streamer/dist/brave-paws-streamer.zip](apps/brave-paws-streamer/dist/brave-paws-streamer.zip)
 
 That zip contains the streamer files with `BravePawsStreamer.exe` as the single entry point. After extracting it on the Windows laptop:
 
@@ -25,7 +25,7 @@ From the repo root:
 1. `npm run camera-helper:health`
    Validates the Windows helper API end to end.
 2. `npm run camera-helper:bundle`
-   Builds the portable helper folder and zip in `dist/`.
+   Builds the portable helper folder and zip in `apps/brave-paws-streamer/dist/`.
 3. `npm run build`
    Builds the main Brave Paws web app.
 

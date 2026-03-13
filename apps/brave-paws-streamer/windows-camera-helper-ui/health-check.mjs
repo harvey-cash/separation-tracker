@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '..');
+const packageRoot = path.resolve(__dirname, '..');
 const port = Number(process.env.CAMERA_HELPER_PORT || 4381);
 const serverUrl = `http://127.0.0.1:${port}`;
 const useMockMode = process.env.CAMERA_HELPER_MOCK === '1';
@@ -39,7 +39,7 @@ async function waitForServer() {
 
 async function main() {
   const serverProcess = spawn(process.execPath, ['windows-camera-helper-ui/server.cjs'], {
-    cwd: repoRoot,
+    cwd: packageRoot,
     windowsHide: true,
     env: {
       ...process.env,
