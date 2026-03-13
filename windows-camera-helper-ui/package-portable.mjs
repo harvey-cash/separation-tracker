@@ -3,18 +3,20 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
+import streamerAssets from './streamer-assets.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const distRoot = path.join(repoRoot, 'dist');
-const legacyBundleName = 'brave-paws-camera-helper';
 const bundleName = 'brave-paws-streamer';
-const legacyBundleRoot = path.join(distRoot, legacyBundleName);
 const bundleRoot = path.join(distRoot, bundleName);
-const legacyZipPath = path.join(distRoot, `${legacyBundleName}.zip`);
 const zipPath = path.join(distRoot, `${bundleName}.zip`);
-const exeName = 'BravePawsStreamer.exe';
+const {
+  STREAMER_EXE_NAME: exeName,
+  STREAMER_SUPPORT_FILES: portableSupportFiles,
+  getPortableBundleReadmeLines,
+} = streamerAssets;
 
 function runProcess(command, args, cwd) {
   return new Promise((resolve, reject) => {
@@ -45,31 +47,22 @@ async function copyIfExists(sourcePath, destinationPath) {
   await fs.cp(sourcePath, destinationPath, { recursive: true });
 }
 
+function isMainModule() {
+  return Boolean(process.argv[1]) && path.resolve(process.argv[1]) === __filename;
+}
+
 async function main() {
   const rootPackageJsonPath = path.join(repoRoot, 'package.json');
   const rootPackageJson = JSON.parse(await fs.readFile(rootPackageJsonPath, 'utf8'));
 
   await fs.mkdir(distRoot, { recursive: true });
-  await fs.rm(legacyBundleRoot, { recursive: true, force: true });
-  await fs.rm(legacyZipPath, { force: true });
   await fs.rm(bundleRoot, { recursive: true, force: true });
   await fs.rm(zipPath, { force: true });
 
   await fs.mkdir(path.join(bundleRoot, 'brave-paws-streamer'), { recursive: true });
   await fs.mkdir(path.join(bundleRoot, 'windows-camera-helper-ui'), { recursive: true });
 
-  const helperFiles = [
-    'README.md',
-    'start-camera-gui.bat',
-    'start-camera.bat',
-    'setup-and-run.ps1',
-    'go2rtc.exe',
-    'cloudflared.exe',
-    'ffmpeg.exe',
-    'go2rtc.yaml',
-  ];
-
-  for (const fileName of helperFiles) {
+  for (const fileName of portableSupportFiles) {
     await copyIfExists(
       path.join(repoRoot, 'windows-camera-helper', fileName),
       path.join(bundleRoot, 'brave-paws-streamer', fileName),
@@ -102,20 +95,7 @@ async function main() {
   await fs.writeFile(path.join(bundleRoot, 'package.json'), `${JSON.stringify(bundlePackageJson, null, 2)}\n`, 'utf8');
   await fs.writeFile(
     path.join(bundleRoot, 'README.md'),
-    [
-      '# Brave Paws Streamer Portable Bundle',
-      '',
-      'This folder contains Brave Paws Streamer as a single executable launcher plus sidecar streaming binaries.',
-      '',
-      '## Run',
-      '',
-      '1. Open the brave-paws-streamer folder.',
-      '2. Double-click start-camera-gui.bat.',
-      '',
-      `The batch launcher starts ${exeName}, which already bundles the Node runtime and helper app.`,
-      'go2rtc.exe, cloudflared.exe, and ffmpeg.exe remain normal sidecar files in the brave-paws-streamer folder.',
-      '',
-    ].join('\n'),
+    getPortableBundleReadmeLines(exeName).join('\n'),
     'utf8',
   );
 
@@ -134,7 +114,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (isMainModule()) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

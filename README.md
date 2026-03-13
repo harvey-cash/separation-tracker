@@ -76,11 +76,9 @@ separation-tracker/
 │   ├── csv.test.ts
 │   ├── dashboard-info-button.test.js
 │   └── google-drive.test.ts
-├── windows-camera-helper/        # Windows streamer launcher and sidecars
+├── windows-camera-helper/        # Windows streamer docs and runtime config
 │   ├── README.md
 │   ├── go2rtc.yaml
-│   ├── setup-and-run.ps1
-│   └── start-camera.bat
 └── src/
     ├── main.tsx                  # React entry point
     ├── App.tsx                   # Root component and view-state router
@@ -133,10 +131,7 @@ If you want to watch your dog during a training session, Brave Paws can store a 
 
 For Windows laptops, use Brave Paws Streamer in [windows-camera-helper/README.md](windows-camera-helper/README.md). It helps you select your webcam and microphone, starts the live stream, and gives you a QR code that pairs the stream directly with Brave Paws.
 
-Prerequisites for the helper:
-
-- Windows 10 or 11
-- `ffmpeg.exe` available on the machine or placed inside `windows-camera-helper/`
+The packaged Windows bundle uses `BravePawsStreamer.exe` as the single entry point and downloads `go2rtc`, `cloudflared`, and `ffmpeg` automatically on first launch when needed.
 
 ---
 
