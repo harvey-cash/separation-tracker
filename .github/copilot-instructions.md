@@ -2,9 +2,12 @@
 
 ## Project Overview
 
-**Brave Paws** is a client-side React + TypeScript single-page application that guides dog owners through a gradual-desensitisation training programme for canine separation anxiety. The app lets users plan timed training sessions, run live countdowns, rate each session, and review progress over time via a history list and chart.
+This repository is an **npm workspaces monorepo** containing two related applications:
 
-All data is persisted in **browser `localStorage`** — there is no back-end database or server-side API.
+1. **Brave Paws App** in `apps/brave-paws-app`, a client-side React + TypeScript SPA for planning timed training sessions, running countdowns, rating outcomes, and reviewing progress.
+2. **Brave Paws Streamer** in `apps/brave-paws-streamer`, a Windows camera-streaming companion that publishes a secure live stream and pairing QR code for the app.
+
+All Brave Paws App session data is persisted in **browser `localStorage`** with optional Google Drive Cloud sync — there is no back-end database or server-side API for the web app.
 
 ---
 
@@ -28,33 +31,41 @@ All data is persisted in **browser `localStorage`** — there is no back-end dat
 
 ```
 separation-tracker/
-├── index.html              # Vite HTML entry point
-├── vite.config.ts          # Vite config: React + Tailwind plugins, GEMINI_API_KEY inlining, HMR toggle
-├── tsconfig.json           # TypeScript config
-├── package.json            # Scripts: dev / build / preview / lint / clean
-├── .env.example            # Environment variable template
-├── metadata.json           # Google AI Studio app metadata
-└── src/
-    ├── main.tsx            # ReactDOM.createRoot entry
-    ├── App.tsx             # Root component — view-state router (see View type)
-    ├── types.ts            # Shared types: Session, Step
-    ├── store.ts            # useSessions hook — CRUD over localStorage
-    ├── index.css           # Global CSS (Tailwind base import)
-    ├── components/
-    │   ├── Dashboard.tsx        # Home: recent sessions, nav to history/graph
-    │   ├── SessionConfig.tsx    # Pre-session step planner (add/remove/reorder steps)
-    │   ├── ActiveSession.tsx    # Live per-step countdown + overall stopwatch
-    │   ├── SessionComplete.tsx  # Post-session anxiety rating + notes
-    │   ├── SessionView.tsx      # Read-only detail view of a saved session
-    │   ├── SessionEditModal.tsx # Modal to edit a saved session inline
-    │   ├── SessionRunner.tsx    # Reusable session-running logic (used by ActiveSession)
-    │   ├── SessionSetup.tsx     # Reusable step-setup logic (used by SessionConfig)
-    │   ├── GraphView.tsx        # Line chart: max independence time per session
-    │   ├── HistoryList.tsx      # Full history with edit, delete, CSV export/import
-    │   └── DurationInput.tsx    # Minutes + seconds input widget
-    └── utils/
-        ├── export.ts       # exportToCSV / parseCSV helpers
-        └── format.ts       # formatDuration / formatTime helpers
+├── apps/
+│   ├── brave-paws-app/
+│   │   ├── package.json         # App scripts: dev / build / preview / test / lint / test:e2e
+│   │   ├── index.html           # Vite HTML entry point
+│   │   ├── vite.config.ts       # Vite config: React + Tailwind plugins, root version injection
+│   │   ├── tsconfig.json        # TypeScript config
+│   │   ├── playwright.config.ts # Playwright config for e2e
+│   │   ├── .env.example         # Environment variable template
+│   │   ├── INFO.md              # Training-method background
+│   │   ├── src/
+│   │   │   ├── main.tsx         # ReactDOM.createRoot entry
+│   │   │   ├── App.tsx          # Root component — view-state router (see View type)
+│   │   │   ├── types.ts         # Shared types: Session, Step
+│   │   │   ├── store.ts         # useSessions hook — CRUD over localStorage
+│   │   │   ├── index.css        # Global styles
+│   │   │   ├── components/
+│   │   │   ├── hooks/
+│   │   │   └── utils/
+│   │   ├── tests/               # App unit tests
+│   │   └── e2e/                 # App Playwright tests
+│   └── brave-paws-streamer/
+│       ├── package.json         # Streamer scripts: gui / health / bundle / test
+│       ├── tests/               # Streamer unit tests
+│       ├── windows-camera-helper/
+│       │   ├── README.md
+│       │   └── go2rtc.yaml
+│       └── windows-camera-helper-ui/
+│           ├── public/
+│           ├── server.cjs
+│           ├── health-check.mjs
+│           ├── package-portable.mjs
+│           └── streamer-assets.cjs
+├── package.json                 # Root workspace scripts and shared version
+├── package-lock.json            # Shared lockfile
+└── RELEASE.md                   # Release and artifact notes
 ```
 
 ---
@@ -120,8 +131,7 @@ Node.js 18 or later.
 
 ```bash
 npm install
-cp .env.example .env.local
-# Edit .env.local and set GEMINI_API_KEY="<your-key>"
+cp apps/brave-paws-app/.env.example apps/brave-paws-app/.env.local
 npm run dev          # http://localhost:3000 with HMR
 ```
 
@@ -131,23 +141,28 @@ Set `DISABLE_HMR=true` in the environment to disable hot-module replacement (use
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Vite dev server on port 3000 |
-| `npm run build` | Type-check + production bundle → `dist/` |
-| `npm run preview` | Serve `dist/` locally |
-| `npm run lint` | `tsc --noEmit` — catches type errors (the only lint step) |
-| `npm run clean` | Remove `dist/` |
+| `npm run dev` | Delegate to Brave Paws App dev server on port 3000 |
+| `npm run build` | Build Brave Paws App → `apps/brave-paws-app/dist/` |
+| `npm run preview` | Preview Brave Paws App build |
+| `npm run lint` | `tsc --noEmit` in the Brave Paws App workspace |
+| `npm test` | Run Brave Paws App unit tests |
+| `npm run test:e2e` | Run Brave Paws App Playwright tests |
+| `npm run camera-helper:gui` | Start Brave Paws Streamer locally |
+| `npm run camera-helper:health` | Run Brave Paws Streamer health check |
+| `npm run camera-helper:bundle` | Build Brave Paws Streamer bundle → `apps/brave-paws-streamer/dist/` |
+| `npm run clean` | Remove workspace build outputs |
 
 ### Linting / Type Checking
 
 ```bash
-npm run lint    # tsc --noEmit
+npm run lint
 ```
 
 There is **no ESLint or Prettier** configured. Type correctness is the only automated check.
 
 ### Testing
 
-There are **no automated tests** in this repository. Validate changes by running `npm run lint` and manually exercising the dev server.
+Validate web-app changes with `npm test`, `npm run lint`, `npm run build`, and optionally `npm run test:e2e`. Validate streamer changes with `npm run streamer:test`, `npm run camera-helper:health`, and `npm run camera-helper:bundle` on Windows when packaging or runtime behavior is affected.
 
 ---
 
@@ -190,8 +205,9 @@ Access the key via `process.env.GEMINI_API_KEY` (inlined at build time by Vite).
 
 ## Known Limitations / Gotchas
 
-- **No router** — deep-linking to a specific view is not supported; the app always opens on the dashboard.
+- **No router** — Brave Paws App deep-linking to a specific view is not supported; the app always opens on the dashboard.
 - **localStorage only** — data does not persist across browsers or devices.
 - **`GEMINI_API_KEY` is a client-side secret** — it is inlined into the JS bundle; treat it as a low-trust key.
 - **Tailwind v4** — the `@tailwindcss/vite` plugin is used instead of PostCSS. Do not add a `tailwind.config.js` or `postcss.config.js` unless migrating away from v4.
 - **HMR** — disabled when `DISABLE_HMR=true` (AI Studio environment). This is intentional.
+- **Streamer paths are package-local** — keep Brave Paws Streamer path resolution rooted in `apps/brave-paws-streamer`, not the repo root, so packaging and CI remain stable.

@@ -7,8 +7,9 @@ import streamerAssets from './streamer-assets.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '..');
-const distRoot = path.join(repoRoot, 'dist');
+const packageRoot = path.resolve(__dirname, '..');
+const workspaceRoot = path.resolve(packageRoot, '..', '..');
+const distRoot = path.join(packageRoot, 'dist');
 const bundleName = 'brave-paws-streamer';
 const bundleRoot = path.join(distRoot, bundleName);
 const zipPath = path.join(distRoot, `${bundleName}.zip`);
@@ -52,7 +53,7 @@ function isMainModule() {
 }
 
 async function main() {
-  const rootPackageJsonPath = path.join(repoRoot, 'package.json');
+  const rootPackageJsonPath = path.join(workspaceRoot, 'package.json');
   const rootPackageJson = JSON.parse(await fs.readFile(rootPackageJsonPath, 'utf8'));
 
   await fs.mkdir(distRoot, { recursive: true });
@@ -64,19 +65,19 @@ async function main() {
 
   for (const fileName of portableSupportFiles) {
     await copyIfExists(
-      path.join(repoRoot, 'windows-camera-helper', fileName),
+      path.join(packageRoot, 'windows-camera-helper', fileName),
       path.join(bundleRoot, 'brave-paws-streamer', fileName),
     );
   }
 
   await copyIfExists(
-    path.join(repoRoot, 'windows-camera-helper-ui', 'public'),
+    path.join(packageRoot, 'windows-camera-helper-ui', 'public'),
     path.join(bundleRoot, 'windows-camera-helper-ui', 'public'),
   );
 
   const pkgOutputBase = path.join(bundleRoot, exeName.replace(/\.exe$/i, ''));
   await runProcess(process.execPath, [
-    path.join(repoRoot, 'node_modules', 'pkg', 'lib-es5', 'bin.js'),
+    path.join(workspaceRoot, 'node_modules', 'pkg', 'lib-es5', 'bin.js'),
     'windows-camera-helper-ui/server.cjs',
     '-t',
     'node18-win-x64',
@@ -84,7 +85,7 @@ async function main() {
     '--no-bytecode',
     '-o',
     pkgOutputBase,
-  ], repoRoot);
+  ], packageRoot);
 
   const bundlePackageJson = {
     name: 'brave-paws-streamer',
@@ -104,7 +105,7 @@ async function main() {
       '-NoProfile',
       '-Command',
       `Compress-Archive -Path '${bundleRoot.replace(/'/g, "''")}\\*' -DestinationPath '${zipPath.replace(/'/g, "''")}' -Force`,
-    ], repoRoot);
+    ], packageRoot);
   }
 
   console.log(`Portable streamer bundle created at ${bundleRoot}`);

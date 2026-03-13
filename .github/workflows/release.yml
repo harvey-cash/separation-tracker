@@ -1,4 +1,4 @@
-name: Release
+name: App Release
 
 on:
   workflow_dispatch:
@@ -8,29 +8,7 @@ on:
         required: true
 
 jobs:
-  streamer:
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run camera-helper:bundle
-      - name: Upload streamer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: brave-paws-streamer
-          path: dist/brave-paws-streamer.zip
-          if-no-files-found: error
-
   release:
-    needs: streamer
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -46,26 +24,19 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - name: Archive build output
-        run: zip -r dist.zip dist/
-      - name: Download streamer artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: brave-paws-streamer
-          path: release-artifacts/
+        run: cd apps/brave-paws-app && zip -r ../../dist.zip dist/
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: ${{ github.event.inputs.version }}
-          files: |
-            dist.zip
-            release-artifacts/brave-paws-streamer.zip
+          files: dist.zip
           generate_release_notes: true
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: apps/brave-paws-app/dist/
 
   deploy:
     needs: release
@@ -75,7 +46,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: site-dist/
       - name: Checkout website repo
         uses: actions/checkout@v4
         with:
@@ -86,7 +57,7 @@ jobs:
         run: |
           rm -rf website/fermi/separation
           mkdir -p website/fermi/separation
-          cp -r dist/* website/fermi/separation/
+          cp -r site-dist/* website/fermi/separation/
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
