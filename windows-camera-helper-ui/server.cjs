@@ -6,6 +6,7 @@ const { createWriteStream, existsSync } = require('node:fs');
 const fs = require('node:fs/promises');
 const { pipeline } = require('node:stream/promises');
 const QRCode = require('qrcode');
+const { STREAMER_DEPENDENCIES } = require('./streamer-assets.cjs');
 
 const repoRoot = process.pkg ? path.dirname(process.execPath) : path.resolve(__dirname, '..');
 const helperDir = path.join(repoRoot, process.pkg ? 'brave-paws-streamer' : 'windows-camera-helper');
@@ -16,8 +17,6 @@ const port = Number(process.env.CAMERA_HELPER_PORT || 4380);
 const shouldOpenBrowser = process.env.CAMERA_HELPER_NO_OPEN !== '1';
 const isMockMode = process.env.CAMERA_HELPER_MOCK === '1';
 
-const GO2RTC_ZIP_URL = 'https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_win64.zip';
-const CLOUDFLARED_URL = 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe';
 const MOCK_SECURE_URL = 'https://mock-brave-paws-camera.trycloudflare.com';
 const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/fermi/separation';
 const MOCK_DEVICES = {
@@ -132,6 +131,45 @@ function escapePowerShellPath(filePath) {
   return filePath.replace(/'/g, "''");
 }
 
+async function extractFileFromZip(zipPath, extractedFileName, destinationPath) {
+  const extractDir = path.join(helperDir, `${path.basename(extractedFileName, path.extname(extractedFileName))}-extract`);
+
+  await fs.rm(extractDir, { recursive: true, force: true });
+  await fs.mkdir(extractDir, { recursive: true });
+
+  try {
+    await runProcess('powershell.exe', [
+      '-NoProfile',
+      '-Command',
+      `Expand-Archive -Path '${escapePowerShellPath(zipPath)}' -DestinationPath '${escapePowerShellPath(extractDir)}' -Force`,
+    ]);
+
+    const { stdout } = await runProcess('powershell.exe', [
+      '-NoProfile',
+      '-Command',
+      [
+        `$file = Get-ChildItem -Path '${escapePowerShellPath(extractDir)}' -Recurse -File -Filter '${escapePowerShellPath(extractedFileName)}' | Select-Object -First 1 -ExpandProperty FullName`,
+        `if (-not $file) { throw 'Unable to locate ${extractedFileName} in downloaded archive.' }`,
+        'Write-Output $file',
+      ].join('; '),
+    ]);
+
+    const extractedPath = stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean);
+
+    if (!extractedPath) {
+      throw new Error(`Unable to locate ${extractedFileName} in downloaded archive.`);
+    }
+
+    await fs.copyFile(extractedPath, destinationPath);
+  } finally {
+    await fs.rm(zipPath, { force: true });
+    await fs.rm(extractDir, { recursive: true, force: true });
+  }
+}
+
 async function ensureDependencies() {
   await fs.mkdir(helperDir, { recursive: true });
 
@@ -139,24 +177,29 @@ async function ensureDependencies() {
     return;
   }
 
-  const go2rtcPath = path.join(helperDir, 'go2rtc.exe');
-  const cloudflaredPath = path.join(helperDir, 'cloudflared.exe');
-  const zipPath = path.join(helperDir, 'go2rtc.zip');
+  for (const dependency of STREAMER_DEPENDENCIES) {
+    const dependencyPath = path.join(helperDir, dependency.fileName);
+    if (existsSync(dependencyPath)) {
+      continue;
+    }
 
-  if (!existsSync(go2rtcPath)) {
-    addLog('Downloading go2rtc...');
-    await downloadFile(GO2RTC_ZIP_URL, zipPath);
-    await runProcess('powershell.exe', [
-      '-NoProfile',
-      '-Command',
-      `Expand-Archive -Path '${escapePowerShellPath(zipPath)}' -DestinationPath '${escapePowerShellPath(helperDir)}' -Force`,
-    ]);
-    await fs.rm(zipPath, { force: true });
-  }
+    if (dependency.name === 'ffmpeg') {
+      const existingFfmpegPath = await resolveFfmpegPath();
+      if (existingFfmpegPath) {
+        continue;
+      }
+    }
 
-  if (!existsSync(cloudflaredPath)) {
-    addLog('Downloading cloudflared...');
-    await downloadFile(CLOUDFLARED_URL, cloudflaredPath);
+    addLog(`Downloading ${dependency.logLabel}...`);
+
+    if (dependency.archiveFileName && dependency.extractedFileName) {
+      const archivePath = path.join(helperDir, dependency.archiveFileName);
+      await downloadFile(dependency.downloadUrl, archivePath);
+      await extractFileFromZip(archivePath, dependency.extractedFileName, dependencyPath);
+      continue;
+    }
+
+    await downloadFile(dependency.downloadUrl, dependencyPath);
   }
 }
 
@@ -345,7 +388,7 @@ async function startStreaming(videoDevice, audioDevice) {
   state.ffmpegAvailable = Boolean(ffmpegPath);
 
   if (!ffmpegPath) {
-    throw new Error('FFmpeg was not found. Install ffmpeg.exe or place it in the Brave Paws Streamer folder.');
+    throw new Error('FFmpeg was not available after the Brave Paws Streamer setup completed.');
   }
 
   if (isMockMode) {
