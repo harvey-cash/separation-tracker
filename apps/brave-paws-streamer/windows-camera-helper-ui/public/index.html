@@ -16,6 +16,7 @@
           <p class="eyebrow">Brave Paws</p>
           <h1>Streamer</h1>
           <p class="lede">A one-click streamer for your Windows laptop camera, local preview, and Brave Paws pairing QR code.</p>
+          <p class="version-text" id="app-version" aria-label="Streamer version">v0.0.0</p>
         </div>
 
         <div class="status-card" id="status-card">
@@ -71,8 +72,11 @@
       <main class="preview-panel" id="preview-panel">
         <div class="preview-frame-wrap">
           <div class="preview-toolbar">
-            <div>
-              <p class="label">Laptop Preview</p>
+            <div class="preview-title-group">
+              <div class="preview-title-row">
+                <p class="label">Laptop Preview</p>
+                <p class="preview-clock" id="current-time">--:--</p>
+              </div>
               <h2>Live room view</h2>
             </div>
             <div class="actions-row compact">

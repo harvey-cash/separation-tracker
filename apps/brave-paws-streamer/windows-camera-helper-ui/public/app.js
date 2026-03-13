@@ -17,10 +17,21 @@ const elements = {
   logCard: document.querySelector('#log-card'),
   toggleLogsButton: document.querySelector('#toggle-logs'),
   logList: document.querySelector('#log-list'),
+  currentTime: document.querySelector('#current-time'),
+  appVersion: document.querySelector('#app-version'),
 };
 
 let currentState = null;
 let areLogsExpanded = false;
+const clockFormatter = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+function renderClock() {
+  elements.currentTime.textContent = clockFormatter.format(new Date());
+}
 
 function arraysEqual(left = [], right = []) {
   if (left.length !== right.length) {
@@ -133,6 +144,7 @@ function applyQr(url, remotePreviewUrl, qrCodeDataUrl) {
 
 function render(state) {
   currentState = state;
+  elements.appVersion.textContent = `v${state.appVersion || '0.0.0'}`;
   const statusLabel = state.status === 'running'
     ? 'Live'
     : state.status === 'starting' || state.status === 'bootstrapping'
@@ -260,5 +272,7 @@ elements.fullscreenPreview.addEventListener('click', async () => {
 });
 
 renderLogCardState();
+renderClock();
 bootstrap();
+setInterval(renderClock, 1000);
 setInterval(pollStatus, 3000);

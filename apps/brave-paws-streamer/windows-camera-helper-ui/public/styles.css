@@ -59,6 +59,12 @@ body {
   overscroll-behavior: contain;
 }
 
+.brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .brand-block h1,
 .preview-toolbar h2,
 .qr-header h2,
@@ -82,6 +88,16 @@ body {
 .brand-block .lede {
   font-size: 0.92rem;
   line-height: 1.4;
+}
+
+.version-text {
+  margin: 0;
+}
+
+.version-text {
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
 }
 
 .eyebrow,
@@ -248,6 +264,27 @@ body {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+}
+
+.preview-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.preview-clock {
+  margin: 0;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
 }
 
 .mono-link,
