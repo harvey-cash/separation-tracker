@@ -28,6 +28,7 @@ const helperDir = path.join(packageRoot, process.pkg ? 'brave-paws-streamer' : '
 const port = Number(process.env.CAMERA_HELPER_PORT || DEFAULT_LOOPBACK_PORT);
 const shouldOpenBrowser = process.env.CAMERA_HELPER_NO_OPEN !== '1';
 const isMockMode = process.env.CAMERA_HELPER_MOCK === '1';
+const STREAMER_PROTOCOL_SCHEME = 'brave-paws-streamer';
 const launchToken = createLaunchToken();
 const allowedOrigins = parseAllowedOrigins();
 const loopbackBaseUrl = buildLoopbackBaseUrl(port, DEFAULT_LOOPBACK_HOST);
@@ -49,6 +50,56 @@ function getAppVersion() {
   } catch {
     return '0.0.0';
   }
+}
+
+function setRegistryValue(key, name, value) {
+  return new Promise((resolve, reject) => {
+    const args = ['add', key, '/f'];
+    if (name) {
+      args.push('/v', name);
+    } else {
+      args.push('/ve');
+    }
+    args.push('/d', value);
+
+    const child = spawn('reg.exe', args, {
+      windowsHide: true,
+      shell: false,
+    });
+
+    let stderr = '';
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error(stderr || `Unable to set registry value ${name || 'default value'} at ${key}.`));
+    });
+  });
+}
+
+function getProtocolHandlerCommand() {
+  if (process.pkg) {
+    return `"${process.execPath}" "%1"`;
+  }
+
+  return `"${process.execPath}" "${__filename}" "%1"`;
+}
+
+async function ensureProtocolHandler() {
+  if (process.platform !== 'win32') {
+    return;
+  }
+
+  const protocolKey = `HKCU\\Software\\Classes\\${STREAMER_PROTOCOL_SCHEME}`;
+  await setRegistryValue(protocolKey, '', 'URL:Brave Paws Streamer Protocol');
+  await setRegistryValue(protocolKey, 'URL Protocol', '');
+  await setRegistryValue(`${protocolKey}\\shell\\open\\command`, '', getProtocolHandlerCommand());
 }
 
 function buildPayload(snapshot = adapter.getSnapshot()) {
@@ -211,6 +262,9 @@ app.listen(port, DEFAULT_LOOPBACK_HOST, () => {
   }
   console.log(`Brave Paws Streamer loopback API running at ${loopbackBaseUrl}`);
   console.log(`Hosted streamer UI launch URL: ${launchUrl}`);
+  ensureProtocolHandler().catch((error) => {
+    console.warn(`Unable to register ${STREAMER_PROTOCOL_SCHEME} protocol handler: ${error instanceof Error ? error.message : error}`);
+  });
 
   if (shouldOpenBrowser) {
     spawn('cmd.exe', ['/c', 'start', '', launchUrl], {
