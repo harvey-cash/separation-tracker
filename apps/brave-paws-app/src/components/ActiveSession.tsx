@@ -19,27 +19,26 @@ type Props = {
 
 export function ActiveSession({ session: initialSession, initialState, cameraUrl = '', onCameraUrlChange, onStateChange, onCompleteSession, onCancel }: Props) {
   const restoredState = initialState?.session.id === initialSession.id ? initialState : undefined;
+  const initialSessionClock = restoredState?.sessionClock ?? {
+    startedAt: Date.now(),
+    accumulatedMs: 0,
+  };
+  const initialStepClock = restoredState?.stepClock ?? {
+    startedAt: null,
+    accumulatedMs: 0,
+  };
   const [session, setSession] = useState<Session>(restoredState?.session ?? initialSession);
   const [isEditingCamera, setIsEditingCamera] = useState(!isCameraUrlValid(cameraUrl));
   
   // Overall session stopwatch
   const [isSessionRunning, setIsSessionRunning] = useState(restoredState?.isSessionRunning ?? true);
-  const [sessionElapsed, setSessionElapsed] = useState(() => getElapsedSeconds(restoredState?.sessionClock ?? {
-    startedAt: Date.now(),
-    accumulatedMs: 0,
-  }));
-  const [sessionClock, setSessionClock] = useState<TimerClock>(() => ({
-    startedAt: restoredState?.sessionClock.startedAt ?? Date.now(),
-    accumulatedMs: restoredState?.sessionClock.accumulatedMs ?? 0,
-  }));
+  const [sessionElapsed, setSessionElapsed] = useState(() => getElapsedSeconds(initialSessionClock));
+  const [sessionClock, setSessionClock] = useState<TimerClock>(() => initialSessionClock);
 
   // Current step countdown
   const [currentStepIndex, setCurrentStepIndex] = useState(restoredState?.currentStepIndex ?? 0);
   const [isStepRunning, setIsStepRunning] = useState(restoredState?.isStepRunning ?? false);
-  const [stepClock, setStepClock] = useState<TimerClock>(() => ({
-    startedAt: restoredState?.stepClock.startedAt ?? null,
-    accumulatedMs: restoredState?.stepClock.accumulatedMs ?? 0,
-  }));
+  const [stepClock, setStepClock] = useState<TimerClock>(() => initialStepClock);
   const [stepRemaining, setStepRemaining] = useState(() => {
     const restoredSession = restoredState?.session ?? initialSession;
     const restoredIndex = restoredState?.currentStepIndex ?? 0;

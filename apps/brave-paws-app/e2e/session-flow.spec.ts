@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+const DEFAULT_CLOCK = '00:00';
+
 function parseClock(text: string) {
   const [minutes, seconds] = text.trim().split(':').map(Number);
   return minutes * 60 + seconds;
@@ -70,28 +72,25 @@ test.describe('Session flow', () => {
     const sessionElapsed = page.locator('header span.font-mono').first();
     const stepRemaining = page.locator('div.text-8xl');
     const stepToggle = page.locator('div.flex.items-center.gap-6 > button').first();
+    const elapsedAtStart = parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK);
 
     await stepToggle.click();
-    await page.waitForTimeout(2_200);
+    await expect.poll(async () => parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK)).toBeGreaterThan(elapsedAtStart);
+    await expect.poll(async () => parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK)).toBeLessThan(30);
 
-    const elapsedBeforeReload = parseClock(await sessionElapsed.textContent() ?? '00:00');
-    const remainingBeforeReload = parseClock(await stepRemaining.textContent() ?? '00:00');
+    const elapsedBeforeReload = parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK);
+    const remainingBeforeReload = parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK);
 
     await page.reload();
     await expect(page.getByRole('button', { name: 'Wrap Up Session' })).toBeVisible();
 
-    const elapsedAfterReload = parseClock(await sessionElapsed.textContent() ?? '00:00');
-    const remainingAfterReload = parseClock(await stepRemaining.textContent() ?? '00:00');
+    const elapsedAfterReload = parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK);
+    const remainingAfterReload = parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK);
 
     expect(elapsedAfterReload).toBeGreaterThanOrEqual(elapsedBeforeReload);
     expect(remainingAfterReload).toBeLessThanOrEqual(remainingBeforeReload);
 
-    await page.waitForTimeout(1_200);
-
-    const elapsedAfterTick = parseClock(await sessionElapsed.textContent() ?? '00:00');
-    const remainingAfterTick = parseClock(await stepRemaining.textContent() ?? '00:00');
-
-    expect(elapsedAfterTick).toBeGreaterThanOrEqual(elapsedAfterReload + 1);
-    expect(remainingAfterTick).toBeLessThanOrEqual(remainingAfterReload - 1);
+    await expect.poll(async () => parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK)).toBeGreaterThan(elapsedAfterReload);
+    await expect.poll(async () => parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK)).toBeLessThan(remainingAfterReload);
   });
 });
