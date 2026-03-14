@@ -28,7 +28,7 @@ All authenticated requests accept the token through `x-brave-paws-session`, `Aut
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/` | Unauthenticated manifest with protocol version, helper metadata, and the hosted UI launch URL. |
+| `GET` | `/` | Unauthenticated manifest with protocol version, helper metadata, loopback base URL, and hosted UI URL. |
 | `GET` | `/api/bootstrap` | Resolve dependency state, enumerate devices, and return the full loopback payload. |
 | `GET` | `/api/status` | Return the current full loopback payload. |
 | `POST` | `/api/refresh-devices` | Re-enumerate local capture devices and return the updated payload. |
@@ -61,6 +61,7 @@ All authenticated requests accept the token through `x-brave-paws-session`, `Aut
     "events": "/api/events"
   },
   "state": {
+    "appVersion": "0.1.22",
     "status": "idle",
     "preview": {
       "localUrl": "",
