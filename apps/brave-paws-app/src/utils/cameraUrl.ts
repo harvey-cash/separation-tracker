@@ -3,12 +3,12 @@ export const CAMERA_URL_QUERY_PARAM = 'cameraUrl';
 export const CAMERA_PROFILE_QUERY_PARAM = 'cameraProfile';
 export const CAMERA_MODE_QUERY_PARAM = 'cameraMode';
 export const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/separation/app/';
-export const DEFAULT_CAMERA_STREAM_PROFILE = 'remote-resilient';
 export const LOW_LATENCY_CAMERA_STREAM_PROFILE = 'remote-low-latency';
-export const DEFAULT_CAMERA_STREAM_MODE = 'mse';
 export const LOW_LATENCY_CAMERA_STREAM_MODE = 'mse,mp4,mjpeg';
+export const DEFAULT_CAMERA_STREAM_PROFILE = LOW_LATENCY_CAMERA_STREAM_PROFILE;
+export const DEFAULT_CAMERA_STREAM_MODE = LOW_LATENCY_CAMERA_STREAM_MODE;
 
-export type CameraStreamProfile = 'local-quality' | 'remote-low-latency' | 'remote-resilient';
+export type CameraStreamProfile = 'local-quality' | 'remote-low-latency';
 
 type CameraLaunchConfig = {
   cameraUrl: string;
@@ -19,7 +19,7 @@ type CameraLaunchConfig = {
 const ALLOWED_CAMERA_STREAM_MODES = new Set(['webrtc', 'webrtc/tcp', 'mse', 'hls', 'mp4', 'mjpeg']);
 
 function sanitizeCameraProfile(value: string): CameraStreamProfile {
-  if (value === 'local-quality' || value === 'remote-low-latency' || value === 'remote-resilient') {
+  if (value === 'local-quality' || value === 'remote-low-latency') {
     return value;
   }
 
@@ -40,11 +40,11 @@ function sanitizeCameraMode(value: string): string {
 }
 
 function getDefaultModeForProfile(profile: CameraStreamProfile): string {
-  if (profile === LOW_LATENCY_CAMERA_STREAM_PROFILE) {
-    return LOW_LATENCY_CAMERA_STREAM_MODE;
+  if (profile === 'local-quality') {
+    return 'mse';
   }
 
-  return DEFAULT_CAMERA_STREAM_MODE;
+  return LOW_LATENCY_CAMERA_STREAM_MODE;
 }
 
 function extractCameraLaunchConfig(value: string): CameraLaunchConfig {
@@ -165,7 +165,7 @@ export function buildCameraPairingUrl(
     return '';
   }
 
-  const profile = sanitizeCameraProfile(options.profile || LOW_LATENCY_CAMERA_STREAM_PROFILE);
+  const profile = sanitizeCameraProfile(options.profile || DEFAULT_CAMERA_STREAM_PROFILE);
   const mode = sanitizeCameraMode(options.mode || getDefaultModeForProfile(profile));
   const pairingUrl = new URL(appUrl);
   pairingUrl.searchParams.set(CAMERA_URL_QUERY_PARAM, sanitizedCameraUrl);

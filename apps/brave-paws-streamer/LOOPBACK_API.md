@@ -32,7 +32,7 @@ All authenticated requests accept the token through `x-brave-paws-session`, `Aut
 | `GET` | `/api/bootstrap` | Resolve dependency state, enumerate devices, and return the full loopback payload. |
 | `GET` | `/api/status` | Return the current full loopback payload. |
 | `POST` | `/api/refresh-devices` | Re-enumerate local capture devices and return the updated payload. |
-| `POST` | `/api/start` | Start streaming with the selected devices and return the updated payload. |
+| `POST` | `/api/start` | Start streaming with the selected devices and return the updated payload. Remote preview always uses the default low-latency profile. |
 | `POST` | `/api/stop` | Stop streaming and return the updated payload. |
 | `GET` | `/api/events` | Server-sent events stream for state, log, and status updates. |
 
@@ -72,8 +72,7 @@ All authenticated requests accept the token through `x-brave-paws-session`, `Aut
       "localProfile": "local-quality",
       "remoteProfile": "remote-low-latency",
       "localMode": "mse",
-      "remoteMode": "mse,mp4,mjpeg",
-      "availableRemoteProfiles": ["remote-low-latency", "remote-resilient"]
+      "remoteMode": "mse,mp4,mjpeg"
     },
     "selection": {
       "video": "",

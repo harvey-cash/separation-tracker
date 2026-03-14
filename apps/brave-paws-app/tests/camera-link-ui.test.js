@@ -9,9 +9,9 @@ test('SessionConfig and ActiveSession use the shared camera link input', () => {
 
   assert.match(sessionConfig, /CameraLinkInput/);
   assert.match(activeSession, /CameraLinkInput/);
-  assert.match(activeSession, /buildPreviewFallbackUrls/);
   assert.match(activeSession, /Remote preview is delayed or stalled/);
   assert.match(activeSession, /Retrying remote preview/);
+  assert.doesNotMatch(activeSession, /fallback mode/i);
 });
 
 test('shared camera link input exposes Brave Paws Streamer scan messaging', () => {
