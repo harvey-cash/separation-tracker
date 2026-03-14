@@ -94,6 +94,7 @@ async function main() {
       body: JSON.stringify({
         videoDevice: selectedVideo,
         audioDevice: selectedAudio,
+        remoteProfile: 'remote-resilient',
       }),
     });
 
@@ -101,8 +102,21 @@ async function main() {
       throw new Error(`Expected running status after start, received ${startPayload.state.status}.`);
     }
 
-    if (!startPayload.state.preview.publicUrl || !startPayload.state.preview.localUrl || !startPayload.state.preview.qrCodeDataUrl) {
-      throw new Error('Start payload did not include secure URL, local preview, and QR code data.');
+    if (
+      !startPayload.state.preview.publicUrl ||
+      !startPayload.state.preview.localUrl ||
+      !startPayload.state.preview.remoteUrl ||
+      !startPayload.state.preview.qrCodeDataUrl
+    ) {
+      throw new Error('Start payload did not include secure URL, local preview, remote preview, and QR code data.');
+    }
+
+    if (startPayload.state.preview.remoteProfile !== 'remote-resilient') {
+      throw new Error(`Expected remote-resilient profile after start, received ${startPayload.state.preview.remoteProfile}.`);
+    }
+
+    if (!startPayload.state.preview.remoteUrl.includes('mode=mse%2Cmp4')) {
+      throw new Error(`Expected remote-resilient preview URL mode ordering, received ${startPayload.state.preview.remoteUrl}.`);
     }
 
     console.log(`Secure URL: ${startPayload.state.preview.publicUrl}`);

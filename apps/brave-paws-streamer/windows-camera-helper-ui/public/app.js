@@ -1,6 +1,7 @@
 const elements = {
   videoDevice: document.querySelector('#video-device'),
   audioDevice: document.querySelector('#audio-device'),
+  remoteProfile: document.querySelector('#remote-profile'),
   statusCard: document.querySelector('#status-card'),
   statusText: document.querySelector('#status-text'),
   statusPill: document.querySelector('#status-pill'),
@@ -9,6 +10,7 @@ const elements = {
   refreshButton: document.querySelector('#refresh-devices'),
   qrCard: document.querySelector('#qr-card'),
   qrImage: document.querySelector('#qr-image'),
+  remotePreviewHint: document.querySelector('#remote-preview-hint'),
   openLocalPreview: document.querySelector('#open-local-preview'),
   fullscreenPreview: document.querySelector('#fullscreen-preview'),
   previewIframe: document.querySelector('#preview-iframe'),
@@ -251,6 +253,27 @@ function applyQr(publicUrl, qrCodeDataUrl) {
   }
 }
 
+function applyRemotePreviewHint(preview) {
+  if (!elements.remotePreviewHint) {
+    return;
+  }
+
+  const remoteProfile = preview?.remoteProfile || 'waiting';
+  const remoteMode = preview?.remoteMode || 'unavailable';
+  elements.remotePreviewHint.textContent = `Remote preview profile: ${remoteProfile} (${remoteMode})`;
+}
+
+function applyRemoteProfileSelection(preview) {
+  if (!elements.remoteProfile) {
+    return;
+  }
+
+  const nextProfile = preview?.remoteProfile || 'remote-low-latency';
+  if (elements.remoteProfile.value !== nextProfile) {
+    elements.remoteProfile.value = nextProfile;
+  }
+}
+
 function getModel(payload) {
   return payload?.state || null;
 }
@@ -269,6 +292,8 @@ function renderDisconnected(detail) {
   populateSelect(elements.audioDevice, [], 'Launch helper to list microphones');
   applyPreview('');
   applyQr('', '');
+  applyRemotePreviewHint(null);
+  applyRemoteProfileSelection(null);
   setLogs([]);
   elements.startButton.disabled = true;
   elements.stopButton.disabled = true;
@@ -322,6 +347,8 @@ function render(payload) {
 
   applyPreview(model.preview?.localUrl || '');
   applyQr(model.preview?.publicUrl || '', model.preview?.qrCodeDataUrl || '');
+  applyRemotePreviewHint(model.preview || null);
+  applyRemoteProfileSelection(model.preview || null);
   setLogs(model.logs || []);
 
   const isBusy = model.status === 'starting' || model.status === 'bootstrapping';
@@ -331,6 +358,7 @@ function render(payload) {
   elements.refreshButton.disabled = false;
   elements.startButton.disabled = isBusy || !ffmpegAvailable;
   elements.stopButton.disabled = !isRunning && !isBusy;
+  elements.remoteProfile.disabled = isBusy;
 }
 
 async function request(apiPath, options = {}) {
@@ -422,6 +450,7 @@ async function startStream() {
       body: JSON.stringify({
         videoDevice: elements.videoDevice.value,
         audioDevice: elements.audioDevice.value,
+        remoteProfile: elements.remoteProfile.value,
       }),
     });
     render(payload);

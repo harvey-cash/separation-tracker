@@ -13,6 +13,8 @@ Brave Paws Streamer:
 4. Renders the QR code locally on the laptop, so the streamer UI does not depend on any external QR image service.
 5. Automatically downloads `go2rtc`, `cloudflared`, and `ffmpeg` into the helper folder on first launch if they are missing.
 
+The laptop preview and the paired Brave Paws preview are intentionally tuned differently. The laptop preview stays quality-oriented, while the paired Brave Paws stream can request a separate remote-first playback profile intended to reduce effective latency and recover more cleanly from stalls on the public tunnel path. The low-latency remote profile now lowers resolution, bitrate, and audio bandwidth to improve recovery, while the resilient profile keeps a slightly heavier stream when stability matters more than minimum delay.
+
 Note: during local development the streamer runs from the `apps/brave-paws-streamer/` workspace with `node windows-camera-helper-ui/server.cjs` or, from the repo root, `npm run camera-helper:gui`. The packaged bundle includes `BravePawsStreamer.exe`, so end users do not need Node.js installed separately.
 
 ## Packaging And Validation
@@ -27,7 +29,7 @@ The portable bundle removes the need for both a repo checkout and a separate Nod
 When you double click `BravePawsStreamer.exe`, the app will:
 1. Automatically download `go2rtc` (a lightweight camera streaming server), `cloudflared` (Cloudflare Tunnels), and `ffmpeg` if they are missing.
 2. Scan your laptop for available cameras and microphones using `ffmpeg`, and prompt you to select which ones to use.
-3. Transcode the camera feed on-the-fly to H.264 / AAC so it is perfectly compatible with the remote tunnel using MSE (Media Source Extensions).
+3. Transcode the camera feed on-the-fly to H.264 / AAC so it is compatible with the tunnel-compatible remote playback path while still supporting a high-quality local preview.
 4. Securely expose the video feed to the public internet temporarily.
 5. Open the hosted streamer page automatically and give you a `https://<random>.trycloudflare.com` URL plus a pairing QR code for the Brave Paws app.
 

@@ -66,8 +66,14 @@ All authenticated requests accept the token through `x-brave-paws-session`, `Aut
     "preview": {
       "localUrl": "",
       "publicUrl": "",
+      "remoteUrl": "",
       "pairingUrl": "",
-      "qrCodeDataUrl": ""
+      "qrCodeDataUrl": "",
+      "localProfile": "local-quality",
+      "remoteProfile": "remote-low-latency",
+      "localMode": "mse",
+      "remoteMode": "mse,mp4,mjpeg",
+      "availableRemoteProfiles": ["remote-low-latency", "remote-resilient"]
     },
     "selection": {
       "video": "",

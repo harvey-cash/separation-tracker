@@ -6,6 +6,12 @@ The deployable streamer UI now targets `https://harvey.cash/separation/streamer/
 
 This workspace owns the loopback API, the Windows-specific adapter, packaging logic, health checks, hosted UI assets, runtime helper files, and streamer-specific tests.
 
+The current implementation now distinguishes between two playback surfaces:
+- Local laptop preview stays on a quality-oriented profile.
+- Remote Brave Paws playback is paired with a remote-first profile that can request a different go2rtc mode order.
+
+That split is intentional. Under the current router-free and backend-free deployment model, the public path remains tunnel-compatible HTTP playback, so the local laptop preview is no longer treated as a proxy for remote latency.
+
 ## Key Commands
 
 From this directory:
@@ -46,6 +52,7 @@ apps/brave-paws-streamer/
 - The hosted UI should be deployed to `https://harvey.cash/separation/streamer/`.
 - CI should run streamer health and bundle steps on Windows.
 - The packager still uses `node_modules/pkg/lib-es5/bin.js` to avoid Windows `npx` issues.
+- Pairing QR codes now carry remote playback profile metadata so the Brave Paws app can preserve remote playback intent instead of assuming a single fixed viewer mode.
 
 ## Related Docs
 
