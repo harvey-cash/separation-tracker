@@ -27,7 +27,7 @@ Short answer:
 
 Today the checked-in streamer is fundamentally a **local helper with an embedded local web UI**:
 
-- `server.cjs` exposes `/api/bootstrap`, `/api/status`, `/api/refresh-devices`, `/api/start`, and `/api/stop`
+- `server.cjs` currently exposes `/api/bootstrap`, `/api/status`, `/api/refresh-devices`, `/api/start`, and `/api/stop`
 - it downloads or resolves `go2rtc`, `cloudflared`, and `ffmpeg`
 - it enumerates Windows DirectShow devices, writes `go2rtc.yaml`, launches the processes, and generates the QR code payload
 - `public/app.js` polls those endpoints and renders controls, logs, preview, and QR state
@@ -103,7 +103,7 @@ This layer should be as platform-neutral as possible.
 
 This is the most important OS-agnostic investment.
 
-Define a stable loopback API and event model that every helper implementation follows, for example:
+Define a stable future loopback API and event model that every helper implementation follows, for example:
 
 - `GET /api/bootstrap`
 - `GET /api/status`
