@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
 
+const DEFAULT_CLOCK = '00:00';
+
+function parseClock(text: string) {
+  const [minutes, seconds] = text.trim().split(':').map(Number);
+  return minutes * 60 + seconds;
+}
+
 test.describe('Session flow', () => {
   test('completes a full session and saves it to the dashboard', async ({ page }) => {
     await page.goto('/');
@@ -54,5 +61,36 @@ test.describe('Session flow', () => {
 
     // A modal should appear for editing/adding a session
     await expect(page.getByRole('heading', { name: 'Edit Session' })).toBeVisible();
+  });
+
+  test('restores an in-progress session after reloading the page', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Start Training' }).click();
+    await page.getByRole('button', { name: "Let's Go!" }).click();
+    await expect(page.getByRole('button', { name: 'Wrap Up Session' })).toBeVisible();
+
+    const sessionElapsed = page.locator('header span.font-mono').first();
+    const stepRemaining = page.locator('div.text-8xl');
+    const stepToggle = page.locator('div.flex.items-center.gap-6 > button').first();
+    const elapsedAtStart = parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK);
+
+    await stepToggle.click();
+    await expect.poll(async () => parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK)).toBeGreaterThan(elapsedAtStart);
+    await expect.poll(async () => parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK)).toBeLessThan(30);
+
+    const elapsedBeforeReload = parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK);
+    const remainingBeforeReload = parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK);
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Wrap Up Session' })).toBeVisible();
+
+    const elapsedAfterReload = parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK);
+    const remainingAfterReload = parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK);
+
+    expect(elapsedAfterReload).toBeGreaterThanOrEqual(elapsedBeforeReload);
+    expect(remainingAfterReload).toBeLessThanOrEqual(remainingBeforeReload);
+
+    await expect.poll(async () => parseClock(await sessionElapsed.textContent() ?? DEFAULT_CLOCK)).toBeGreaterThan(elapsedAfterReload);
+    await expect.poll(async () => parseClock(await stepRemaining.textContent() ?? DEFAULT_CLOCK)).toBeLessThan(remainingAfterReload);
   });
 });
