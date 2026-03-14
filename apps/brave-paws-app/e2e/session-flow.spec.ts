@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+function parseClock(text: string) {
+  const [minutes, seconds] = text.trim().split(':').map(Number);
+  return minutes * 60 + seconds;
+}
+
 test.describe('Session flow', () => {
   test('completes a full session and saves it to the dashboard', async ({ page }) => {
     await page.goto('/');
@@ -54,5 +59,39 @@ test.describe('Session flow', () => {
 
     // A modal should appear for editing/adding a session
     await expect(page.getByRole('heading', { name: 'Edit Session' })).toBeVisible();
+  });
+
+  test('restores an in-progress session after reloading the page', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Start Training' }).click();
+    await page.getByRole('button', { name: "Let's Go!" }).click();
+    await expect(page.getByRole('button', { name: 'Wrap Up Session' })).toBeVisible();
+
+    const sessionElapsed = page.locator('header span.font-mono').first();
+    const stepRemaining = page.locator('div.text-8xl');
+    const stepToggle = page.locator('div.flex.items-center.gap-6 > button').first();
+
+    await stepToggle.click();
+    await page.waitForTimeout(2_200);
+
+    const elapsedBeforeReload = parseClock(await sessionElapsed.textContent() ?? '00:00');
+    const remainingBeforeReload = parseClock(await stepRemaining.textContent() ?? '00:00');
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Wrap Up Session' })).toBeVisible();
+
+    const elapsedAfterReload = parseClock(await sessionElapsed.textContent() ?? '00:00');
+    const remainingAfterReload = parseClock(await stepRemaining.textContent() ?? '00:00');
+
+    expect(elapsedAfterReload).toBeGreaterThanOrEqual(elapsedBeforeReload);
+    expect(remainingAfterReload).toBeLessThanOrEqual(remainingBeforeReload);
+
+    await page.waitForTimeout(1_200);
+
+    const elapsedAfterTick = parseClock(await sessionElapsed.textContent() ?? '00:00');
+    const remainingAfterTick = parseClock(await stepRemaining.textContent() ?? '00:00');
+
+    expect(elapsedAfterTick).toBeGreaterThanOrEqual(elapsedAfterReload + 1);
+    expect(remainingAfterTick).toBeLessThanOrEqual(remainingAfterReload - 1);
   });
 });

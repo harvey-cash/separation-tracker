@@ -5,36 +5,55 @@ import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
 import { CameraLinkInput } from './CameraLinkInput';
 import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTimer } from '../utils/timer';
+import { ActiveSessionState } from '../utils/activeSessionStorage';
 
 type Props = {
   session: Session;
+  initialState?: ActiveSessionState;
   cameraUrl?: string;
   onCameraUrlChange?: (url: string) => void;
+  onStateChange?: (state: ActiveSessionState) => void;
   onCompleteSession: (session: Session) => void;
   onCancel: () => void;
 };
 
-export function ActiveSession({ session: initialSession, cameraUrl = '', onCameraUrlChange, onCompleteSession, onCancel }: Props) {
-  const [session, setSession] = useState<Session>(initialSession);
+export function ActiveSession({ session: initialSession, initialState, cameraUrl = '', onCameraUrlChange, onStateChange, onCompleteSession, onCancel }: Props) {
+  const restoredState = initialState?.session.id === initialSession.id ? initialState : undefined;
+  const [session, setSession] = useState<Session>(restoredState?.session ?? initialSession);
   const [isEditingCamera, setIsEditingCamera] = useState(!isCameraUrlValid(cameraUrl));
   
   // Overall session stopwatch
-  const [isSessionRunning, setIsSessionRunning] = useState(true);
-  const [sessionElapsed, setSessionElapsed] = useState(0);
-  const [sessionClock, setSessionClock] = useState<TimerClock>(() => ({
+  const [isSessionRunning, setIsSessionRunning] = useState(restoredState?.isSessionRunning ?? true);
+  const [sessionElapsed, setSessionElapsed] = useState(() => getElapsedSeconds(restoredState?.sessionClock ?? {
     startedAt: Date.now(),
     accumulatedMs: 0,
   }));
+  const [sessionClock, setSessionClock] = useState<TimerClock>(() => ({
+    startedAt: restoredState?.sessionClock.startedAt ?? Date.now(),
+    accumulatedMs: restoredState?.sessionClock.accumulatedMs ?? 0,
+  }));
 
   // Current step countdown
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isStepRunning, setIsStepRunning] = useState(false);
-  const [stepRemaining, setStepRemaining] = useState(
-    session.steps[0]?.durationSeconds || 0
-  );
-  const [stepClock, setStepClock] = useState<TimerClock>({
-    startedAt: null,
-    accumulatedMs: 0,
+  const [currentStepIndex, setCurrentStepIndex] = useState(restoredState?.currentStepIndex ?? 0);
+  const [isStepRunning, setIsStepRunning] = useState(restoredState?.isStepRunning ?? false);
+  const [stepClock, setStepClock] = useState<TimerClock>(() => ({
+    startedAt: restoredState?.stepClock.startedAt ?? null,
+    accumulatedMs: restoredState?.stepClock.accumulatedMs ?? 0,
+  }));
+  const [stepRemaining, setStepRemaining] = useState(() => {
+    const restoredSession = restoredState?.session ?? initialSession;
+    const restoredIndex = restoredState?.currentStepIndex ?? 0;
+    const currentStep = restoredSession.steps[restoredIndex];
+
+    if (!currentStep) {
+      return 0;
+    }
+
+    if (!restoredState) {
+      return currentStep.durationSeconds;
+    }
+
+    return getRemainingSeconds(currentStep.durationSeconds, restoredState.stepClock);
   });
   const sessionRef = useRef(session);
   const sessionClockRef = useRef(sessionClock);
@@ -159,6 +178,17 @@ export function ActiveSession({ session: initialSession, cameraUrl = '', onCamer
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [syncSessionElapsed, syncStepRemaining]);
+
+  useEffect(() => {
+    onStateChange?.({
+      session,
+      currentStepIndex,
+      isSessionRunning,
+      sessionClock,
+      isStepRunning,
+      stepClock,
+    });
+  }, [currentStepIndex, isSessionRunning, isStepRunning, onStateChange, session, sessionClock, stepClock]);
 
   const handleToggleSession = () => {
     const now = Date.now();

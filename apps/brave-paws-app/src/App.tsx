@@ -13,6 +13,13 @@ import { GoogleDriveSync } from './components/GoogleDriveSync';
 import { useGoogleDrive } from './hooks/useGoogleDrive';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
+import {
+  ActiveSessionState,
+  clearActiveSessionState,
+  createActiveSessionState,
+  loadActiveSessionState,
+  saveActiveSessionState,
+} from './utils/activeSessionStorage';
 import { ArrowLeft } from 'lucide-react';
 
 type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view' | 'info';
@@ -28,9 +35,11 @@ const DEFAULT_STEPS: Step[] = [
 
 export default function App() {
   const { sessions, addSession, updateSession, deleteSession, replaceSessions } = useSessions();
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [restoredActiveSessionState] = useState<ActiveSessionState | null>(() => loadActiveSessionState());
+  const [currentView, setCurrentView] = useState<View>(restoredActiveSessionState ? 'active' : 'dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
-  const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [activeSession, setActiveSession] = useState<Session | null>(restoredActiveSessionState?.session ?? null);
+  const [activeSessionState, setActiveSessionState] = useState<ActiveSessionState | null>(restoredActiveSessionState);
   const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
 
   useEffect(() => {
@@ -50,6 +59,15 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(CAMERA_URL_STORAGE_KEY, cameraUrl);
   }, [cameraUrl]);
+
+  useEffect(() => {
+    if (activeSessionState) {
+      saveActiveSessionState(activeSessionState);
+      return;
+    }
+
+    clearActiveSessionState();
+  }, [activeSessionState]);
 
   const handleImportSessions = (imported: Session[]) => {
     replaceSessions(imported);
@@ -80,28 +98,33 @@ export default function App() {
     };
     
     setActiveSession(newSession);
+    setActiveSessionState(null);
     setCurrentView('config');
   };
 
   const handleStartSession = (session: Session) => {
     setActiveSession(session);
+    setActiveSessionState(createActiveSessionState(session));
     setCurrentView('active');
   };
 
   const handleCompleteSession = (session: Session) => {
     setActiveSession(session);
+    setActiveSessionState(null);
     setCurrentView('complete');
   };
 
   const handleSaveSession = (session: Session) => {
     addSession(session);
     setActiveSession(null);
+    setActiveSessionState(null);
     setCurrentView('dashboard');
   };
 
   const handleCancelSession = () => {
     if (window.confirm('Are you sure you want to cancel this session? Progress will not be saved.')) {
       setActiveSession(null);
+      setActiveSessionState(null);
       setCurrentView('dashboard');
     }
   };
@@ -149,8 +172,10 @@ export default function App() {
       {currentView === 'active' && activeSession && (
         <ActiveSession
           session={activeSession}
+          initialState={activeSessionState ?? undefined}
           cameraUrl={cameraUrl}
           onCameraUrlChange={setCameraUrl}
+          onStateChange={setActiveSessionState}
           onCompleteSession={handleCompleteSession}
           onCancel={handleCancelSession}
         />
