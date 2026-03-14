@@ -32,7 +32,7 @@ test('sanitizeCameraUrl rejects unsupported protocols and malformed URLs', () =>
 
 test('extractCameraUrlFromValue supports Brave Paws deep links', () => {
   assert.equal(
-    extractCameraUrlFromValue('https://harvey.cash/fermi/separation?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com'),
+    extractCameraUrlFromValue('https://harvey.cash/separation/app/?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com'),
     'https://demo.trycloudflare.com',
   );
 });
@@ -40,7 +40,7 @@ test('extractCameraUrlFromValue supports Brave Paws deep links', () => {
 test('isCameraUrlValid only accepts sanitized remote or local links', () => {
   assert.equal(isCameraUrlValid('https://demo.trycloudflare.com'), true);
   assert.equal(
-    isCameraUrlValid('https://harvey.cash/fermi/separation?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com'),
+    isCameraUrlValid('https://harvey.cash/separation/app/?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com'),
     true,
   );
   assert.equal(isCameraUrlValid('http://192.168.1.10:1984'), false);

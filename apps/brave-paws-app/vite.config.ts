@@ -13,7 +13,7 @@ export default defineConfig(({mode}) => {
     '958585772739-prba4n2jh4aqid4ase11tbcsunpfppop.apps.googleusercontent.com';
 
   return {
-    base: './',
+    base: '/separation/app/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

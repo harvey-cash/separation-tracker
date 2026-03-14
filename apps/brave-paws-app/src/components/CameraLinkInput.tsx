@@ -362,7 +362,7 @@ export function CameraLinkInput({
                   commitManualUrl();
                 }
               }}
-              placeholder="https://harvey.cash/fermi/separation?cameraUrl=..."
+              placeholder="https://harvey.cash/separation/app/?cameraUrl=..."
               className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-700 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-mono text-sm"
             />
             <p className={`${descriptionClass} ${isCameraUrlValid(manualUrl) ? 'text-emerald-700' : 'text-slate-500'}`}>

@@ -61,7 +61,6 @@ async function main() {
   await fs.rm(zipPath, { force: true });
 
   await fs.mkdir(path.join(bundleRoot, 'brave-paws-streamer'), { recursive: true });
-  await fs.mkdir(path.join(bundleRoot, 'windows-camera-helper-ui'), { recursive: true });
 
   for (const fileName of portableSupportFiles) {
     await copyIfExists(
@@ -69,11 +68,6 @@ async function main() {
       path.join(bundleRoot, 'brave-paws-streamer', fileName),
     );
   }
-
-  await copyIfExists(
-    path.join(packageRoot, 'windows-camera-helper-ui', 'public'),
-    path.join(bundleRoot, 'windows-camera-helper-ui', 'public'),
-  );
 
   const pkgOutputBase = path.join(bundleRoot, exeName.replace(/\.exe$/i, ''));
   await runProcess(process.execPath, [

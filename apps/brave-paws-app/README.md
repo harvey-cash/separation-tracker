@@ -8,6 +8,8 @@ Brave Paws is a client-side React + TypeScript app for planning, running, and re
 
 Session data is stored locally in the browser by default, with optional Google Drive backup if you connect your account.
 
+Production deployments target `https://harvey.cash/separation/app/`.
+
 ## Key Commands
 
 From this directory:
@@ -45,7 +47,7 @@ Copy `.env.example` to `.env.local` and set values as needed.
 
 | Variable | Required | Description |
 |---|---|---|
-| `APP_URL` | No | Hosting URL used for self-referential links. |
+| `APP_URL` | No | Hosting URL used for self-referential links. For production this should be `https://harvey.cash/separation/app/`. |
 | `VITE_GOOGLE_CLIENT_ID` | No | OAuth client ID for Google Drive backup. |
 
 If `VITE_GOOGLE_CLIENT_ID` is unset, the app falls back to the built-in default client ID.

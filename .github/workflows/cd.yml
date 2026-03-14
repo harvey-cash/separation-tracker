@@ -57,8 +57,16 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=v$VERSION" >> $GITHUB_OUTPUT
       - run: npm run build
+      - name: Stage hosted site output
+        run: |
+          mkdir -p site-dist
+          mkdir -p site-dist/app
+          mkdir -p site-dist/streamer
+          cp -r apps/brave-paws-landing/dist/* site-dist/
+          cp -r apps/brave-paws-app/dist/* site-dist/app/
+          cp -r apps/brave-paws-streamer/windows-camera-helper-ui/public/* site-dist/streamer/
       - name: Archive build output
-        run: cd apps/brave-paws-app && zip -r ../../dist.zip dist/
+        run: cd site-dist && zip -r ../dist.zip .
       - name: Commit and push version bump
         run: |
           git config user.name "github-actions[bot]"
@@ -80,8 +88,8 @@ jobs:
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: apps/brave-paws-app/dist/
+          name: site-dist
+          path: site-dist/
 
   deploy:
     needs: release
@@ -93,7 +101,7 @@ jobs:
       - name: Download dist artifact
         uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: site-dist
           path: site-dist/
       - name: Checkout website repo
         uses: actions/checkout@v4
@@ -103,9 +111,17 @@ jobs:
           path: website
       - name: Update site files
         run: |
-          rm -rf website/fermi/separation
-          mkdir -p website/fermi/separation
-          cp -r site-dist/* website/fermi/separation/
+          mkdir -p website/separation
+          rm -rf website/separation/assets
+          rm -rf website/separation/app
+          rm -rf website/separation/streamer
+          mkdir -p website/separation/app
+          mkdir -p website/separation/streamer
+          find website/separation -maxdepth 1 -type f -delete
+          cp -r site-dist/*.html website/separation/
+          cp -r site-dist/assets website/separation/
+          cp -r site-dist/app/* website/separation/app/
+          cp -r site-dist/streamer/* website/separation/streamer/
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
@@ -114,5 +130,5 @@ jobs:
           branch: deploy/separation-${{ needs.release.outputs.version }}
           title: "Deploy separation-tracker ${{ needs.release.outputs.version }}"
           body: |
-            Automated deployment of separation-tracker ${{ needs.release.outputs.version }} to `/fermi/separation/`.
+            Automated deployment of separation-tracker ${{ needs.release.outputs.version }} to `/separation/`, `/separation/app/`, and `/separation/streamer/`.
           commit-message: "deploy separation-tracker ${{ needs.release.outputs.version }}"

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brave Paws</title>
+    <meta
+      name="description"
+      content="Brave Paws helps dog guardians plan separation-anxiety training with a session tracker, a hosted streamer UI, and a lightweight Windows helper."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero panel">
+        <div class="eyebrow-row">
+          <span class="eyebrow">Brave Paws</span>
+          <span class="pill">Separation Anxiety Training</span>
+        </div>
+        <div class="hero-grid">
+          <div>
+            <h1>Thoughtful tools for gradual separation-anxiety training.</h1>
+            <p class="hero-copy">
+              Brave Paws is a small set of tools for dog guardians working through cue-less, below-threshold separation training: a session tracker for the plan, and a lightweight streamer companion for remote camera pairing.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="./app/">Open Brave Paws App</a>
+              <a class="button button-secondary" href="./streamer/">Open Streamer UI</a>
+            </div>
+          </div>
+          <div class="hero-card card">
+            <p class="label">Core idea</p>
+            <h2>Train below threshold. Track the real pattern. Reduce the guesswork.</h2>
+            <p>
+              Brave Paws centers gradual desensitisation: short planned absences, varied durations, clean data, and practical review over time.
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <main class="content-stack">
+        <section class="panel section-panel">
+          <div class="section-heading">
+            <p class="eyebrow">What This Is</p>
+            <h2>Separation anxiety training is a structured behaviour protocol, not a willpower problem.</h2>
+          </div>
+          <div class="two-column-copy">
+            <p>
+              Dogs with separation anxiety can panic when left alone. The goal is not to "teach them a lesson" or simply wait it out. The work is to create absences that stay short enough for the dog to cope, then extend those absences gradually over time.
+            </p>
+            <p>
+              Brave Paws follows the gradual-desensitisation approach described in Julie Naismith's <em>Be Right Back</em>: keep sessions below threshold, remove departure cues, vary durations, and let observed behaviour guide the next step.
+            </p>
+          </div>
+          <div class="principle-grid">
+            <article class="card principle-card">
+              <p class="label">1</p>
+              <h3>Below threshold</h3>
+              <p>Each absence stays short enough that the dog does not tip into panic.</p>
+            </article>
+            <article class="card principle-card">
+              <p class="label">2</p>
+              <h3>Cue-less departures</h3>
+              <p>Reduce predictable leaving rituals so anticipation does not become the trigger.</p>
+            </article>
+            <article class="card principle-card">
+              <p class="label">3</p>
+              <h3>Randomised durations</h3>
+              <p>Step lengths move up and down so the dog does not learn that each rep always gets harder.</p>
+            </article>
+            <article class="card principle-card">
+              <p class="label">4</p>
+              <h3>Gradual extension</h3>
+              <p>Progress grows across sessions only when the previous work stayed calm and sustainable.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="product-grid">
+          <article class="panel product-panel">
+            <div class="section-heading compact">
+              <p class="eyebrow">Brave Paws App</p>
+              <h2>Plan, run, rate, and review your training sessions.</h2>
+            </div>
+            <p>
+              The app is a client-side tracker for building timed sessions, running step-by-step countdowns, logging outcomes, and reviewing trends over time. It keeps the training method practical when you are repeating small sessions every day.
+            </p>
+            <ul class="feature-list">
+              <li>Create varied session steps with short absences.</li>
+              <li>Run sessions with a guided countdown and total training timer.</li>
+              <li>Record calm, coping, or panicking outcomes with notes.</li>
+              <li>Review history, charts, and CSV exports.</li>
+            </ul>
+            <a class="button button-primary" href="./app/">Go to the App</a>
+          </article>
+
+          <article class="panel product-panel streamer-panel">
+            <div class="section-heading compact">
+              <p class="eyebrow">Brave Paws Streamer</p>
+              <h2>Hosted control UI, local helper, and remote camera pairing.</h2>
+            </div>
+            <p>
+              The streamer is split across two surfaces: a hosted control page and a local Windows helper that handles device access, process management, and secure tunnel creation. That keeps the UI easy to update while keeping the trusted machine-specific work local.
+            </p>
+            <div class="architecture-card card">
+              <div>
+                <p class="label">Hosted</p>
+                <p class="mono">harvey.cash/separation/streamer/</p>
+              </div>
+              <div class="architecture-arrow">↔</div>
+              <div>
+                <p class="label">Loopback helper</p>
+                <p class="mono">127.0.0.1 + session token</p>
+              </div>
+            </div>
+            <a class="button button-secondary" href="./streamer/">Go to the Streamer</a>
+          </article>
+        </section>
+
+        <section class="panel section-panel">
+          <div class="section-heading">
+            <p class="eyebrow">Open Source</p>
+            <h2>The code, packaging, and deployment are all in the open.</h2>
+          </div>
+          <div class="repo-row">
+            <p>
+              Brave Paws is built as an open-source monorepo with the app, streamer helper, hosted streamer UI, and deployment workflows in one place.
+            </p>
+            <a class="button button-secondary" href="https://github.com/harvey-cash/separation-tracker" target="_blank" rel="noopener noreferrer">
+              View GitHub Repo
+            </a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer panel">
+        <div>
+          <p class="eyebrow">Support Development</p>
+          <h2>Buy Me a Coffee is coming later.</h2>
+          <p>
+            A donation link is not set up yet. This section is here as a placeholder for future support options once the project surfaces are settled.
+          </p>
+        </div>
+        <div class="footer-links">
+          <a href="./app/">App</a>
+          <a href="./streamer/">Streamer</a>
+          <a href="https://github.com/harvey-cash/separation-tracker" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </footer>
+    </div>
+  </body>
+  </html>
