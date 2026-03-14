@@ -3,6 +3,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 const {
+  DEFAULT_LOOPBACK_HOST,
   DEFAULT_LOOPBACK_PORT,
   LOOPBACK_API_PATHS,
   STREAMER_EVENT_TYPES,
@@ -29,7 +30,7 @@ const shouldOpenBrowser = process.env.CAMERA_HELPER_NO_OPEN !== '1';
 const isMockMode = process.env.CAMERA_HELPER_MOCK === '1';
 const launchToken = createLaunchToken();
 const allowedOrigins = parseAllowedOrigins();
-const loopbackBaseUrl = buildLoopbackBaseUrl(port);
+const loopbackBaseUrl = buildLoopbackBaseUrl(port, DEFAULT_LOOPBACK_HOST);
 const launchUrl = buildHostedUiLaunchUrl({ port, token: launchToken });
 const appVersion = getAppVersion();
 
@@ -128,7 +129,6 @@ app.get(LOOPBACK_API_PATHS.manifest, (_request, response) => {
     },
     apiBaseUrl: loopbackBaseUrl,
     uiUrl: getStreamerUiUrl(),
-    launchUrl,
   });
 });
 
@@ -196,7 +196,7 @@ app.post(LOOPBACK_API_PATHS.stop, async (_request, response) => {
   response.json(buildPayload(snapshot));
 });
 
-app.listen(port, () => {
+app.listen(port, DEFAULT_LOOPBACK_HOST, () => {
   broadcastEvent(STREAMER_EVENT_TYPES.log, {
     line: `Brave Paws Streamer listening on ${loopbackBaseUrl}`,
     logs: adapter.getSnapshot().logs,

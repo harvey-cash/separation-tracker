@@ -348,8 +348,13 @@ async function startStream() {
 }
 
 async function stopStream() {
-  const payload = await request('/api/stop', { method: 'POST' });
-  render(payload);
+  try {
+    setStatus('Stopping', 'Stopping camera services…');
+    const payload = await request('/api/stop', { method: 'POST' });
+    render(payload);
+  } catch (error) {
+    setStatus('Attention', error instanceof Error ? error.message : 'Unable to stop camera.');
+  }
 }
 
 elements.refreshButton.addEventListener('click', refreshDevices);

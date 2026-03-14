@@ -305,6 +305,13 @@ h3 {
   color: var(--rose);
 }
 
+.version-text {
+  margin: 16px 0 0;
+  color: rgba(96, 112, 131, 0.7);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
 @media (max-width: 960px) {
   .hero-grid,
   .product-grid,
