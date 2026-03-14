@@ -15,6 +15,8 @@ Brave Paws Streamer:
 
 The laptop preview and the paired Brave Paws preview are intentionally tuned differently. The laptop preview stays quality-oriented, while the paired Brave Paws stream can request a separate remote-first playback profile intended to reduce effective latency and recover more cleanly from stalls on the public tunnel path. The low-latency remote profile now lowers resolution, bitrate, and audio bandwidth to improve recovery, while the resilient profile keeps a slightly heavier stream when stability matters more than minimum delay.
 
+That means the main performance bottleneck is the public transport path, not the fact that the preview is embedded as an `iframe`. Replacing the embedded viewer with a custom RTC-aware player would only be a major performance win if the full delivery path also moved to a real end-to-end WebRTC flow instead of the current cloudflared-friendly HTTP playback route.
+
 Note: during local development the streamer runs from the `apps/brave-paws-streamer/` workspace with `node windows-camera-helper-ui/server.cjs` or, from the repo root, `npm run camera-helper:gui`. The packaged bundle includes `BravePawsStreamer.exe`, so end users do not need Node.js installed separately.
 
 ## Packaging And Validation

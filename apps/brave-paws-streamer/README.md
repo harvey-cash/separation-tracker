@@ -12,6 +12,18 @@ The current implementation now distinguishes between two playback surfaces:
 
 That split is intentional. Under the current router-free and backend-free deployment model, the public path remains tunnel-compatible HTTP playback, so the local laptop preview is no longer treated as a proxy for remote latency.
 
+## Transport Evaluation
+
+Swapping the current embedded go2rtc viewer `iframe` for a custom "native" player is not, by itself, a meaningful performance win.
+
+- The `iframe` is just the container. If it loads go2rtc's built-in viewer, the browser still uses the same underlying media stack it would use for a custom page.
+- The larger constraint in the current architecture is the transport path: camera capture → go2rtc → local HTTP server → cloudflared tunnel → remote browser.
+- Because the public route is intentionally tunnel-compatible HTTP playback today, replacing the `iframe` alone does not remove the tunnel hop, the HTTP delivery mode, or the current buffering/recovery trade-offs.
+
+A direct RTC-aware player only becomes materially interesting if the surrounding architecture also changes to support a true end-to-end WebRTC path, including compatible signaling and ICE traversal that can preserve the low-latency transport instead of falling back to the current tunnel-friendly HTTP modes.
+
+In other words: a player rewrite may improve UI control and customization, but the main performance gains would come from changing the network transport and stream profiles, not from removing the `iframe` wrapper itself.
+
 ## Key Commands
 
 From this directory:
