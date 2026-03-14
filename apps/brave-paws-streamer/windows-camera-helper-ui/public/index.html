@@ -38,6 +38,14 @@
           </label>
         </div>
 
+        <label class="field">
+          <span>Remote Preview Profile</span>
+          <select id="remote-profile">
+            <option value="remote-low-latency">Low Latency</option>
+            <option value="remote-resilient">Resilient</option>
+          </select>
+        </label>
+
         <div class="actions-row">
           <button id="refresh-devices" class="button button-secondary">Refresh Devices</button>
           <button id="start-stream" class="button button-primary">Start Camera</button>
@@ -53,6 +61,7 @@
           </div>
           <img id="qr-image" alt="Camera link QR code" />
           <p class="hint">Scan with Brave Paws on your phone and the app will save this stream automatically.</p>
+          <p class="hint" id="remote-preview-hint">Remote preview profile: waiting for helper…</p>
         </div>
 
         <div class="log-card collapsed" id="log-card">

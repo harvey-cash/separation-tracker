@@ -52,6 +52,8 @@ export default function App() {
 
     const currentUrl = new URL(window.location.href);
     currentUrl.searchParams.delete('cameraUrl');
+    currentUrl.searchParams.delete('cameraProfile');
+    currentUrl.searchParams.delete('cameraMode');
     window.history.replaceState({}, document.title, currentUrl.toString());
   }, []);
 

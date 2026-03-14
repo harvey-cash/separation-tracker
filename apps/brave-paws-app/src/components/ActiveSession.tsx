@@ -1,11 +1,39 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Session } from '../types';
-import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff } from 'lucide-react';
+import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff, AlertCircle, RotateCcw } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
 import { CameraLinkInput } from './CameraLinkInput';
 import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTimer } from '../utils/timer';
 import { ActiveSessionState } from '../utils/activeSessionStorage';
+
+const PREVIEW_LOAD_TIMEOUT_MS = 12000;
+
+function buildPreviewFallbackUrls(streamUrl: string): string[] {
+  if (!streamUrl) {
+    return [];
+  }
+
+  try {
+    const primaryUrl = new URL(streamUrl);
+    const primaryMode = primaryUrl.searchParams.get('mode') || 'mse';
+    const fallbackModes = [primaryMode, 'mp4,mjpeg', 'mjpeg'];
+    const urls = [];
+
+    for (const mode of fallbackModes) {
+      const nextUrl = new URL(primaryUrl.toString());
+      nextUrl.searchParams.set('mode', mode);
+      const serialized = nextUrl.toString();
+      if (!urls.includes(serialized)) {
+        urls.push(serialized);
+      }
+    }
+
+    return urls;
+  } catch {
+    return [streamUrl];
+  }
+}
 
 type Props = {
   session: Session;
@@ -54,6 +82,10 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
 
     return getRemainingSeconds(currentStep.durationSeconds, restoredState.stepClock);
   });
+  const [previewCandidateIndex, setPreviewCandidateIndex] = useState(0);
+  const [previewReloadToken, setPreviewReloadToken] = useState(0);
+  const [previewStatus, setPreviewStatus] = useState<'loading' | 'live' | 'degraded'>('loading');
+  const [previewStatusMessage, setPreviewStatusMessage] = useState('Connecting to remote preview…');
   const sessionRef = useRef(session);
   const sessionClockRef = useRef(sessionClock);
   const currentStepIndexRef = useRef(currentStepIndex);
@@ -236,6 +268,64 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const isFinished = currentStepIndex >= session.steps.length - 1 && session.steps[session.steps.length - 1].completed;
   const streamUrl = buildCameraStreamUrl(cameraUrl);
   const hasValidCameraUrl = streamUrl.length > 0;
+  const previewFallbackUrls = buildPreviewFallbackUrls(streamUrl);
+  const activePreviewUrl = previewFallbackUrls[previewCandidateIndex] || streamUrl;
+
+  useEffect(() => {
+    setPreviewCandidateIndex(0);
+    setPreviewReloadToken(0);
+    if (!hasValidCameraUrl || isEditingCamera) {
+      setPreviewStatus('loading');
+      setPreviewStatusMessage('Link a remote camera to start the live preview.');
+      return;
+    }
+
+    setPreviewStatus('loading');
+    setPreviewStatusMessage('Connecting to remote preview…');
+  }, [hasValidCameraUrl, isEditingCamera, streamUrl]);
+
+  useEffect(() => {
+    if (!hasValidCameraUrl || isEditingCamera || !activePreviewUrl) {
+      return;
+    }
+
+    setPreviewStatus('loading');
+    setPreviewStatusMessage(
+      previewCandidateIndex === 0
+        ? 'Connecting to remote preview…'
+        : 'Remote preview is slow to respond. Trying a fallback mode…',
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      if (previewCandidateIndex < previewFallbackUrls.length - 1) {
+        setPreviewCandidateIndex((currentIndex) => Math.min(currentIndex + 1, previewFallbackUrls.length - 1));
+        return;
+      }
+
+      setPreviewStatus('degraded');
+      setPreviewStatusMessage('Remote preview is delayed or stalled. Retry the preview or open it in a separate tab.');
+    }, PREVIEW_LOAD_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [activePreviewUrl, hasValidCameraUrl, isEditingCamera, previewCandidateIndex, previewFallbackUrls.length, previewReloadToken]);
+
+  const handlePreviewLoad = useCallback(() => {
+    setPreviewStatus('live');
+    setPreviewStatusMessage(
+      previewCandidateIndex === 0
+        ? 'Remote preview connected.'
+        : 'Remote preview connected using a fallback mode tuned for recovery.',
+    );
+  }, [previewCandidateIndex]);
+
+  const handlePreviewRetry = useCallback(() => {
+    setPreviewCandidateIndex(0);
+    setPreviewStatus('loading');
+    setPreviewStatusMessage('Retrying remote preview…');
+    setPreviewReloadToken((current) => current + 1);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] flex flex-col">
@@ -266,13 +356,15 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
         {hasValidCameraUrl && !isEditingCamera ? (
           <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800 relative group">
              <iframe
-               src={streamUrl}
+               key={`${activePreviewUrl}-${previewReloadToken}`}
+               src={activePreviewUrl}
                className="w-full h-full border-0 absolute inset-0"
                allow="autoplay; fullscreen; microphone"
+               onLoad={handlePreviewLoad}
              />
              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                <a
-                 href={streamUrl}
+                 href={activePreviewUrl}
                  target="_blank"
                  rel="noopener noreferrer"
                  className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm flex items-center"
@@ -285,6 +377,32 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                >
                  Change Camera
                </button>
+             </div>
+             <div className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
+               <div
+                 className={`pointer-events-auto flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs shadow-lg backdrop-blur-sm ${
+                   previewStatus === 'degraded'
+                     ? 'border-amber-200 bg-amber-50/95 text-amber-900'
+                     : previewStatus === 'live'
+                     ? 'border-emerald-200 bg-emerald-50/95 text-emerald-900'
+                     : 'border-slate-200 bg-white/95 text-slate-700'
+                 }`}
+               >
+                 <div className="flex items-start gap-2">
+                   <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                   <span>{previewStatusMessage}</span>
+                 </div>
+                 {(previewStatus === 'degraded' || previewCandidateIndex > 0) && (
+                   <button
+                     type="button"
+                     onClick={handlePreviewRetry}
+                     className="inline-flex items-center gap-1 rounded-lg border border-current/20 px-2 py-1 font-medium transition-colors hover:bg-white/60"
+                   >
+                     <RotateCcw size={12} />
+                     Retry
+                   </button>
+                 )}
+               </div>
              </div>
           </div>
         ) : (

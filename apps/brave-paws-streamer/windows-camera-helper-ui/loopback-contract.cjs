@@ -8,6 +8,8 @@ const DEFAULT_APP_URL = 'https://harvey.cash/separation/app/';
 const STREAMER_HELPER_NAME = 'brave-paws-streamer';
 const STREAMER_HELPER_PLATFORM = 'windows';
 const TOKEN_HEADER = 'x-brave-paws-session';
+const CAMERA_PROFILE_QUERY_PARAM = 'cameraProfile';
+const CAMERA_MODE_QUERY_PARAM = 'cameraMode';
 
 const LOOPBACK_API_PATHS = {
   manifest: '/',
@@ -55,9 +57,21 @@ function buildHostedUiLaunchUrl({ port = DEFAULT_LOOPBACK_PORT, token }) {
   return launchUrl.toString();
 }
 
-function buildPairingUrl(cameraUrl) {
+function buildPairingUrl(cameraUrl, options = {}) {
   const pairingUrl = new URL(getBravePawsAppUrl());
   pairingUrl.searchParams.set('cameraUrl', cameraUrl);
+
+  const profile = typeof options.profile === 'string' ? options.profile.trim() : '';
+  const mode = typeof options.mode === 'string' ? options.mode.trim() : '';
+
+  if (profile) {
+    pairingUrl.searchParams.set(CAMERA_PROFILE_QUERY_PARAM, profile);
+  }
+
+  if (mode) {
+    pairingUrl.searchParams.set(CAMERA_MODE_QUERY_PARAM, mode);
+  }
+
   return pairingUrl.toString();
 }
 
@@ -151,6 +165,8 @@ function writeSseEvent(response, eventType, payload) {
 }
 
 module.exports = {
+  CAMERA_MODE_QUERY_PARAM,
+  CAMERA_PROFILE_QUERY_PARAM,
   DEFAULT_LOOPBACK_HOST,
   DEFAULT_LOOPBACK_PORT,
   LOOPBACK_API_PATHS,

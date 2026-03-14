@@ -71,6 +71,5 @@ Run these from the repo root:
 - Landing page source: [apps/brave-paws-landing/index.html](apps/brave-paws-landing/index.html)
 - Web app training-method background: [apps/brave-paws-app/INFO.md](apps/brave-paws-app/INFO.md)
 - Streamer overview and development commands: [apps/brave-paws-streamer/README.md](apps/brave-paws-streamer/README.md)
-- Streamer static-hosting feasibility spike: [apps/brave-paws-streamer/STATIC_HOSTING_FEASIBILITY.md](apps/brave-paws-streamer/STATIC_HOSTING_FEASIBILITY.md)
 - Streamer end-user notes and runtime details: [apps/brave-paws-streamer/windows-camera-helper/README.md](apps/brave-paws-streamer/windows-camera-helper/README.md)
 - Release and distribution guide: [RELEASE.md](RELEASE.md)

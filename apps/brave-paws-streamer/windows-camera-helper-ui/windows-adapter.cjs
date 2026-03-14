@@ -17,6 +17,66 @@ const MOCK_DEVICES = {
   video: ['Mock Windows Camera'],
   audio: ['Mock Windows Microphone'],
 };
+const LOCAL_PREVIEW_PROFILE = 'local-quality';
+const LOCAL_PREVIEW_MODE = 'mse';
+const REMOTE_PREVIEW_PROFILE = 'remote-low-latency';
+const REMOTE_PREVIEW_MODE = 'mse,mp4,mjpeg';
+const REMOTE_RESILIENT_PROFILE = 'remote-resilient';
+const REMOTE_RESILIENT_MODE = 'mse,mp4';
+const REMOTE_PROFILE_OPTIONS = [REMOTE_PREVIEW_PROFILE, REMOTE_RESILIENT_PROFILE];
+const REMOTE_ENCODING_PROFILES = {
+  [REMOTE_PREVIEW_PROFILE]: {
+    videoTemplate: 'brave_paws_h264_low_latency',
+    audioTemplate: 'brave_paws_aac_low_latency',
+    width: 960,
+    height: 540,
+    description: 'Remote low-latency profile enabled: lower bitrate, faster keyframes, and lighter audio for quicker recovery.',
+  },
+  [REMOTE_RESILIENT_PROFILE]: {
+    videoTemplate: 'brave_paws_h264_resilient',
+    audioTemplate: 'brave_paws_aac_resilient',
+    width: 1280,
+    height: 720,
+    description: 'Remote resilient profile enabled: more conservative bitrate and quality tuning for steadier playback.',
+  },
+};
+
+function buildPreviewUrl(baseUrl, mode) {
+  const previewUrl = new URL('/stream.html', `${baseUrl.replace(/\/+$/, '')}/`);
+  previewUrl.searchParams.set('src', 'camera');
+  previewUrl.searchParams.set('mode', mode);
+  return previewUrl.toString();
+}
+
+function sanitizeRemoteProfile(profile) {
+  return REMOTE_PROFILE_OPTIONS.includes(profile) ? profile : REMOTE_PREVIEW_PROFILE;
+}
+
+function getRemoteModeForProfile(profile) {
+  return sanitizeRemoteProfile(profile) === REMOTE_RESILIENT_PROFILE
+    ? REMOTE_RESILIENT_MODE
+    : REMOTE_PREVIEW_MODE;
+}
+
+function getEncodingProfileForRemoteProfile(profile) {
+  return REMOTE_ENCODING_PROFILES[sanitizeRemoteProfile(profile)] || REMOTE_ENCODING_PROFILES[REMOTE_PREVIEW_PROFILE];
+}
+
+function createPreviewState(overrides = {}) {
+  const remoteProfile = sanitizeRemoteProfile(overrides.remoteProfile || REMOTE_PREVIEW_PROFILE);
+  return {
+    localUrl: '',
+    publicUrl: '',
+    remoteUrl: '',
+    pairingUrl: '',
+    qrCodeDataUrl: '',
+    localProfile: LOCAL_PREVIEW_PROFILE,
+    remoteProfile,
+    localMode: LOCAL_PREVIEW_MODE,
+    remoteMode: getRemoteModeForProfile(remoteProfile),
+    availableRemoteProfiles: [...REMOTE_PROFILE_OPTIONS],
+  };
+}
 
 function createWindowsAdapter({
   appVersion,
@@ -32,12 +92,7 @@ function createWindowsAdapter({
   const state = {
     appVersion,
     status: 'idle',
-    preview: {
-      localUrl: '',
-      publicUrl: '',
-      pairingUrl: '',
-      qrCodeDataUrl: '',
-    },
+    preview: createPreviewState(),
     selection: {
       video: '',
       audio: '',
@@ -366,28 +421,42 @@ function createWindowsAdapter({
     return state.devices;
   }
 
-  async function writeConfig(selectedVideo, selectedAudio) {
+  async function writeConfig(selectedVideo, selectedAudio, remoteProfile) {
     const videoDevice = selectedVideo || '0';
     const audioDevice = selectedAudio || '0';
+    const encodingProfile = getEncodingProfileForRemoteProfile(remoteProfile);
     const yamlContent = [
+      'ffmpeg:',
+      '  # Brave Paws remote playback profiles trade image fidelity for quicker recovery and clearer live audio on tunnel-based remote playback.',
+      '  brave_paws_h264_low_latency: "-codec:v libx264 -pix_fmt yuv420p -preset:v superfast -tune:v zerolatency -g:v 30 -profile:v baseline -level:v 3.1 -b:v 1200k -maxrate:v 1200k -bufsize:v 1200k"',
+      '  brave_paws_h264_resilient: "-codec:v libx264 -pix_fmt yuv420p -preset:v veryfast -tune:v zerolatency -g:v 45 -profile:v main -level:v 3.1 -b:v 1800k -maxrate:v 1800k -bufsize:v 2400k"',
+      '  brave_paws_aac_low_latency: "-codec:a aac -ar 16000 -ac 1 -b:a 48k"',
+      '  brave_paws_aac_resilient: "-codec:a aac -ar 24000 -ac 1 -b:a 64k"',
+      '',
       'streams:',
       '  camera:',
-      `    - "ffmpeg:device?video=${videoDevice}&audio=${audioDevice}#video=h264#audio=aac"`,
+      `    - "ffmpeg:device?video=${videoDevice}&audio=${audioDevice}#video=${encodingProfile.videoTemplate}#audio=${encodingProfile.audioTemplate}#width=${encodingProfile.width}#height=${encodingProfile.height}"`,
       '',
     ].join('\n');
 
     await fs.writeFile(path.join(helperDir, 'go2rtc.yaml'), yamlContent, 'utf8');
+    addLog(encodingProfile.description);
   }
 
   async function updatePairingArtifacts() {
     if (!state.preview.publicUrl) {
+      state.preview.remoteUrl = '';
       state.preview.pairingUrl = '';
       state.preview.qrCodeDataUrl = '';
       emitState();
       return;
     }
 
-    state.preview.pairingUrl = buildPairingUrl(state.preview.publicUrl);
+    state.preview.remoteUrl = buildPreviewUrl(state.preview.publicUrl, state.preview.remoteMode);
+    state.preview.pairingUrl = buildPairingUrl(state.preview.publicUrl, {
+      profile: state.preview.remoteProfile,
+      mode: state.preview.remoteMode,
+    });
     state.preview.qrCodeDataUrl = await QRCode.toDataURL(state.preview.pairingUrl, {
       errorCorrectionLevel: 'M',
       margin: 2,
@@ -456,12 +525,7 @@ function createWindowsAdapter({
 
     cloudflaredProc = null;
     go2rtcProc = null;
-    state.preview = {
-      localUrl: '',
-      publicUrl: '',
-      pairingUrl: '',
-      qrCodeDataUrl: '',
-    };
+    state.preview = createPreviewState({ remoteProfile: state.preview.remoteProfile });
     setError('', '');
     addLog('Streaming stopped.');
     setStatus('idle');
@@ -469,13 +533,18 @@ function createWindowsAdapter({
     return getSnapshot();
   }
 
-  async function start(videoDevice, audioDevice) {
+  async function start(videoDevice, audioDevice, remoteProfile) {
+    const nextRemoteProfile = sanitizeRemoteProfile(remoteProfile || state.preview.remoteProfile);
     state.selection.video = videoDevice || '';
     state.selection.audio = audioDevice || '';
-    state.preview.publicUrl = '';
-    state.preview.pairingUrl = '';
-    state.preview.qrCodeDataUrl = '';
-    state.preview.localUrl = '';
+    state.preview = {
+      ...createPreviewState({ remoteProfile: nextRemoteProfile }),
+      publicUrl: '',
+      pairingUrl: '',
+      qrCodeDataUrl: '',
+      localUrl: '',
+      remoteUrl: '',
+    };
     setError('', '');
     setStatus('bootstrapping');
     addLog('Preparing Brave Paws Streamer...');
@@ -488,7 +557,7 @@ function createWindowsAdapter({
     if (isMockMode) {
       await stop();
       setStatus('starting');
-      state.preview.localUrl = 'http://127.0.0.1:1984/stream.html?src=camera&mode=mse';
+      state.preview.localUrl = buildPreviewUrl('http://127.0.0.1:1984', state.preview.localMode);
       state.preview.publicUrl = MOCK_SECURE_URL;
       await updatePairingArtifacts();
       addLog('Mock mode enabled. Skipping live stream startup.');
@@ -497,7 +566,7 @@ function createWindowsAdapter({
       return getSnapshot();
     }
 
-    await writeConfig(videoDevice, audioDevice);
+    await writeConfig(videoDevice, audioDevice, state.preview.remoteProfile);
     await stop();
 
     setStatus('starting');
@@ -517,7 +586,7 @@ function createWindowsAdapter({
     });
     attachProcessLogs(cloudflaredProc, 'cloudflared');
 
-    state.preview.localUrl = 'http://127.0.0.1:1984/stream.html?src=camera&mode=mse';
+    state.preview.localUrl = buildPreviewUrl('http://127.0.0.1:1984', state.preview.localMode);
     emitState();
 
     await new Promise((resolve, reject) => {
@@ -566,6 +635,7 @@ function createWindowsAdapter({
     events,
     getSnapshot,
     refreshDevices,
+    sanitizeRemoteProfile,
     setError,
     setStatus,
     shutdown,
