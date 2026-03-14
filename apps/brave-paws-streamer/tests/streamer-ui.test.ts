@@ -16,8 +16,16 @@ test('streamer UI includes a clock and package-version display', () => {
   assert.match(html, /id="app-version"/);
   assert.match(html, /\.\/styles\.css/);
   assert.match(html, /\.\/app\.js/);
+  assert.match(html, /id="launch-helper"/);
+  assert.match(html, /id="download-helper"/);
+  assert.match(html, /github\.com\/harvey-cash\/separation-tracker\/releases\/latest/);
   assert.match(clientScript, /hour12:\s*false/);
   assert.match(clientScript, /window\.location\.hash/);
   assert.match(clientScript, /new EventSource/);
+  assert.match(clientScript, /brave-paws-streamer:\/\/launch/);
+  assert.match(clientScript, /Get Latest .* Release/);
+  assert.match(clientScript, /window\.open\(elements\.downloadHelper\.href/);
   assert.match(serverScript, /buildHostedUiLaunchUrl/);
+  assert.match(serverScript, /STREAMER_PROTOCOL_SCHEME = 'brave-paws-streamer'/);
+  assert.match(serverScript, /HKCU\\\\Software\\\\Classes\\\\\$\{STREAMER_PROTOCOL_SCHEME\}/);
 });

@@ -19,10 +19,16 @@ const elements = {
   logList: document.querySelector('#log-list'),
   currentTime: document.querySelector('#current-time'),
   appVersion: document.querySelector('#app-version'),
+  helperLauncher: document.querySelector('#helper-launcher'),
+  helperLaunchCopy: document.querySelector('#helper-launch-copy'),
+  launchHelper: document.querySelector('#launch-helper'),
+  downloadHelper: document.querySelector('#download-helper'),
 };
 
 const LOOPBACK_TOKEN_PARAM = 'token';
 const LOOPBACK_BASE_PARAM = 'loopback';
+const STREAMER_PROTOCOL_URL = 'brave-paws-streamer://launch';
+const STREAMER_RELEASES_URL = 'https://github.com/harvey-cash/separation-tracker/releases/latest';
 let currentPayload = null;
 let eventSource = null;
 let areLogsExpanded = false;
@@ -48,6 +54,71 @@ function arraysEqual(left = [], right = []) {
 function setStatus(status, detail) {
   elements.statusText.textContent = detail;
   elements.statusPill.textContent = status;
+}
+
+function detectOperatingSystem() {
+  const platform = [
+    window.navigator.userAgentData?.platform,
+    window.navigator.platform,
+    window.navigator.userAgent,
+  ]
+    .find(Boolean)
+    ?.toLowerCase() || '';
+
+  if (platform.includes('win')) {
+    return 'Windows';
+  }
+
+  if (platform.includes('mac')) {
+    return 'macOS';
+  }
+
+  if (platform.includes('linux')) {
+    return 'Linux';
+  }
+
+  return '';
+}
+
+function configureHelperLauncher() {
+  const osLabel = detectOperatingSystem();
+  elements.downloadHelper.href = STREAMER_RELEASES_URL;
+  if (osLabel === 'Windows') {
+    elements.downloadHelper.textContent = 'Get Latest Windows Release';
+    elements.helperLaunchCopy.textContent = 'If Brave Paws Streamer is already installed on this Windows laptop, open it here. Otherwise, download the latest Windows release on GitHub.';
+    return;
+  }
+
+  elements.downloadHelper.textContent = 'Get Latest Release';
+  elements.helperLaunchCopy.textContent = 'If Brave Paws Streamer is already installed on this device, try opening it here. Otherwise, download the latest release on GitHub.';
+}
+
+function setHelperLauncherVisibility(isVisible) {
+  elements.helperLauncher.classList.toggle('hidden', !isVisible);
+}
+
+function tryLaunchHelper() {
+  const onBlur = () => {
+    window.clearTimeout(fallbackTimer);
+    window.removeEventListener('blur', onBlur);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  };
+
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      onBlur();
+    }
+  };
+
+  const fallbackTimer = window.setTimeout(() => {
+    window.removeEventListener('blur', onBlur);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.open(elements.downloadHelper.href, '_blank', 'noopener,noreferrer');
+  }, 1600);
+
+  window.addEventListener('blur', onBlur);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.location.href = STREAMER_PROTOCOL_URL;
 }
 
 function renderLogCardState() {
@@ -193,6 +264,7 @@ function renderDisconnected(detail) {
   elements.startButton.disabled = true;
   elements.stopButton.disabled = true;
   elements.refreshButton.disabled = true;
+  setHelperLauncherVisibility(true);
 }
 
 function render(payload) {
@@ -203,6 +275,8 @@ function render(payload) {
     renderDisconnected('Launch Brave Paws Streamer on Windows to connect this hosted control page.');
     return;
   }
+
+  setHelperLauncherVisibility(false);
 
   const errorMessage = model.error?.message || '';
   elements.appVersion.textContent = `v${payload.helper?.version || model.appVersion || '0.0.0'}`;
@@ -364,6 +438,7 @@ elements.toggleLogsButton.addEventListener('click', () => {
   areLogsExpanded = !areLogsExpanded;
   renderLogCardState();
 });
+elements.launchHelper.addEventListener('click', tryLaunchHelper);
 elements.openLocalPreview.addEventListener('click', () => {
   if (currentPayload?.state?.preview?.localUrl) {
     window.open(currentPayload.state.preview.localUrl, '_blank', 'noopener,noreferrer');
@@ -380,6 +455,7 @@ elements.fullscreenPreview.addEventListener('click', async () => {
 window.addEventListener('hashchange', bootstrap);
 
 renderLogCardState();
+configureHelperLauncher();
 renderClock();
 bootstrap();
 setInterval(renderClock, 1000);

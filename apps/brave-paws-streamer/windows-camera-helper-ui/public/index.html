@@ -89,6 +89,21 @@
               <p class="label">Not live yet</p>
               <h3>Start the camera to see the full-screen preview here.</h3>
               <p>The preview stays local on this laptop while Brave Paws uses the paired stream on your phone.</p>
+              <div class="helper-launcher" id="helper-launcher">
+                <p class="helper-launch-copy" id="helper-launch-copy">If Brave Paws Streamer is already installed, open it here. Otherwise, download the latest release on GitHub.</p>
+                <div class="actions-row helper-launch-actions">
+                  <button id="launch-helper" class="button button-primary" type="button">Open Brave Paws Streamer</button>
+                  <a
+                    id="download-helper"
+                    class="button button-secondary button-link"
+                    href="https://github.com/harvey-cash/separation-tracker/releases/latest"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Get Latest Release
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
           <iframe id="preview-iframe" class="preview-iframe hidden" allow="autoplay; fullscreen; microphone"></iframe>
