@@ -29,6 +29,8 @@ const LOOPBACK_TOKEN_PARAM = 'token';
 const LOOPBACK_BASE_PARAM = 'loopback';
 const STREAMER_PROTOCOL_URL = 'brave-paws-streamer://launch';
 const STREAMER_RELEASES_URL = 'https://github.com/harvey-cash/separation-tracker/releases/latest';
+// Give common desktop browsers about 1.6 seconds to hand off to a registered protocol handler before opening the release fallback.
+const PROTOCOL_LAUNCH_TIMEOUT_MS = 1600;
 let currentPayload = null;
 let eventSource = null;
 let areLogsExpanded = false;
@@ -57,6 +59,7 @@ function setStatus(status, detail) {
 }
 
 function detectOperatingSystem() {
+  // Best-effort messaging only. If the platform cannot be detected, this returns an empty string and the launcher falls back to generic copy.
   const platform = [
     window.navigator.userAgentData?.platform,
     window.navigator.platform,
@@ -82,15 +85,21 @@ function detectOperatingSystem() {
 
 function configureHelperLauncher() {
   const osLabel = detectOperatingSystem();
+  const intro = osLabel === 'Windows'
+    ? 'If Brave Paws Streamer is already installed on this Windows laptop, open it here.'
+    : 'If Brave Paws Streamer is already installed on this device, try opening it here.';
+  const download = osLabel === 'Windows'
+    ? 'Otherwise, download the latest Windows release on GitHub.'
+    : 'Otherwise, download the latest release on GitHub.';
+
   elements.downloadHelper.href = STREAMER_RELEASES_URL;
   if (osLabel === 'Windows') {
     elements.downloadHelper.textContent = 'Get Latest Windows Release';
-    elements.helperLaunchCopy.textContent = 'If Brave Paws Streamer is already installed on this Windows laptop, open it here. Otherwise, download the latest Windows release on GitHub.';
-    return;
+  } else {
+    elements.downloadHelper.textContent = 'Get Latest Release';
   }
 
-  elements.downloadHelper.textContent = 'Get Latest Release';
-  elements.helperLaunchCopy.textContent = 'If Brave Paws Streamer is already installed on this device, try opening it here. Otherwise, download the latest release on GitHub.';
+  elements.helperLaunchCopy.textContent = `${intro} ${download}`;
 }
 
 function setHelperLauncherVisibility(isVisible) {
@@ -114,7 +123,7 @@ function tryLaunchHelper() {
     window.removeEventListener('blur', onBlur);
     document.removeEventListener('visibilitychange', onVisibilityChange);
     window.open(elements.downloadHelper.href, '_blank', 'noopener,noreferrer');
-  }, 1600);
+  }, PROTOCOL_LAUNCH_TIMEOUT_MS);
 
   window.addEventListener('blur', onBlur);
   document.addEventListener('visibilitychange', onVisibilityChange);

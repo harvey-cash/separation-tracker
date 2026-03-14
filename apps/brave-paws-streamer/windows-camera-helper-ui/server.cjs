@@ -52,10 +52,6 @@ function getAppVersion() {
   }
 }
 
-function quoteRegistryValue(value) {
-  return value.replace(/"/g, '\\"');
-}
-
 function setRegistryValue(key, name, value) {
   return new Promise((resolve, reject) => {
     const args = ['add', key, '/f'];
@@ -82,17 +78,17 @@ function setRegistryValue(key, name, value) {
         return;
       }
 
-      reject(new Error(stderr || `Unable to update ${key}.`));
+      reject(new Error(stderr || `Unable to set registry value ${name || 'default value'} at ${key}.`));
     });
   });
 }
 
 function getProtocolHandlerCommand() {
   if (process.pkg) {
-    return `"${quoteRegistryValue(process.execPath)}" "%1"`;
+    return `"${process.execPath}" "%1"`;
   }
 
-  return `"${quoteRegistryValue(process.execPath)}" "${quoteRegistryValue(__filename)}" "%1"`;
+  return `"${process.execPath}" "${__filename}" "%1"`;
 }
 
 async function ensureProtocolHandler() {
