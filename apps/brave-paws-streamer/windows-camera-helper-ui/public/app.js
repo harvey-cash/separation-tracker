@@ -21,8 +21,12 @@ const elements = {
   appVersion: document.querySelector('#app-version'),
 };
 
-let currentState = null;
+const LOOPBACK_TOKEN_PARAM = 'token';
+const LOOPBACK_BASE_PARAM = 'loopback';
+let currentPayload = null;
+let eventSource = null;
 let areLogsExpanded = false;
+
 const clockFormatter = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
   minute: '2-digit',
@@ -50,6 +54,31 @@ function renderLogCardState() {
   elements.logCard.classList.toggle('collapsed', !areLogsExpanded);
   elements.toggleLogsButton.textContent = areLogsExpanded ? 'Hide Logs' : 'Show Logs';
   elements.toggleLogsButton.setAttribute('aria-expanded', String(areLogsExpanded));
+}
+
+function sanitizeLoopbackBaseUrl(value) {
+  try {
+    const parsed = new URL(value);
+    const isLoopbackHost = ['127.0.0.1', 'localhost', '::1'].includes(parsed.hostname);
+    if (parsed.protocol !== 'http:' || !isLoopbackHost) {
+      return '';
+    }
+
+    parsed.pathname = '';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function getLaunchConfig() {
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  return {
+    loopbackBaseUrl: sanitizeLoopbackBaseUrl(params.get(LOOPBACK_BASE_PARAM) || ''),
+    token: (params.get(LOOPBACK_TOKEN_PARAM) || '').trim(),
+  };
 }
 
 function populateSelect(select, options, fallbackLabel) {
@@ -127,8 +156,8 @@ function applyPreview(url) {
   elements.fullscreenPreview.disabled = false;
 }
 
-function applyQr(url, remotePreviewUrl, qrCodeDataUrl) {
-  if (!url) {
+function applyQr(publicUrl, qrCodeDataUrl) {
+  if (!publicUrl) {
     elements.qrCard.classList.add('hidden');
     if (elements.qrImage.getAttribute('src')) {
       elements.qrImage.removeAttribute('src');
@@ -142,71 +171,153 @@ function applyQr(url, remotePreviewUrl, qrCodeDataUrl) {
   }
 }
 
-function render(state) {
-  currentState = state;
-  elements.appVersion.textContent = `v${state.appVersion || '0.0.0'}`;
-  const statusLabel = state.status === 'running'
+function getModel(payload) {
+  return payload?.state || null;
+}
+
+function renderDisconnected(detail) {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+
+  currentPayload = null;
+  elements.appVersion.textContent = 'Hosted UI';
+  setStatus('Waiting', detail);
+  elements.statusCard.classList.remove('compact');
+  populateSelect(elements.videoDevice, [], 'Launch helper to list cameras');
+  populateSelect(elements.audioDevice, [], 'Launch helper to list microphones');
+  applyPreview('');
+  applyQr('', '');
+  setLogs([]);
+  elements.startButton.disabled = true;
+  elements.stopButton.disabled = true;
+  elements.refreshButton.disabled = true;
+}
+
+function render(payload) {
+  currentPayload = payload;
+  const model = getModel(payload);
+
+  if (!model) {
+    renderDisconnected('Launch Brave Paws Streamer on Windows to connect this hosted control page.');
+    return;
+  }
+
+  const errorMessage = model.error?.message || '';
+  elements.appVersion.textContent = `v${payload.helper?.version || model.appVersion || '0.0.0'}`;
+
+  const statusLabel = model.status === 'running'
     ? 'Live'
-    : state.status === 'starting' || state.status === 'bootstrapping'
+    : model.status === 'starting' || model.status === 'bootstrapping'
     ? 'Starting'
-    : state.status === 'error'
+    : model.status === 'error'
     ? 'Attention'
     : 'Idle';
 
-  const detail = state.error || (state.status === 'running'
+  const detail = errorMessage || (model.status === 'running'
     ? 'Stream live and pairing QR ready.'
-    : state.status === 'starting' || state.status === 'bootstrapping'
+    : model.status === 'starting' || model.status === 'bootstrapping'
     ? 'Starting stream services and preparing your pairing QR…'
-    : 'Ready to start.');
+    : 'Connected to the Windows helper.');
 
   setStatus(statusLabel, detail);
   elements.statusCard.classList.toggle(
     'compact',
-    state.status === 'running' || (state.status === 'idle' && !state.error),
+    model.status === 'running' || (model.status === 'idle' && !errorMessage),
   );
 
-  populateSelect(elements.videoDevice, state.devices.video || [], 'No camera found');
-  populateSelect(elements.audioDevice, state.devices.audio || [], 'No microphone found');
+  populateSelect(elements.videoDevice, model.devices?.video || [], 'No camera found');
+  populateSelect(elements.audioDevice, model.devices?.audio || [], 'No microphone found');
 
-  if (state.selectedVideo) {
-    elements.videoDevice.value = state.selectedVideo;
+  if (model.selection?.video) {
+    elements.videoDevice.value = model.selection.video;
   }
-  if (state.selectedAudio) {
-    elements.audioDevice.value = state.selectedAudio;
+  if (model.selection?.audio) {
+    elements.audioDevice.value = model.selection.audio;
   }
 
-  applyPreview(state.localPreviewUrl);
-  applyQr(state.secureUrl, state.remotePreviewUrl, state.qrCodeDataUrl);
-  setLogs(state.logs || []);
+  applyPreview(model.preview?.localUrl || '');
+  applyQr(model.preview?.publicUrl || '', model.preview?.qrCodeDataUrl || '');
+  setLogs(model.logs || []);
 
-  const isBusy = state.status === 'starting' || state.status === 'bootstrapping';
-  const isRunning = state.status === 'running';
-  elements.startButton.disabled = isBusy || !state.ffmpegAvailable;
+  const isBusy = model.status === 'starting' || model.status === 'bootstrapping';
+  const isRunning = model.status === 'running';
+  const ffmpegAvailable = Boolean(model.dependencies?.ffmpeg?.available);
+
+  elements.refreshButton.disabled = false;
+  elements.startButton.disabled = isBusy || !ffmpegAvailable;
   elements.stopButton.disabled = !isRunning && !isBusy;
 }
 
-async function request(path, options = {}) {
-  const response = await fetch(path, {
+async function request(apiPath, options = {}) {
+  const launchConfig = getLaunchConfig();
+  if (!launchConfig.loopbackBaseUrl || !launchConfig.token) {
+    throw new Error('Launch the Windows helper to attach this hosted streamer page.');
+  }
+
+  const response = await fetch(`${launchConfig.loopbackBaseUrl}${apiPath}`, {
     headers: {
       'Content-Type': 'application/json',
+      'x-brave-paws-session': launchConfig.token,
+      ...(options.headers || {}),
     },
     ...options,
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ error: 'Request failed.' }));
-    throw new Error(payload.error || 'Request failed.');
+    const payload = await response.json().catch(() => ({ error: { message: 'Request failed.' } }));
+    throw new Error(payload.error?.message || 'Request failed.');
   }
 
   return response.json();
 }
 
+function connectEvents() {
+  const launchConfig = getLaunchConfig();
+  if (!launchConfig.loopbackBaseUrl || !launchConfig.token || typeof window.EventSource !== 'function') {
+    return;
+  }
+
+  if (eventSource) {
+    eventSource.close();
+  }
+
+  const eventsUrl = new URL(`${launchConfig.loopbackBaseUrl}/api/events`);
+  eventsUrl.searchParams.set('token', launchConfig.token);
+  eventSource = new EventSource(eventsUrl.toString());
+
+  for (const eventName of ['hello', 'state', 'status', 'devices', 'log', 'error']) {
+    eventSource.addEventListener(eventName, (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.state) {
+          render({
+            ...(currentPayload || {}),
+            helper: currentPayload?.helper || payload.helper,
+            state: payload.state,
+          });
+        }
+      } catch {
+        return;
+      }
+    });
+  }
+}
+
 async function bootstrap() {
+  const launchConfig = getLaunchConfig();
+  if (!launchConfig.loopbackBaseUrl || !launchConfig.token) {
+    renderDisconnected('Launch Brave Paws Streamer on Windows to connect this hosted control page.');
+    return;
+  }
+
   try {
     const payload = await request('/api/bootstrap');
     render(payload);
+    connectEvents();
   } catch (error) {
-    setStatus('Attention', error instanceof Error ? error.message : 'Bootstrap failed.');
+    renderDisconnected(error instanceof Error ? error.message : 'Bootstrap failed.');
   }
 }
 
@@ -237,16 +348,12 @@ async function startStream() {
 }
 
 async function stopStream() {
-  const payload = await request('/api/stop', { method: 'POST' });
-  render(payload);
-}
-
-async function pollStatus() {
   try {
-    const payload = await request('/api/status');
+    setStatus('Stopping', 'Stopping camera services…');
+    const payload = await request('/api/stop', { method: 'POST' });
     render(payload);
-  } catch {
-    return;
+  } catch (error) {
+    setStatus('Attention', error instanceof Error ? error.message : 'Unable to stop camera.');
   }
 }
 
@@ -258,8 +365,8 @@ elements.toggleLogsButton.addEventListener('click', () => {
   renderLogCardState();
 });
 elements.openLocalPreview.addEventListener('click', () => {
-  if (currentState?.localPreviewUrl) {
-    window.open(currentState.localPreviewUrl, '_blank', 'noopener,noreferrer');
+  if (currentPayload?.state?.preview?.localUrl) {
+    window.open(currentPayload.state.preview.localUrl, '_blank', 'noopener,noreferrer');
   }
 });
 elements.fullscreenPreview.addEventListener('click', async () => {
@@ -270,9 +377,9 @@ elements.fullscreenPreview.addEventListener('click', async () => {
 
   await elements.previewPanel.requestFullscreen();
 });
+window.addEventListener('hashchange', bootstrap);
 
 renderLogCardState();
 renderClock();
 bootstrap();
 setInterval(renderClock, 1000);
-setInterval(pollStatus, 3000);

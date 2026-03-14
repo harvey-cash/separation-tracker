@@ -14,7 +14,10 @@ test('streamer UI includes a clock and package-version display', () => {
   );
   assert.doesNotMatch(html, /Local Time/);
   assert.match(html, /id="app-version"/);
+  assert.match(html, /\.\/styles\.css/);
+  assert.match(html, /\.\/app\.js/);
   assert.match(clientScript, /hour12:\s*false/);
-  assert.match(clientScript, /state\.appVersion/);
-  assert.match(serverScript, /appVersion,/);
+  assert.match(clientScript, /window\.location\.hash/);
+  assert.match(clientScript, /new EventSource/);
+  assert.match(serverScript, /buildHostedUiLaunchUrl/);
 });

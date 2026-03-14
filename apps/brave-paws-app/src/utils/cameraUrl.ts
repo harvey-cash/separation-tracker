@@ -1,6 +1,6 @@
 export const CAMERA_URL_STORAGE_KEY = 'csa_camera_url';
 export const CAMERA_URL_QUERY_PARAM = 'cameraUrl';
-export const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/fermi/separation';
+export const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/separation/app/';
 
 export function sanitizeCameraUrl(value: string): string {
   const trimmed = value.trim();

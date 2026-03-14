@@ -1,9 +1,10 @@
 # Release Guide
 
-This repository now produces two kinds of distributable output:
+This repository now produces three kinds of distributable output:
 
-1. The Brave Paws web app build in `apps/brave-paws-app/dist/`
-2. The Brave Paws Streamer portable bundle in `apps/brave-paws-streamer/dist/brave-paws-streamer.zip`
+1. The Brave Paws landing page build in `apps/brave-paws-landing/dist/`
+2. The Brave Paws web app build in `apps/brave-paws-app/dist/`
+3. The Brave Paws Streamer portable bundle in `apps/brave-paws-streamer/dist/brave-paws-streamer.zip`
 
 These are now released separately on GitHub so users can download only what they need.
 
@@ -19,6 +20,8 @@ That zip contains the streamer files with `BravePawsStreamer.exe` as the single 
 2. Double-click `BravePawsStreamer.exe`.
 
 Brave Paws Streamer opens a local browser UI, lets you start the camera stream, and shows a QR code that Brave Paws can scan directly. On first launch it downloads `go2rtc`, `cloudflared`, and `ffmpeg` automatically if they are not already available, so end users do not need Node.js or manual helper setup.
+
+The portable helper now launches the hosted control page at `https://harvey.cash/separation/streamer/`, which connects back to the loopback API on the Windows machine.
 
 ### Automated Streamer GitHub Releases
 
@@ -44,7 +47,13 @@ From the repo root:
 2. `npm run camera-helper:bundle`
    Builds the portable helper folder and zip in `apps/brave-paws-streamer/dist/`.
 3. `npm run build`
-   Builds the main Brave Paws web app.
+   Builds the landing page and the main Brave Paws web app.
+
+## Hosted Web Targets
+
+- Brave Paws landing page deploys to `https://harvey.cash/separation/`
+- Brave Paws App deploys to `https://harvey.cash/separation/app/`
+- Brave Paws Streamer UI deploys to `https://harvey.cash/separation/streamer/`
 
 ## CI And CD
 

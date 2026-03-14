@@ -36,4 +36,5 @@ test('portable bundle README explains the single executable flow', () => {
   assert.match(readme, /Double-click BravePawsStreamer\.exe\./);
   assert.match(readme, /single executable entry point/i);
   assert.match(readme, /downloads go2rtc, cloudflared, and ffmpeg/i);
+  assert.match(readme, /https:\/\/harvey\.cash\/separation\/streamer\//i);
 });

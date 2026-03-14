@@ -10,9 +10,6 @@
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\""
   },
   "pkg": {
-    "assets": [
-      "windows-camera-helper-ui/public/**/*"
-    ],
     "scripts": [
       "windows-camera-helper-ui/server.cjs"
     ]
