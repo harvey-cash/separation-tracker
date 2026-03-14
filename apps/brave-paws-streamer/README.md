@@ -44,5 +44,6 @@ apps/brave-paws-streamer/
 ## Related Docs
 
 - End-user and runtime details: [windows-camera-helper/README.md](windows-camera-helper/README.md)
+- Static-hosting research spike: [STATIC_HOSTING_FEASIBILITY.md](STATIC_HOSTING_FEASIBILITY.md)
 - Repo overview and workspace commands: [../../README.md](../../README.md)
 - Release process: [../../RELEASE.md](../../RELEASE.md)
