@@ -1,7 +1,6 @@
 const elements = {
   videoDevice: document.querySelector('#video-device'),
   audioDevice: document.querySelector('#audio-device'),
-  remoteProfile: document.querySelector('#remote-profile'),
   statusCard: document.querySelector('#status-card'),
   statusText: document.querySelector('#status-text'),
   statusPill: document.querySelector('#status-pill'),
@@ -258,20 +257,9 @@ function applyRemotePreviewHint(preview) {
     return;
   }
 
-  const remoteProfile = preview?.remoteProfile || 'waiting';
-  const remoteMode = preview?.remoteMode || 'unavailable';
-  elements.remotePreviewHint.textContent = `Remote preview profile: ${remoteProfile} (${remoteMode})`;
-}
-
-function applyRemoteProfileSelection(preview) {
-  if (!elements.remoteProfile) {
-    return;
-  }
-
-  const nextProfile = preview?.remoteProfile || 'remote-low-latency';
-  if (elements.remoteProfile.value !== nextProfile) {
-    elements.remoteProfile.value = nextProfile;
-  }
+  const remoteProfile = preview?.remoteProfile || 'remote-low-latency';
+  const remoteMode = preview?.remoteMode || 'mse,mp4,mjpeg';
+  elements.remotePreviewHint.textContent = `Remote preview uses ${remoteProfile} (${remoteMode}).`;
 }
 
 function getModel(payload) {
@@ -293,7 +281,6 @@ function renderDisconnected(detail) {
   applyPreview('');
   applyQr('', '');
   applyRemotePreviewHint(null);
-  applyRemoteProfileSelection(null);
   setLogs([]);
   elements.startButton.disabled = true;
   elements.stopButton.disabled = true;
@@ -348,7 +335,6 @@ function render(payload) {
   applyPreview(model.preview?.localUrl || '');
   applyQr(model.preview?.publicUrl || '', model.preview?.qrCodeDataUrl || '');
   applyRemotePreviewHint(model.preview || null);
-  applyRemoteProfileSelection(model.preview || null);
   setLogs(model.logs || []);
 
   const isBusy = model.status === 'starting' || model.status === 'bootstrapping';
@@ -358,7 +344,6 @@ function render(payload) {
   elements.refreshButton.disabled = false;
   elements.startButton.disabled = isBusy || !ffmpegAvailable;
   elements.stopButton.disabled = !isRunning && !isBusy;
-  elements.remoteProfile.disabled = isBusy;
 }
 
 async function request(apiPath, options = {}) {
@@ -450,7 +435,6 @@ async function startStream() {
       body: JSON.stringify({
         videoDevice: elements.videoDevice.value,
         audioDevice: elements.audioDevice.value,
-        remoteProfile: elements.remoteProfile.value,
       }),
     });
     render(payload);

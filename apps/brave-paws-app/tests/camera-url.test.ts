@@ -51,7 +51,7 @@ test('isCameraUrlValid only accepts sanitized remote or local links', () => {
 test('buildCameraStreamUrl appends the go2rtc preview path once', () => {
   assert.equal(
     buildCameraStreamUrl('https://demo.trycloudflare.com/'),
-    'https://demo.trycloudflare.com/stream.html?src=camera&mode=mse',
+    'https://demo.trycloudflare.com/stream.html?src=camera&mode=mse%2Cmp4%2Cmjpeg',
   );
 });
 
@@ -74,6 +74,13 @@ test('buildCameraPairingUrl encodes the cloudflare link into the Brave Paws URL'
 test('getCameraUrlFromSearch extracts and sanitizes the deep-link query parameter', () => {
   assert.equal(
     getCameraUrlFromSearch(`?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com%2F&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`),
+    `${BRAVE_PAWS_PAIRING_URL}?${CAMERA_URL_QUERY_PARAM}=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`,
+  );
+});
+
+test('getCameraUrlFromSearch sanitizes invalid remote profile values to the default low-latency profile', () => {
+  assert.equal(
+    getCameraUrlFromSearch(`?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=definitely-invalid-profile`),
     `${BRAVE_PAWS_PAIRING_URL}?${CAMERA_URL_QUERY_PARAM}=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`,
   );
 });

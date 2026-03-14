@@ -9,32 +9,6 @@ import { ActiveSessionState } from '../utils/activeSessionStorage';
 
 const PREVIEW_LOAD_TIMEOUT_MS = 12000;
 
-function buildPreviewFallbackUrls(streamUrl: string): string[] {
-  if (!streamUrl) {
-    return [];
-  }
-
-  try {
-    const primaryUrl = new URL(streamUrl);
-    const primaryMode = primaryUrl.searchParams.get('mode') || 'mse';
-    const fallbackModes = [primaryMode, 'mp4,mjpeg', 'mjpeg'];
-    const urls = [];
-
-    for (const mode of fallbackModes) {
-      const nextUrl = new URL(primaryUrl.toString());
-      nextUrl.searchParams.set('mode', mode);
-      const serialized = nextUrl.toString();
-      if (!urls.includes(serialized)) {
-        urls.push(serialized);
-      }
-    }
-
-    return urls;
-  } catch {
-    return [streamUrl];
-  }
-}
-
 type Props = {
   session: Session;
   initialState?: ActiveSessionState;
@@ -82,7 +56,6 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
 
     return getRemainingSeconds(currentStep.durationSeconds, restoredState.stepClock);
   });
-  const [previewCandidateIndex, setPreviewCandidateIndex] = useState(0);
   const [previewReloadToken, setPreviewReloadToken] = useState(0);
   const [previewStatus, setPreviewStatus] = useState<'loading' | 'live' | 'degraded'>('loading');
   const [previewStatusMessage, setPreviewStatusMessage] = useState('Connecting to remote preview…');
@@ -268,11 +241,9 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const isFinished = currentStepIndex >= session.steps.length - 1 && session.steps[session.steps.length - 1].completed;
   const streamUrl = buildCameraStreamUrl(cameraUrl);
   const hasValidCameraUrl = streamUrl.length > 0;
-  const previewFallbackUrls = buildPreviewFallbackUrls(streamUrl);
-  const activePreviewUrl = previewFallbackUrls[previewCandidateIndex] || streamUrl;
+  const activePreviewUrl = streamUrl;
 
   useEffect(() => {
-    setPreviewCandidateIndex(0);
     setPreviewReloadToken(0);
     if (!hasValidCameraUrl || isEditingCamera) {
       setPreviewStatus('loading');
@@ -290,18 +261,9 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     }
 
     setPreviewStatus('loading');
-    setPreviewStatusMessage(
-      previewCandidateIndex === 0
-        ? 'Connecting to remote preview…'
-        : 'Remote preview is slow to respond. Trying a fallback mode…',
-    );
+    setPreviewStatusMessage('Connecting to remote preview…');
 
     const timeoutId = window.setTimeout(() => {
-      if (previewCandidateIndex < previewFallbackUrls.length - 1) {
-        setPreviewCandidateIndex((currentIndex) => Math.min(currentIndex + 1, previewFallbackUrls.length - 1));
-        return;
-      }
-
       setPreviewStatus('degraded');
       setPreviewStatusMessage('Remote preview is delayed or stalled. Retry the preview or open it in a separate tab.');
     }, PREVIEW_LOAD_TIMEOUT_MS);
@@ -309,19 +271,14 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [activePreviewUrl, hasValidCameraUrl, isEditingCamera, previewCandidateIndex, previewFallbackUrls.length, previewReloadToken]);
+  }, [activePreviewUrl, hasValidCameraUrl, isEditingCamera, previewReloadToken]);
 
   const handlePreviewLoad = useCallback(() => {
     setPreviewStatus('live');
-    setPreviewStatusMessage(
-      previewCandidateIndex === 0
-        ? 'Remote preview connected.'
-        : 'Remote preview connected using a fallback mode tuned for recovery.',
-    );
-  }, [previewCandidateIndex]);
+    setPreviewStatusMessage('Remote preview connected.');
+  }, []);
 
   const handlePreviewRetry = useCallback(() => {
-    setPreviewCandidateIndex(0);
     setPreviewStatus('loading');
     setPreviewStatusMessage('Retrying remote preview…');
     setPreviewReloadToken((current) => current + 1);
@@ -392,7 +349,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                    <AlertCircle size={14} className="mt-0.5 shrink-0" />
                    <span>{previewStatusMessage}</span>
                  </div>
-                 {(previewStatus === 'degraded' || previewCandidateIndex > 0) && (
+                 {previewStatus === 'degraded' && (
                    <button
                      type="button"
                      onClick={handlePreviewRetry}

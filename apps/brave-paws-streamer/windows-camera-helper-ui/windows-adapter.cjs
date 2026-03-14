@@ -21,24 +21,12 @@ const LOCAL_PREVIEW_PROFILE = 'local-quality';
 const LOCAL_PREVIEW_MODE = 'mse';
 const REMOTE_PREVIEW_PROFILE = 'remote-low-latency';
 const REMOTE_PREVIEW_MODE = 'mse,mp4,mjpeg';
-const REMOTE_RESILIENT_PROFILE = 'remote-resilient';
-const REMOTE_RESILIENT_MODE = 'mse,mp4';
-const REMOTE_PROFILE_OPTIONS = [REMOTE_PREVIEW_PROFILE, REMOTE_RESILIENT_PROFILE];
-const REMOTE_ENCODING_PROFILES = {
-  [REMOTE_PREVIEW_PROFILE]: {
-    videoTemplate: 'brave_paws_h264_low_latency',
-    audioTemplate: 'brave_paws_aac_low_latency',
-    width: 960,
-    height: 540,
-    description: 'Remote low-latency profile enabled: lower bitrate, faster keyframes, and lighter audio for quicker recovery.',
-  },
-  [REMOTE_RESILIENT_PROFILE]: {
-    videoTemplate: 'brave_paws_h264_resilient',
-    audioTemplate: 'brave_paws_aac_resilient',
-    width: 1280,
-    height: 720,
-    description: 'Remote resilient profile enabled: more conservative bitrate and quality tuning for steadier playback.',
-  },
+const REMOTE_ENCODING_PROFILE = {
+  videoTemplate: 'brave_paws_h264_low_latency',
+  audioTemplate: 'brave_paws_aac_low_latency',
+  width: 960,
+  height: 540,
+  description: 'Remote low-latency profile enabled: lower bitrate, faster keyframes, and lighter audio for quicker recovery.',
 };
 
 function buildPreviewUrl(baseUrl, mode) {
@@ -48,22 +36,7 @@ function buildPreviewUrl(baseUrl, mode) {
   return previewUrl.toString();
 }
 
-function sanitizeRemoteProfile(profile) {
-  return REMOTE_PROFILE_OPTIONS.includes(profile) ? profile : REMOTE_PREVIEW_PROFILE;
-}
-
-function getRemoteModeForProfile(profile) {
-  return sanitizeRemoteProfile(profile) === REMOTE_RESILIENT_PROFILE
-    ? REMOTE_RESILIENT_MODE
-    : REMOTE_PREVIEW_MODE;
-}
-
-function getEncodingProfileForRemoteProfile(profile) {
-  return REMOTE_ENCODING_PROFILES[sanitizeRemoteProfile(profile)] || REMOTE_ENCODING_PROFILES[REMOTE_PREVIEW_PROFILE];
-}
-
-function createPreviewState(overrides = {}) {
-  const remoteProfile = sanitizeRemoteProfile(overrides.remoteProfile || REMOTE_PREVIEW_PROFILE);
+function createPreviewState() {
   return {
     localUrl: '',
     publicUrl: '',
@@ -71,10 +44,9 @@ function createPreviewState(overrides = {}) {
     pairingUrl: '',
     qrCodeDataUrl: '',
     localProfile: LOCAL_PREVIEW_PROFILE,
-    remoteProfile,
+    remoteProfile: REMOTE_PREVIEW_PROFILE,
     localMode: LOCAL_PREVIEW_MODE,
-    remoteMode: getRemoteModeForProfile(remoteProfile),
-    availableRemoteProfiles: [...REMOTE_PROFILE_OPTIONS],
+    remoteMode: REMOTE_PREVIEW_MODE,
   };
 }
 
@@ -421,26 +393,23 @@ function createWindowsAdapter({
     return state.devices;
   }
 
-  async function writeConfig(selectedVideo, selectedAudio, remoteProfile) {
+  async function writeConfig(selectedVideo, selectedAudio) {
     const videoDevice = selectedVideo || '0';
     const audioDevice = selectedAudio || '0';
-    const encodingProfile = getEncodingProfileForRemoteProfile(remoteProfile);
     const yamlContent = [
       'ffmpeg:',
-      '  # Brave Paws remote playback profiles trade image fidelity for quicker recovery and clearer live audio on tunnel-based remote playback.',
+      '  # Brave Paws remote playback is tuned for lower latency and quicker recovery on tunnel-based remote playback.',
       '  brave_paws_h264_low_latency: "-codec:v libx264 -pix_fmt yuv420p -preset:v superfast -tune:v zerolatency -g:v 30 -profile:v baseline -level:v 3.1 -b:v 1200k -maxrate:v 1200k -bufsize:v 1200k"',
-      '  brave_paws_h264_resilient: "-codec:v libx264 -pix_fmt yuv420p -preset:v veryfast -tune:v zerolatency -g:v 45 -profile:v main -level:v 3.1 -b:v 1800k -maxrate:v 1800k -bufsize:v 2400k"',
       '  brave_paws_aac_low_latency: "-codec:a aac -ar 16000 -ac 1 -b:a 48k"',
-      '  brave_paws_aac_resilient: "-codec:a aac -ar 24000 -ac 1 -b:a 64k"',
       '',
       'streams:',
       '  camera:',
-      `    - "ffmpeg:device?video=${videoDevice}&audio=${audioDevice}#video=${encodingProfile.videoTemplate}#audio=${encodingProfile.audioTemplate}#width=${encodingProfile.width}#height=${encodingProfile.height}"`,
+      `    - "ffmpeg:device?video=${videoDevice}&audio=${audioDevice}#video=${REMOTE_ENCODING_PROFILE.videoTemplate}#audio=${REMOTE_ENCODING_PROFILE.audioTemplate}#width=${REMOTE_ENCODING_PROFILE.width}#height=${REMOTE_ENCODING_PROFILE.height}"`,
       '',
     ].join('\n');
 
     await fs.writeFile(path.join(helperDir, 'go2rtc.yaml'), yamlContent, 'utf8');
-    addLog(encodingProfile.description);
+    addLog(REMOTE_ENCODING_PROFILE.description);
   }
 
   async function updatePairingArtifacts() {
@@ -525,7 +494,7 @@ function createWindowsAdapter({
 
     cloudflaredProc = null;
     go2rtcProc = null;
-    state.preview = createPreviewState({ remoteProfile: state.preview.remoteProfile });
+    state.preview = createPreviewState();
     setError('', '');
     addLog('Streaming stopped.');
     setStatus('idle');
@@ -533,12 +502,11 @@ function createWindowsAdapter({
     return getSnapshot();
   }
 
-  async function start(videoDevice, audioDevice, remoteProfile) {
-    const nextRemoteProfile = sanitizeRemoteProfile(remoteProfile || state.preview.remoteProfile);
+  async function start(videoDevice, audioDevice) {
     state.selection.video = videoDevice || '';
     state.selection.audio = audioDevice || '';
     state.preview = {
-      ...createPreviewState({ remoteProfile: nextRemoteProfile }),
+      ...createPreviewState(),
       publicUrl: '',
       pairingUrl: '',
       qrCodeDataUrl: '',
@@ -566,7 +534,7 @@ function createWindowsAdapter({
       return getSnapshot();
     }
 
-    await writeConfig(videoDevice, audioDevice, state.preview.remoteProfile);
+    await writeConfig(videoDevice, audioDevice);
     await stop();
 
     setStatus('starting');
@@ -635,7 +603,6 @@ function createWindowsAdapter({
     events,
     getSnapshot,
     refreshDevices,
-    sanitizeRemoteProfile,
     setError,
     setStatus,
     shutdown,

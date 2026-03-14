@@ -230,8 +230,8 @@ app.post(LOOPBACK_API_PATHS.refreshDevices, async (_request, response) => {
 
 app.post(LOOPBACK_API_PATHS.start, async (request, response) => {
   try {
-    const { videoDevice = '', audioDevice = '', remoteProfile = '' } = request.body || {};
-    const snapshot = await adapter.start(videoDevice, audioDevice, remoteProfile);
+    const { videoDevice = '', audioDevice = '' } = request.body || {};
+    const snapshot = await adapter.start(videoDevice, audioDevice);
     response.json(buildPayload(snapshot));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to start streaming.';
