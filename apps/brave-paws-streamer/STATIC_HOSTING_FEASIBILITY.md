@@ -2,285 +2,426 @@
 
 ## Executive Summary
 
-It is **not realistic to make Brave Paws Streamer fully deployable as a pure GitHub Pages app with no local native component** while preserving the current experience.
+The first spike concluded that **Approach B is the right near-term direction**:
 
-The current streamer depends on capabilities that a static website cannot perform on its own:
+> host the streamer UI at `harvey.cash/separation/streamer`, but keep a trusted local helper to handle device access, process management, and secure tunnel creation.
 
-- starting and supervising `go2rtc.exe` and `cloudflared.exe`
-- discovering Windows DirectShow cameras and microphones via `ffmpeg`
-- writing local `go2rtc.yaml` configuration
-- opening and stopping long-running local processes
-- exposing a laptop-local media server through a secure public tunnel
+That remains the best fit for the current repo because the Windows streamer already separates into:
 
-Those responsibilities currently live in `apps/brave-paws-streamer/windows-camera-helper-ui/server.cjs`, while the browser UI is only a thin local client over `/api/*`.
+- a **thin browser UI** in `windows-camera-helper-ui/public/app.js`
+- a **local control plane** in `windows-camera-helper-ui/server.cjs`
+- a **portable package entry point** in `windows-camera-helper-ui/package-portable.mjs`
+- a **runtime dependency manifest** in `windows-camera-helper-ui/streamer-assets.cjs`
 
-The most feasible path to `https://harvey.cash/separation/streamer` is therefore:
+The second spike asked a different question: if the static UI plus localhost helper model is adopted now, **how should the helper be designed so future helpers can exist for Windows, macOS, Linux, Raspberry Pi, Android, and iOS without rethinking the whole product again?**
 
-> **move the UI to static hosting, but keep a small local trusted helper running on the laptop**
+Short answer:
 
-That would let users open a hosted page that looks almost identical to the current streamer, while a local helper continues to handle device access, process management, and tunnel creation.
+- **yes**, the static UI + native helper model can be made much more OS agnostic
+- the right split is a **shared hosted web UI plus a small platform-specific capture/orchestration adapter**
+- desktop/server-class platforms are realistic fits for the localhost-helper model
+- Android and iOS are only partial fits; they likely need **native wrapper apps or fully native apps**, not a generic localhost process
+- the hosted-UI approach is still the best balance of reach, reuse, and iteration speed
 
 ## Current Architecture Snapshot
 
-Today the Windows bundle is fundamentally a **local control plane plus local web UI**:
+Today the checked-in streamer is fundamentally a **local helper with an embedded local web UI**:
 
-- `windows-camera-helper-ui/server.cjs` serves the UI, enumerates devices, downloads dependencies, starts `go2rtc.exe`, starts `cloudflared.exe`, generates the QR code, and exposes `/api/bootstrap`, `/api/status`, `/api/start`, and `/api/stop`.
-- `windows-camera-helper-ui/public/app.js` polls those local endpoints and renders the controls, preview, QR code, and logs.
-- `windows-camera-helper-ui/health-check.mjs` validates the flow by booting the server, calling the local API, starting a stream, checking for a secure URL and QR code, and stopping cleanly.
-- `windows-camera-helper-ui/package-portable.mjs` packages that local server into `BravePawsStreamer.exe`.
-- `windows-camera-helper-ui/streamer-assets.cjs` defines the runtime downloads for `go2rtc`, `cloudflared`, and `ffmpeg`.
-- `apps/brave-paws-app/src/utils/cameraUrl.ts` shows that Brave Paws App stores a base camera URL and derives the playable stream URL by appending `/stream.html?src=camera&mode=mse`.
+- `server.cjs` exposes `/api/bootstrap`, `/api/status`, `/api/refresh-devices`, `/api/start`, and `/api/stop`
+- it downloads or resolves `go2rtc`, `cloudflared`, and `ffmpeg`
+- it enumerates Windows DirectShow devices, writes `go2rtc.yaml`, launches the processes, and generates the QR code payload
+- `public/app.js` polls those endpoints and renders controls, logs, preview, and QR state
 
-That last point is important: the checked-in app is currently optimized around a **tunneled go2rtc web playback endpoint**, not a brand-new browser-native WebRTC signaling flow. go2rtc may support WebRTC modes, but a pure browser-first WebRTC architecture would still be a broader redesign than "host the current streamer UI on GitHub Pages".
+That means the current codebase is already close to the desired split:
 
-That means the existing design already has a useful separation:
+1. **hosted UI**
+2. **local native/helper runtime**
 
-1. a **control UI** rendered in HTML/CSS/JS
-2. a **native/local orchestration layer** that the UI depends on
+The work is not inventing a new product shape. The work is **decoupling the current Windows helper from its bundled static assets and turning the helper boundary into a stable cross-platform contract**.
 
-Static hosting can replace only the first half unless the overall architecture changes materially.
+## Concise Summary Of The First Spike
 
-## What GitHub Pages Can And Cannot Do
+The first spike evaluated four broad options.
 
-### What a static site can do well
+| Option | Verdict | Concise reason |
+|---|---|---|
+| A. Pure static page with browser-only capture | Discarded for near-term delivery | A static page cannot supervise `go2rtc`, `cloudflared`, device discovery, or reliable always-on streaming without introducing a much larger hosted media architecture. |
+| B. Static page + localhost native helper | **Chosen direction** | Best match to the current codebase and user flow; preserves the tunnel-based pairing model with the least redesign. |
+| C. Static page + browser extension + native messaging | Discarded | Technically possible, but install friction, browser-specific review/policy burden, and poorer UX make it worse than a helper app. |
+| D. Static page + managed relay/signaling service | Deferred as future-state architecture | Could be cleaner long-term, but it is no longer a small follow-up to the current repo and requires backend/infrastructure investment. |
 
-- serve the streamer UI shell from `harvey.cash/separation/streamer`
-- render controls, status, logs, QR codes, and instructions
-- call browser APIs such as `getUserMedia` if the user grants permission
-- connect to an existing remote stream URL
-- talk to a local helper over loopback HTTP/WebSocket if the browser allows it
+The first spike therefore answered:
 
-### What a static site cannot do by itself
+- **Can the streamer become pure static hosting with no native component?** No, not while keeping the current behavior.
+- **Can the UI be statically hosted while preserving roughly the current experience?** Yes, if a trusted local helper remains responsible for capture, orchestration, and tunneling.
 
-- install or launch `go2rtc`, `cloudflared`, or `ffmpeg`
-- enumerate Windows devices the same way the current helper does
-- keep long-running media/tunnel processes alive independently of the tab
-- safely expose laptop-local services to the internet without another trusted component
-- provide signaling, TURN, access control, or relay infrastructure for browser-to-browser WebRTC on its own
+## What Must Stay Local Even With Static Hosting
 
-The key conclusion is that **GitHub Pages can host the control surface, but it cannot replace the local streaming agent**.
-
-## Security Constraint To Preserve
-
-If the streamer becomes a hosted page, the security boundary becomes more important, not less.
-
-Right now the helper is local and self-contained. A hosted page talking to a localhost helper introduces a new risk:
-
-- a malicious website could try to call the same localhost API
-
-Any static-hosted approach that keeps a local helper should therefore include all of the following:
-
-- bind helper APIs to `127.0.0.1` only
-- require an allowlisted `Origin` such as `https://harvey.cash`
-- require a per-launch nonce or session token so `Origin` alone is not the only control
-- avoid unauthenticated `start`/`stop` endpoints on localhost
-- continue generating fresh per-session public stream URLs
-- ideally add a second secret beyond the bare tunnel URL if the remote stream should resist accidental sharing
-
-This matters because the current tunnel model is encrypted in transit, but the viewer URL itself is still a bearer secret.
-
-## Approaches Compared
-
-| Approach | What changes | UX parity with current app | Engineering effort | Security posture | Ease | Elegance |
-|---|---|---:|---:|---|---|---|
-| A. Pure static page, browser-only capture, no local helper | Use `getUserMedia` in the page and attempt direct browser streaming | Low | High | Weak to moderate unless a real relay/signaling layer is added | Low | Medium |
-| B. Static page + localhost native helper using existing tunnel stack | Host UI on GitHub Pages, keep a small local helper that runs go2rtc/cloudflared/ffmpeg | High | Moderate | Strong if loopback API is origin- and token-protected | **High** | **High** |
-| C. Static page + browser extension + native messaging host | Hosted UI delegates privileged actions through an extension | Medium | High | Strong if implemented carefully | Medium-low | Low |
-| D. Static page + managed relay service replacing go2rtc/cloudflared | Redesign around a hosted signaling/TURN/SFU service | Medium-high eventually | Very high | Potentially strongest, but operationally largest | Low near-term | Highest long-term |
-
-### Approach A: Pure static browser-only streamer
-
-This is the only option that is truly "just GitHub Pages", but it does **not** match the current product shape very well.
-
-Pros:
-
-- no local executable
-- simplest deployment story for the UI
-- browser camera permission flow is familiar
-
-Cons:
-
-- the stream only lives while the tab is open and healthy
-- the page cannot launch or supervise `cloudflared`
-- there is no obvious secure way to expose a browser-originated stream over the public internet without adding backend signaling/TURN infrastructure
-- device handling becomes browser-dependent rather than Windows-helper-controlled
-- it diverges from the current Brave Paws playback contract, which expects a tunneled go2rtc-style URL rather than a new signaling stack
-- Brave Paws would stop looking like the current "launch once, get QR, keep laptop running" model
-
-Bottom line: **not feasible for "almost identical" behavior** unless the product is redesigned around a hosted real-time media service.
-
-### Approach B: Static page + localhost native helper
-
-This is the closest fit to the current implementation.
-
-The idea:
-
-1. keep a lightweight local helper installed on Windows
-2. move the UI itself to `harvey.cash/separation/streamer`
-3. let the hosted page talk to the helper over `http://127.0.0.1:<port>` or a local WebSocket
-4. keep `go2rtc`, `cloudflared`, dependency download, device enumeration, and QR generation in the local helper
-
-Why it fits the repo well:
-
-- `server.cjs` already exposes a clean local API surface
-- `public/app.js` is already a browser client that could be repointed to a hosted origin
-- the native responsibilities are already concentrated in one place
-- the Brave Paws App pairing flow can stay almost unchanged because the helper can still produce the same base secure URL
-
-Main required refactor:
-
-- split the current combined server into:
-  - a **headless local helper API**
-  - a **hosted static UI**
-
-Recommended security additions:
-
-- random per-launch local auth token
-- strict `Origin` validation
-- optional custom URL path or tokenized viewer URL on the tunneled side
-
-Bottom line: **feasible and the best near-term blend of ease and elegance**.
-
-### Approach C: Static page + browser extension/native messaging
-
-In this model, the hosted page talks to a browser extension, and the extension talks to a native host that manages streaming.
-
-Pros:
-
-- strong separation between hosted UI and privileged local operations
-- extension APIs can mediate access more explicitly than open localhost HTTP
-
-Cons:
-
-- worst install story for mainstream users
-- browser-store policy/review friction
-- browser-specific support burden
-- less elegant than a small helper with a loopback API
-
-Bottom line: technically feasible, but the product experience becomes more cumbersome than the current `.exe`.
-
-### Approach D: Hosted relay architecture
-
-This is the cleanest long-term architecture if the goal is eventually "open a website and stream" with minimal native software.
-
-A redesigned version would likely use:
-
-- browser capture or a local helper capture agent
-- hosted signaling
-- TURN for NAT traversal
-- possibly an SFU or media relay
-- authenticated sessions instead of public tunnel URLs
-
-Pros:
-
-- most elegant end-state architecture
-- better foundation for access control, revocation, and multi-viewer support
-- less dependence on `cloudflared` and a tunneled localhost media server
-- the most natural place to introduce true browser-first WebRTC rather than tunneled `stream.html?src=camera&mode=mse`
-
-Cons:
-
-- much larger product and infrastructure investment
-- introduces backend operations and cost
-- no longer fits the current "static site only" constraint
-
-Bottom line: **best long-term architecture, but not a GitHub Pages-only solution and not a small follow-up to the current repo**.
-
-## Recommended Direction
-
-If the target is:
-
-> users visit `harvey.cash/separation/streamer` and use Brave Paws Streamer almost exactly like the current Windows bundle
-
-then the recommended direction is:
-
-### Recommendation: hosted UI + local helper API
-
-Keep these local:
+If `harvey.cash/separation/streamer` becomes the main entry point, the hosted page can own presentation and onboarding, but the helper still needs to own:
 
 - device enumeration
-- go2rtc configuration and lifecycle
-- cloudflared lifecycle
-- FFmpeg resolution and download
-- QR code payload generation or secure URL generation
+- capture pipeline setup
+- local dependency resolution or bundling
+- `go2rtc` lifecycle
+- `cloudflared` lifecycle
+- secure stream URL generation
+- QR payload generation
+- health/state reporting back to the hosted page
 
-Move these to static hosting:
+That is true on every platform. The main design question is therefore not whether a helper exists, but **how much of the helper can be shared and how much must remain platform-specific**.
 
-- page layout and branding
-- controls and logs UI
-- onboarding instructions
-- status polling and rendering
+## New Research: Designing The Native Helper To Be OS Agnostic
 
-This preserves the current mental model:
+### Goal
 
-1. install Brave Paws Streamer once
-2. visit `harvey.cash/separation/streamer`
-3. the page detects the local helper
-4. select camera/mic
-5. start stream
-6. scan QR code in Brave Paws App
+The eventual product goal is:
 
-That is very close to today's flow, but with the UI deployed centrally instead of packaged into the executable.
+> anyone visiting `harvey.cash/separation/streamer` should be guided to the correct streamer installation for their environment and, after installation, use a familiar hosted control UI regardless of platform.
 
-## Suggested Migration Shape
+That implies the hosted page should become the stable front door, while helper implementations vary by platform behind a common contract.
 
-### Phase 1: Separate local orchestration from local static assets
+### Recommended Architectural Split
 
-Refactor the current helper so that it can run with no bundled browser assets at all, exposing only JSON/WebSocket APIs over loopback.
+The helper should be redesigned around three layers:
 
-### Phase 2: Host the existing UI on `harvey.cash/separation/streamer`
+#### 1. Shared hosted UI
 
-Adapt the current `public/app.js` logic so the hosted page can:
+Owned centrally at `harvey.cash/separation/streamer`.
 
-- detect whether the helper is running
-- prompt the user to install/start it if missing
-- authenticate to the helper using a local session token
+Responsibilities:
 
-### Phase 3: Improve localhost trust boundaries
+- installation/startup instructions
+- helper detection
+- device selection UI
+- start/stop controls
+- logs, preview, and QR presentation
+- upgrade messaging and troubleshooting help
 
-Before shipping a hosted UI, add:
+This layer should be as platform-neutral as possible.
 
-- origin checks
-- CSRF-style local session token protection
-- explicit helper "pair" or "approve this page" behavior if needed
+#### 2. Shared helper protocol
 
-### Phase 4: Decide whether tunnel URLs need stronger viewer protection
+This is the most important OS-agnostic investment.
 
-If "secure fashion" should mean more than "unguessable temporary URL over TLS", consider:
+Define a stable loopback API and event model that every helper implementation follows, for example:
 
-- random secret path segments
-- signed viewer tokens
-- an authenticated proxy in front of the stream
+- `GET /api/bootstrap`
+- `GET /api/status`
+- `POST /api/start`
+- `POST /api/stop`
+- `POST /api/refresh-devices`
+- optional WebSocket or SSE stream for logs/status changes
 
-That is optional for the static-hosting move, but important if the product needs stronger access control than the current temporary public URL model.
+Shared payload concepts should include:
 
-## Overall Feasibility Verdict
+- platform name and version
+- helper version
+- install/update status of dependencies
+- available audio/video devices
+- active stream state
+- preview URL if applicable
+- public pairing URL / QR payload
+- machine-readable error codes
 
-### Can Brave Paws Streamer become a pure statically hosted site?
+If this contract is kept stable, the hosted UI can remain largely unchanged while helpers evolve per platform.
 
-**No, not without changing the product substantially.**
+#### 3. Platform-specific helper adapters
 
-A static site alone cannot replace the local process-management and device-integration work that the current Windows helper performs.
+These are the pieces that should differ per OS:
 
-### Can Brave Paws Streamer use a statically hosted UI while still tunneling a secure live stream in roughly the same way as today?
+- device enumeration
+- process spawning and shutdown
+- dependency packaging or download locations
+- installer/distribution method
+- auto-start and permissions behavior
+- mobile-specific camera/session APIs where localhost helpers are not practical
 
-**Yes.**
+In other words:
 
-That is the most practical and elegant route:
+- **share the API shape and user flow**
+- **specialize the OS integration**
 
-- keep a small local helper
-- host the UI centrally
-- preserve the current `go2rtc + cloudflared` tunnel model
-- harden localhost communication before exposing the control surface on a public origin
+### What Is Realistically Shareable Across Platforms
+
+The following logic is good shared-helper territory, even if the final binaries differ:
+
+- state machine for idle / starting / running / stopping / error
+- hosted-page authentication/token validation
+- QR payload generation
+- stream URL normalization
+- config templating for `go2rtc`
+- tunnel URL parsing and validation
+- structured logging/event emission
+- version reporting and update checks
+
+The following logic is inherently platform-specific:
+
+- camera/microphone enumeration
+- process kill semantics
+- executable naming and path resolution
+- sandbox/permission prompts
+- installer format and update channel
+- whether the platform even permits a localhost daemon
+
+That split suggests a practical rule:
+
+> keep the product contract shared, but allow the capture/runtime adapter to be platform-native.
+
+### Platform-by-Platform Evaluation
+
+#### Windows
+
+Windows is already the reference implementation.
+
+Fit with hosted UI + localhost helper:
+
+- **excellent**
+
+Why:
+
+- current code already works this way
+- `.exe` packaging is familiar
+- loopback helper and spawned binaries are normal on desktop Windows
+
+Recommended direction:
+
+- refactor the existing helper into a headless local API plus hosted UI
+- keep Windows as the first-class baseline contract for other helper ports
+
+#### macOS
+
+Fit with hosted UI + localhost helper:
+
+- **strong**
+
+Why:
+
+- desktop app plus loopback service is viable
+- camera/microphone permissions can be requested through a native app
+- `cloudflared` and `go2rtc` both have macOS distributions
+
+Main complications:
+
+- code signing and notarization matter much more than on Windows
+- camera enumeration and capture plumbing are different
+
+Recommended direction:
+
+- build a native macOS helper app or packaged desktop helper that exposes the same local API as Windows
+
+#### Linux
+
+Fit with hosted UI + localhost helper:
+
+- **strong**, especially for technical users
+
+Why:
+
+- loopback services and sidecar binaries are normal
+- Linux packaging can target AppImage, `.deb`, Snap, or Flatpak depending on audience
+- `cloudflared`, `go2rtc`, and `ffmpeg` all fit naturally here
+
+Main complications:
+
+- camera/audio stack differences across distros
+- broader support matrix than Windows/macOS
+
+Recommended direction:
+
+- treat Linux as a supported helper family, not a single packaging target
+- standardize the loopback API first, then ship the simplest install path that matches the intended audience
+
+#### Raspberry Pi
+
+Fit with hosted UI + localhost helper:
+
+- **very strong**
+
+Why:
+
+- Raspberry Pi is effectively a Linux appliance target
+- always-on local helper is a natural fit
+- the hosted UI is useful because it avoids requiring the Pi itself to own the full control UI lifecycle
+
+Main complications:
+
+- ARM build/distribution
+- lower resource ceilings
+- potentially headless operation
+
+Recommended direction:
+
+- treat Raspberry Pi as a Linux helper profile with ARM packaging and optional service-mode startup
+
+#### Android
+
+Fit with hosted UI + localhost helper:
+
+- **partial only**
+
+Why:
+
+- Android can run native apps and local HTTP servers, but this is a much less natural product shape than desktop
+- background execution, camera access, and localhost communication are governed by mobile OS lifecycle rules
+- distribution would almost certainly need to be a real Android app, not “download a generic helper process”
+
+Most realistic shapes:
+
+1. **native Android app that embeds or loads the hosted UI**
+2. native Android app with its own UI but same conceptual helper contract
+3. browser-only capture flow, which would be a different product with weaker parity
+
+Recommendation:
+
+- do not assume Android will use the same localhost-helper packaging pattern as desktop
+- instead, aim for a **shared hosted UI concept and shared API contract**, with an Android-native wrapper/bridge when mobile becomes a priority
+
+#### iOS
+
+Fit with hosted UI + localhost helper:
+
+- **weak**
+
+Why:
+
+- iOS is the least compatible platform with the desktop localhost-helper model
+- long-running local daemons, arbitrary sidecar binaries, and general-purpose localhost helper installation are not natural app-store patterns
+- camera/microphone access, background behavior, and networking are tightly constrained
+
+Most realistic shapes:
+
+1. **fully native iOS app**
+2. native shell that embeds web content and bridges selected operations to native code
+
+Recommendation:
+
+- plan for iOS as a **native app target**, even if it reuses hosted UI assets or shared product flows
+- do not design the desktop helper API under the assumption that iOS can run the same implementation style
+
+### Packaging And Install Discovery Implications
+
+If the hosted page becomes the universal front door, it should not try to pretend every platform installs the same artifact.
+
+Instead, `harvey.cash/separation/streamer` should detect environment and present the best available path, for example:
+
+- **Windows:** download `.exe`
+- **macOS:** download signed app or installer
+- **Linux:** show supported distro/install methods
+- **Raspberry Pi:** show ARM build/service setup path
+- **Android:** send to Play Store or APK distribution page when ready
+- **iOS:** send to App Store/TestFlight when ready
+
+Important nuance:
+
+- environment detection should guide defaults, not hard-block alternatives
+- the page should still expose manual platform choices
+- the page should also detect whether a local helper is already running and switch from “install” to “connect”
+
+That leads to the right product framing:
+
+> one hosted destination, multiple platform-specific helper distributions, one mostly consistent control experience after connection.
+
+### Localhost Communication Constraints
+
+For desktop/server-class platforms, the hosted page talking to loopback is still the most practical design.
+
+However, the trust boundary must be explicit.
+
+Minimum requirements before shipping:
+
+- bind only to `127.0.0.1` or equivalent loopback
+- validate `Origin` against the hosted streamer domain
+- require a per-launch token or pairing secret
+- avoid unauthenticated start/stop endpoints
+- avoid assuming that possession of localhost access alone is enough authorization
+
+Helpful future-proofing additions:
+
+- a helper “pair with this page” handshake
+- WebSocket/SSE logs instead of aggressive polling
+- helper version negotiation so the hosted page can support older helpers gracefully
+
+Those protections matter on every desktop platform, not just Windows.
+
+### Recommended OS-Agnostic Strategy
+
+The best future-proof plan is:
+
+1. **standardize the helper protocol first**
+2. **keep the hosted UI as the canonical control surface**
+3. **treat Windows/macOS/Linux/Raspberry Pi as localhost-helper platforms**
+4. **treat Android/iOS as native-app or native-wrapper platforms**
+5. **reuse product flow and API concepts even where the runtime implementation differs**
+
+That gives Brave Paws Streamer a coherent multi-platform story without waiting for every platform to converge on identical technical internals.
+
+## Should Brave Paws Streamer Become Fully Native Instead?
+
+This spike also evaluated the alternative of **not** hosting the UI statically at all, and instead building native streamer apps as the primary experience.
+
+### Pros Of Going Fully Native
+
+- strongest alignment with mobile operating systems, especially iOS
+- better access to camera, microphone, permissions, background execution, and OS-level UX affordances
+- no public-page-to-localhost trust boundary to harden
+- app-store distribution can be more natural on mobile
+- each platform can feel more polished and idiomatic
+
+### Cons Of Going Fully Native
+
+- much higher engineering and maintenance cost across platforms
+- slower iteration than changing a centrally hosted web UI
+- harder to keep Windows/macOS/Linux/mobile features visually and behaviorally aligned
+- more review/signing/release-process overhead
+- lower reuse of the current browser client already present in `public/app.js`
+- weaker “visit one URL and get started” story
+
+### Practical Comparison: Hosted UI + Helper vs Fully Native
+
+| Question | Hosted UI + helper | Fully native apps |
+|---|---|---|
+| Best fit for current Windows codebase | **Excellent** | Moderate |
+| Centralized UI updates | **Excellent** | Weak |
+| Desktop parity with current flow | **Excellent** | Strong |
+| Mobile fit | Partial | **Strongest** |
+| Engineering cost | **Lower** | Higher |
+| Distribution simplicity across many environments | Strong if install-dispatch is well designed | Weaker because every platform needs its own app lifecycle |
+| Long-term architectural purity | Good | Good, but at much higher cost |
+
+### Verdict On The Native-App Alternative
+
+Fully native streamer apps are worth considering if:
+
+- mobile capture becomes a first-class product requirement
+- app-store distribution becomes strategically important
+- Brave Paws is willing to fund multiple platform-specific app lifecycles
+
+But for the current repo and the stated objective of sending users to `harvey.cash/separation/streamer`, **fully native should not replace the hosted-UI plan as the primary near-term direction**.
+
+The better framing is:
+
+- use **hosted UI + local helper** as the main cross-platform desktop/server strategy
+- allow **native wrappers or fully native apps** where platform constraints make localhost-helper patterns awkward, especially on Android and iOS
 
 ## Final Recommendation
 
-For near-term delivery, pursue **Approach B: statically hosted UI plus localhost native helper**.
+Continue pursuing **Approach B** and reshape it into:
 
-It is:
+> **one hosted streamer UI, one shared helper protocol, multiple platform-specific helper implementations**
 
-- the **easiest** approach that still preserves the current user experience
-- the **most elegant** approach that fits the current codebase
-- the option with the best reuse of the existing streamer architecture
+Near-term:
 
-Do **not** plan around a pure GitHub Pages-only implementation if the goal is current-feature parity.
+- refactor the current Windows helper into a headless API plus hosted UI
+- harden localhost trust boundaries
+- design the helper API as a durable cross-platform contract
+
+Medium-term:
+
+- extend the helper pattern to macOS, Linux, and Raspberry Pi
+- use the hosted page as the install-dispatch and control surface for those platforms
+
+Long-term:
+
+- treat Android and iOS as native-wrapper or native-app targets that reuse the same product model where possible
+
+That path best satisfies the eventual goal that **anyone visiting `harvey.cash/separation/streamer` can be directed toward the right installation for their environment while preserving a mostly consistent Brave Paws Streamer experience.**
