@@ -132,7 +132,7 @@ export function SessionConfig({ initialSession, cameraUrl = '', onCameraUrlChang
           <h2 className="text-lg font-bold text-slate-800">Remote Stream Link (Optional)</h2>
         </div>
         <p className="text-sm text-slate-500 mb-4">
-          Scan the QR code from Brave Paws Streamer, or paste a pairing link manually if needed.
+          Scan the QR code from Brave Paws Streamer, or paste the simplified camera URL manually if needed.
         </p>
         <CameraLinkInput
           cameraUrl={cameraUrl}

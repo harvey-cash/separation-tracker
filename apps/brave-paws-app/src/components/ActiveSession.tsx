@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Session } from '../types';
-import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff, AlertCircle, RotateCcw } from 'lucide-react';
+import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff, RotateCcw, Minimize2, Maximize2 } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
 import { CameraLinkInput } from './CameraLinkInput';
@@ -30,8 +30,6 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     accumulatedMs: 0,
   };
   const [session, setSession] = useState<Session>(restoredState?.session ?? initialSession);
-  const [isEditingCamera, setIsEditingCamera] = useState(!isCameraUrlValid(cameraUrl));
-  
   // Overall session stopwatch
   const [isSessionRunning, setIsSessionRunning] = useState(restoredState?.isSessionRunning ?? true);
   const [sessionElapsed, setSessionElapsed] = useState(() => getElapsedSeconds(initialSessionClock));
@@ -57,8 +55,10 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     return getRemainingSeconds(currentStep.durationSeconds, restoredState.stepClock);
   });
   const [previewReloadToken, setPreviewReloadToken] = useState(0);
-  const [previewStatus, setPreviewStatus] = useState<'loading' | 'live' | 'degraded'>('loading');
-  const [previewStatusMessage, setPreviewStatusMessage] = useState('Connecting to remote preview…');
+  const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'live' | 'degraded' | 'disconnected'>('idle');
+  const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a camera URL to start the live preview.');
+  const [isPreviewConnected, setIsPreviewConnected] = useState(() => isCameraUrlValid(cameraUrl));
+  const [isPreviewMinimized, setIsPreviewMinimized] = useState(false);
   const sessionRef = useRef(session);
   const sessionClockRef = useRef(sessionClock);
   const currentStepIndexRef = useRef(currentStepIndex);
@@ -241,22 +241,34 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const isFinished = currentStepIndex >= session.steps.length - 1 && session.steps[session.steps.length - 1].completed;
   const streamUrl = buildCameraStreamUrl(cameraUrl);
   const hasValidCameraUrl = streamUrl.length > 0;
-  const activePreviewUrl = streamUrl;
+  const activePreviewUrl = hasValidCameraUrl && isPreviewConnected ? streamUrl : '';
 
   useEffect(() => {
-    setPreviewReloadToken(0);
-    if (!hasValidCameraUrl || isEditingCamera) {
-      setPreviewStatus('loading');
-      setPreviewStatusMessage('Link a remote camera to start the live preview.');
+    if (!hasValidCameraUrl) {
+      setIsPreviewConnected(false);
+      setIsPreviewMinimized(false);
+    }
+  }, [hasValidCameraUrl]);
+
+  useEffect(() => {
+    if (!hasValidCameraUrl) {
+      setPreviewStatus('idle');
+      setPreviewStatusMessage('Paste a camera URL to start the live preview.');
+      return;
+    }
+
+    if (!isPreviewConnected) {
+      setPreviewStatus('disconnected');
+      setPreviewStatusMessage('Camera preview disconnected. Paste a new URL or reconnect.');
       return;
     }
 
     setPreviewStatus('loading');
     setPreviewStatusMessage('Connecting to remote preview…');
-  }, [hasValidCameraUrl, isEditingCamera, streamUrl]);
+  }, [hasValidCameraUrl, isPreviewConnected, streamUrl]);
 
   useEffect(() => {
-    if (!hasValidCameraUrl || isEditingCamera || !activePreviewUrl) {
+    if (!activePreviewUrl) {
       return;
     }
 
@@ -265,13 +277,13 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
 
     const timeoutId = window.setTimeout(() => {
       setPreviewStatus('degraded');
-      setPreviewStatusMessage('Remote preview is delayed or stalled. Retry the preview or open it in a separate tab.');
+      setPreviewStatusMessage('Remote preview looks delayed. Refresh it or disconnect and reconnect.');
     }, PREVIEW_LOAD_TIMEOUT_MS);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [activePreviewUrl, hasValidCameraUrl, isEditingCamera, previewReloadToken]);
+  }, [activePreviewUrl, previewReloadToken]);
 
   const handlePreviewLoad = useCallback(() => {
     setPreviewStatus('live');
@@ -279,10 +291,29 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   }, []);
 
   const handlePreviewRetry = useCallback(() => {
+    if (!activePreviewUrl) {
+      return;
+    }
+
     setPreviewStatus('loading');
-    setPreviewStatusMessage('Retrying remote preview…');
+    setPreviewStatusMessage('Refreshing remote preview…');
     setPreviewReloadToken((current) => current + 1);
-  }, []);
+  }, [activePreviewUrl]);
+
+  const handleTogglePreviewConnection = useCallback(() => {
+    if (!hasValidCameraUrl) {
+      return;
+    }
+
+    if (isPreviewConnected) {
+      setIsPreviewConnected(false);
+      setIsPreviewMinimized(false);
+      return;
+    }
+
+    setIsPreviewConnected(true);
+    setPreviewReloadToken((current) => current + 1);
+  }, [hasValidCameraUrl, isPreviewConnected]);
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] flex flex-col">
@@ -310,75 +341,82 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
 
       <main className="flex-1 max-w-md w-full mx-auto p-4 flex flex-col gap-4">
         {/* Webcam Area */}
-        {hasValidCameraUrl && !isEditingCamera ? (
-          <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800 relative group">
-             <iframe
-               key={`${activePreviewUrl}-${previewReloadToken}`}
-               src={activePreviewUrl}
-               className="w-full h-full border-0 absolute inset-0"
-               allow="autoplay; fullscreen; microphone"
-               onLoad={handlePreviewLoad}
-             />
-             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-               <a
-                 href={activePreviewUrl}
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm flex items-center"
-               >
-                 Popout
-               </a>
-               <button
-                 onClick={() => setIsEditingCamera(true)}
-                 className="px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg text-xs font-medium backdrop-blur-sm border border-slate-700 shadow-sm"
-               >
-                 Change Camera
-               </button>
-             </div>
-             <div className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
-               <div
-                 className={`pointer-events-auto flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs shadow-lg backdrop-blur-sm ${
-                   previewStatus === 'degraded'
-                     ? 'border-amber-200 bg-amber-50/95 text-amber-900'
-                     : previewStatus === 'live'
-                     ? 'border-emerald-200 bg-emerald-50/95 text-emerald-900'
-                     : 'border-slate-200 bg-white/95 text-slate-700'
-                 }`}
-               >
-                 <div className="flex items-start gap-2">
-                   <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                   <span>{previewStatusMessage}</span>
-                 </div>
-                 {previewStatus === 'degraded' && (
-                   <button
-                     type="button"
-                     onClick={handlePreviewRetry}
-                     className="inline-flex items-center gap-1 rounded-lg border border-current/20 px-2 py-1 font-medium transition-colors hover:bg-white/60"
-                   >
-                     <RotateCcw size={12} />
-                     Retry
-                   </button>
-                 )}
-               </div>
-             </div>
-          </div>
-        ) : (
-          <div className="w-full bg-slate-100 rounded-xl border border-slate-200 border-dashed p-4 flex flex-col items-center justify-center text-slate-500 gap-3">
-            <div className="flex items-center gap-2 text-slate-400">
-               <VideoOff size={20} />
-               <span className="text-sm font-medium">Link Remote Camera</span>
-            </div>
-            <div className="w-full">
-              <CameraLinkInput
-                cameraUrl={cameraUrl}
-                onCameraUrlChange={(url) => onCameraUrlChange?.(url)}
-                onDone={() => setIsEditingCamera(false)}
-                onCancel={hasValidCameraUrl ? () => setIsEditingCamera(false) : undefined}
-                compact
+        <section className="space-y-2">
+          {!isPreviewMinimized && hasValidCameraUrl && isPreviewConnected ? (
+            <div className="w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-lg border border-slate-800">
+              <iframe
+                key={`${activePreviewUrl}-${previewReloadToken}`}
+                src={activePreviewUrl}
+                className="w-full h-full border-0"
+                allow="autoplay; fullscreen; microphone"
+                onLoad={handlePreviewLoad}
               />
             </div>
+          ) : !isPreviewMinimized ? (
+            <div className="w-full bg-slate-100 rounded-xl border border-slate-200 border-dashed p-4 flex flex-col items-center justify-center text-slate-500 gap-3">
+              <div className="flex items-center gap-2 text-slate-400">
+                <VideoOff size={20} />
+                <span className="text-sm font-medium">Paste Camera URL</span>
+              </div>
+              <div className="w-full">
+                <CameraLinkInput
+                  cameraUrl={cameraUrl}
+                  onCameraUrlChange={(url) => onCameraUrlChange?.(url)}
+                  onDone={() => {
+                    setIsPreviewConnected(true);
+                    setIsPreviewMinimized(false);
+                    setPreviewReloadToken((current) => current + 1);
+                  }}
+                  compact
+                  initialMode="manual"
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <span>{previewStatusMessage}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePreviewRetry}
+                disabled={!activePreviewUrl}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <RotateCcw size={12} />
+                Refresh
+              </button>
+              {hasValidCameraUrl && (
+                <button
+                  type="button"
+                  onClick={handleTogglePreviewConnection}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                >
+                  {isPreviewConnected ? 'Disconnect' : 'Reconnect'}
+                </button>
+              )}
+              {hasValidCameraUrl && isPreviewConnected && (
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewMinimized((current) => !current)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                >
+                  {isPreviewMinimized ? (
+                    <>
+                      <Maximize2 size={12} />
+                      Maximise
+                    </>
+                  ) : (
+                    <>
+                      <Minimize2 size={12} />
+                      Minimise
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
-        )}
+        </section>
 
         {/* Central Countdown */}
         <div className="flex-1 flex flex-col items-center justify-center py-6">

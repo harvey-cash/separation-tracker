@@ -15,6 +15,8 @@ test('streamer UI includes a clock and package-version display', () => {
   assert.doesNotMatch(html, /Local Time/);
   assert.match(html, /id="app-version"/);
   assert.match(html, /id="remote-preview-hint"/);
+  assert.match(html, /id="camera-url-text"/);
+  assert.match(html, /id="copy-camera-url"/);
   assert.doesNotMatch(html, /id="remote-profile"/);
   assert.match(html, /\.\/styles\.css/);
   assert.match(html, /\.\/app\.js/);
@@ -24,6 +26,9 @@ test('streamer UI includes a clock and package-version display', () => {
   assert.match(clientScript, /hour12:\s*false/);
   assert.match(clientScript, /window\.location\.hash/);
   assert.match(clientScript, /new EventSource/);
+  assert.match(clientScript, /navigator\.clipboard\?\.writeText/);
+  assert.match(clientScript, /currentPayload\?\.state\?\.preview\?\.publicUrl/);
+  assert.doesNotMatch(clientScript, /currentPayload\?\.state\?\.preview\?\.pairingUrl/);
   assert.match(clientScript, /Remote preview uses/);
   assert.doesNotMatch(clientScript, /elements\.remoteProfile/);
   assert.match(clientScript, /brave-paws-streamer:\/\/launch/);

@@ -8,6 +8,7 @@ type Props = {
   onDone?: () => void;
   onCancel?: () => void;
   compact?: boolean;
+  initialMode?: ScanMode;
 };
 
 type ScanMode = 'scan' | 'manual';
@@ -36,8 +37,9 @@ export function CameraLinkInput({
   onDone,
   onCancel,
   compact = false,
+  initialMode,
 }: Props) {
-  const [mode, setMode] = useState<ScanMode>(cameraUrl ? 'manual' : 'scan');
+  const [mode, setMode] = useState<ScanMode>(initialMode ?? (cameraUrl ? 'manual' : 'scan'));
   const [manualUrl, setManualUrl] = useState(cameraUrl);
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [isRequestingCamera, setIsRequestingCamera] = useState(false);
@@ -351,7 +353,7 @@ export function CameraLinkInput({
       ) : (
         <div className="space-y-3">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Stream Link</label>
+              <label className="text-sm font-medium text-slate-700">Camera URL</label>
             <input
               type="url"
               value={manualUrl}
@@ -362,7 +364,7 @@ export function CameraLinkInput({
                   commitManualUrl();
                 }
               }}
-              placeholder="https://harvey.cash/separation/app/?cameraUrl=..."
+              placeholder="https://demo.trycloudflare.com"
               className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-700 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-mono text-sm"
             />
             <p className={`${descriptionClass} ${isCameraUrlValid(manualUrl) ? 'text-emerald-700' : 'text-slate-500'}`}>
@@ -378,7 +380,7 @@ export function CameraLinkInput({
               className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
             >
               <Link2 size={16} />
-              {onDone ? 'Use Link' : 'Save Link'}
+               {onDone ? 'Use Camera URL' : 'Save Camera URL'}
             </button>
             {(manualUrl || cameraUrl) && (
               <button
