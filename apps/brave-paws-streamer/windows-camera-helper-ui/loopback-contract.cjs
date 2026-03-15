@@ -57,6 +57,10 @@ function buildHostedUiLaunchUrl({ port = DEFAULT_LOOPBACK_PORT, token }) {
   return launchUrl.toString();
 }
 
+function buildHostedUiOpenCommandArgs(launchUrl) {
+  return ['/c', 'start', '', `"${String(launchUrl).replace(/"/g, '""')}"`];
+}
+
 function buildPairingUrl(cameraUrl, options = {}) {
   const pairingUrl = new URL(getBravePawsAppUrl());
   pairingUrl.searchParams.set('cameraUrl', cameraUrl);
@@ -175,6 +179,7 @@ module.exports = {
   STREAMER_HELPER_PLATFORM,
   STREAMER_PROTOCOL_VERSION,
   TOKEN_HEADER,
+  buildHostedUiOpenCommandArgs,
   buildHostedUiLaunchUrl,
   buildLoopbackBaseUrl,
   buildPairingUrl,
