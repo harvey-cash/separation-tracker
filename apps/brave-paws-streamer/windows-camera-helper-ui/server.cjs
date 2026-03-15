@@ -10,6 +10,7 @@ const {
   STREAMER_HELPER_NAME,
   STREAMER_HELPER_PLATFORM,
   STREAMER_PROTOCOL_VERSION,
+  buildHostedUiOpenCommandArgs,
   buildHostedUiLaunchUrl,
   buildLoopbackBaseUrl,
   createAuthMiddleware,
@@ -267,7 +268,7 @@ app.listen(port, DEFAULT_LOOPBACK_HOST, () => {
   });
 
   if (shouldOpenBrowser) {
-    spawn('cmd.exe', ['/c', 'start', '', launchUrl], {
+    spawn('cmd.exe', buildHostedUiOpenCommandArgs(launchUrl), {
       cwd: packageRoot,
       detached: true,
       windowsHide: true,
