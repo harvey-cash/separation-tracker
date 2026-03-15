@@ -93,18 +93,6 @@ export function normalizeCameraUrlValue(value: string): string {
     return '';
   }
 
-  try {
-    const input = new URL(value.trim());
-    if (input.searchParams.has(CAMERA_URL_QUERY_PARAM)) {
-      return buildCameraPairingUrl(config.cameraUrl, `${input.origin}${input.pathname}`, {
-        profile: config.profile,
-        mode: config.mode,
-      });
-    }
-  } catch {
-    return config.cameraUrl;
-  }
-
   return config.cameraUrl;
 }
 
@@ -177,21 +165,15 @@ export function buildCameraPairingUrl(
 export function getCameraUrlFromSearch(search: string): string {
   const params = new URLSearchParams(search);
   const cameraUrl = sanitizeCameraUrl(params.get(CAMERA_URL_QUERY_PARAM) || '');
-  if (!cameraUrl) {
-    return '';
-  }
-
-  const profile = sanitizeCameraProfile(params.get(CAMERA_PROFILE_QUERY_PARAM) || '');
-  const mode = sanitizeCameraMode(params.get(CAMERA_MODE_QUERY_PARAM) || getDefaultModeForProfile(profile));
-  return buildCameraPairingUrl(cameraUrl, BRAVE_PAWS_PAIRING_URL, { profile, mode });
+  return cameraUrl;
 }
 
 export function getCameraUrlValidationMessage(value: string): string {
   if (!value.trim()) {
-    return 'Add a stream link or scan the QR code from Brave Paws Streamer.';
+    return 'Add a camera URL or scan the QR code from Brave Paws Streamer.';
   }
 
   return isCameraUrlValid(value)
-    ? 'Link looks good. Brave Paws will use it for remote preview.'
-    : 'Use a Brave Paws pairing link, a direct https stream link, or http only for localhost testing.';
+    ? 'Camera URL looks good. Brave Paws will use it for remote preview.'
+    : 'Use the simplified Brave Paws camera URL, or http only for localhost testing.';
 }

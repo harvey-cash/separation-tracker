@@ -9,6 +9,8 @@ const elements = {
   refreshButton: document.querySelector('#refresh-devices'),
   qrCard: document.querySelector('#qr-card'),
   qrImage: document.querySelector('#qr-image'),
+  cameraUrlText: document.querySelector('#camera-url-text'),
+  copyCameraUrl: document.querySelector('#copy-camera-url'),
   remotePreviewHint: document.querySelector('#remote-preview-hint'),
   openLocalPreview: document.querySelector('#open-local-preview'),
   fullscreenPreview: document.querySelector('#fullscreen-preview'),
@@ -35,6 +37,7 @@ const PROTOCOL_LAUNCH_TIMEOUT_MS = 1600;
 let currentPayload = null;
 let eventSource = null;
 let areLogsExpanded = false;
+let cameraUrlCopyResetId = 0;
 
 const clockFormatter = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
@@ -243,12 +246,52 @@ function applyQr(publicUrl, qrCodeDataUrl) {
     if (elements.qrImage.getAttribute('src')) {
       elements.qrImage.removeAttribute('src');
     }
+    elements.cameraUrlText.textContent = 'Waiting for helper…';
+    elements.copyCameraUrl.textContent = 'Copy Camera URL';
+    elements.copyCameraUrl.disabled = true;
     return;
   }
 
   elements.qrCard.classList.remove('hidden');
   if ((elements.qrImage.getAttribute('src') || '') !== (qrCodeDataUrl || '')) {
     elements.qrImage.src = qrCodeDataUrl || '';
+  }
+  elements.cameraUrlText.textContent = publicUrl;
+  elements.copyCameraUrl.textContent = 'Copy Camera URL';
+  elements.copyCameraUrl.disabled = false;
+}
+
+async function copyCameraUrl() {
+  const cameraUrl = currentPayload?.state?.preview?.publicUrl || '';
+  if (!cameraUrl) {
+    return;
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(cameraUrl);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = cameraUrl;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+    }
+
+    elements.copyCameraUrl.textContent = 'Copied';
+    window.clearTimeout(cameraUrlCopyResetId);
+    const resetId = window.setTimeout(() => {
+      if (cameraUrlCopyResetId === resetId) {
+        elements.copyCameraUrl.textContent = 'Copy Camera URL';
+      }
+    }, 1800);
+    cameraUrlCopyResetId = resetId;
+  } catch {
+    elements.copyCameraUrl.textContent = 'Copy Failed';
   }
 }
 
@@ -460,6 +503,7 @@ elements.toggleLogsButton.addEventListener('click', () => {
   areLogsExpanded = !areLogsExpanded;
   renderLogCardState();
 });
+elements.copyCameraUrl.addEventListener('click', copyCameraUrl);
 elements.launchHelper.addEventListener('click', tryLaunchHelper);
 elements.openLocalPreview.addEventListener('click', () => {
   if (currentPayload?.state?.preview?.localUrl) {
