@@ -37,6 +37,7 @@ import {
   loadLastSync,
   getLatestSessionDateMs,
   isRemoteSessionSetNewer,
+  shouldUseRemoteData,
   tokensFromGISResponse,
   findOrCreateFolder,
   findFile,
@@ -142,6 +143,38 @@ test('isRemoteSessionSetNewer returns true when remote sessions are more recent'
   ];
 
   assert.equal(isRemoteSessionSetNewer(localSessions, remoteSessions), true);
+});
+
+test('shouldUseRemoteData keeps local data on a fresh sync when local sessions are newer', () => {
+  const localSessions = [
+    { id: 'local-1', date: '2024-03-03T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+  ];
+  const remoteSessions = [
+    { id: 'remote-1', date: '2024-03-02T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+  ];
+
+  assert.equal(shouldUseRemoteData({
+    lastSyncMs: 0,
+    remoteModifiedMs: new Date('2024-03-02T11:00:00.000Z').getTime(),
+    localSessions,
+    remoteSessions,
+  }), false);
+});
+
+test('shouldUseRemoteData uses cloud data on a fresh sync when remote sessions are newer', () => {
+  const localSessions = [
+    { id: 'local-1', date: '2024-03-01T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+  ];
+  const remoteSessions = [
+    { id: 'remote-1', date: '2024-03-04T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+  ];
+
+  assert.equal(shouldUseRemoteData({
+    lastSyncMs: 0,
+    remoteModifiedMs: new Date('2024-03-04T11:00:00.000Z').getTime(),
+    localSessions,
+    remoteSessions,
+  }), true);
 });
 
 // ── tokensFromGISResponse ─────────────────────────────────────────────────────

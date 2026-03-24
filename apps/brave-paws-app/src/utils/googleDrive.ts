@@ -75,6 +75,21 @@ export function isRemoteSessionSetNewer(
   return getLatestSessionDateMs(remoteSessions) > getLatestSessionDateMs(localSessions);
 }
 
+export function shouldUseRemoteData(options: {
+  lastSyncMs: number;
+  remoteModifiedMs: number;
+  localSessions: Session[];
+  remoteSessions: Session[];
+}): boolean {
+  const { lastSyncMs, remoteModifiedMs, localSessions, remoteSessions } = options;
+
+  if (lastSyncMs === 0) {
+    return isRemoteSessionSetNewer(localSessions, remoteSessions);
+  }
+
+  return remoteModifiedMs > lastSyncMs;
+}
+
 /** Build a {@link DriveTokens} object from a GIS token response. */
 export function tokensFromGISResponse(
   accessToken: string,

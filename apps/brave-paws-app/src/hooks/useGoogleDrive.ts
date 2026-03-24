@@ -8,7 +8,7 @@ import {
   loadFolderId,
   saveLastSync,
   loadLastSync,
-  isRemoteSessionSetNewer,
+  shouldUseRemoteData,
   tokensFromGISResponse,
   findOrCreateFolder,
   findFile,
@@ -154,14 +154,16 @@ export function useGoogleDrive(
       if (remoteFile) {
         const remoteModifiedMs = new Date(remoteFile.modifiedTime).getTime();
         const lastSyncMs = loadLastSync();
-        const shouldCompareSessionDates = lastSyncMs === 0;
 
-        if (remoteModifiedMs > lastSyncMs || shouldCompareSessionDates) {
+        if (remoteModifiedMs > lastSyncMs || lastSyncMs === 0) {
           const remoteCSV = await downloadFile(accessToken, remoteFile.id);
           const remoteSessions = parseCSV(remoteCSV);
-          const remoteIsNewer = shouldCompareSessionDates
-            ? isRemoteSessionSetNewer(sessions, remoteSessions)
-            : remoteModifiedMs > lastSyncMs;
+          const remoteIsNewer = shouldUseRemoteData({
+            lastSyncMs,
+            remoteModifiedMs,
+            localSessions: sessions,
+            remoteSessions,
+          });
 
           if (remoteIsNewer) {
             // Remote was updated since our last sync — prompt conflict resolution
