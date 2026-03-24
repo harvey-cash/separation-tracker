@@ -1,3 +1,5 @@
+import type { Session } from '../types';
+
 export const DRIVE_FILE_NAME = 'brave_paws_sessions.csv';
 export const DRIVE_FOLDER_NAME = 'BravePaws_Data';
 
@@ -57,6 +59,35 @@ export function saveLastSync(ts: number): void {
 
 export function loadLastSync(): number {
   return parseInt(localStorage.getItem(LAST_SYNC_KEY) ?? '0', 10) || 0;
+}
+
+export function getLatestSessionDateMs(sessions: Session[]): number {
+  return sessions.reduce((latestMs, session) => {
+    const sessionMs = new Date(session.date).getTime();
+    return Number.isFinite(sessionMs) ? Math.max(latestMs, sessionMs) : latestMs;
+  }, 0);
+}
+
+export function isRemoteSessionSetNewer(
+  localSessions: Session[],
+  remoteSessions: Session[],
+): boolean {
+  return getLatestSessionDateMs(remoteSessions) > getLatestSessionDateMs(localSessions);
+}
+
+export function shouldUseRemoteData(options: {
+  lastSyncMs: number;
+  remoteModifiedMs: number;
+  localSessions: Session[];
+  remoteSessions: Session[];
+}): boolean {
+  const { lastSyncMs, remoteModifiedMs, localSessions, remoteSessions } = options;
+
+  if (lastSyncMs === 0) {
+    return isRemoteSessionSetNewer(localSessions, remoteSessions);
+  }
+
+  return remoteModifiedMs > lastSyncMs;
 }
 
 /** Build a {@link DriveTokens} object from a GIS token response. */
