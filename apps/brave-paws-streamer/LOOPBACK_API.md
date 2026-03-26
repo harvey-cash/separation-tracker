@@ -72,7 +72,7 @@ All authenticated requests accept the token through `x-brave-paws-session`, `Aut
       "localProfile": "local-quality",
       "remoteProfile": "remote-low-latency",
       "localMode": "mse",
-      "remoteMode": "mse,mp4,mjpeg"
+      "remoteMode": "mp4,mjpeg"
     },
     "selection": {
       "video": "",

@@ -4,7 +4,7 @@ export const CAMERA_PROFILE_QUERY_PARAM = 'cameraProfile';
 export const CAMERA_MODE_QUERY_PARAM = 'cameraMode';
 export const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/separation/app/';
 export const LOW_LATENCY_CAMERA_STREAM_PROFILE = 'remote-low-latency';
-export const LOW_LATENCY_CAMERA_STREAM_MODE = 'mse,mp4,mjpeg';
+export const LOW_LATENCY_CAMERA_STREAM_MODE = 'mp4,mjpeg';
 export const DEFAULT_CAMERA_STREAM_PROFILE = LOW_LATENCY_CAMERA_STREAM_PROFILE;
 export const DEFAULT_CAMERA_STREAM_MODE = LOW_LATENCY_CAMERA_STREAM_MODE;
 

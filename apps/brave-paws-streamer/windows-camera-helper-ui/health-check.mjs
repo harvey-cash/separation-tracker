@@ -114,7 +114,7 @@ async function main() {
       throw new Error(`Expected remote-low-latency profile after start, received ${startPayload.state.preview.remoteProfile}.`);
     }
 
-    if (!startPayload.state.preview.remoteUrl.includes('mode=mse%2Cmp4%2Cmjpeg')) {
+    if (!startPayload.state.preview.remoteUrl.includes('mode=mp4%2Cmjpeg')) {
       throw new Error(`Expected low-latency preview URL mode ordering, received ${startPayload.state.preview.remoteUrl}.`);
     }
 
