@@ -4,7 +4,7 @@ import { X, Plus, Trash2, GripVertical } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatDuration } from '../utils/format';
 import { DurationInput } from './DurationInput';
-import { getSessionStatusLabel, getStepStatusLabel } from '../utils/sessionStatus';
+import { getSessionStatusLabel, getStatusButtonClasses, getStepStatusLabel } from '../utils/sessionStatus';
 
 export function SessionEditModal({ 
   session, 
@@ -96,15 +96,7 @@ export function SessionEditModal({
                 <button
                   key={sessionStatus}
                   onClick={() => setStatus(sessionStatus)}
-                  className={`rounded-2xl border px-3 py-3 text-sm font-bold transition-all ${
-                    status === sessionStatus
-                      ? sessionStatus === 'completed'
-                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200'
-                        : sessionStatus === 'aborted'
-                        ? 'border-amber-300 bg-amber-50 text-amber-700 ring-2 ring-amber-200'
-                        : 'border-slate-300 bg-slate-100 text-slate-700 ring-2 ring-slate-200'
-                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                  }`}
+                  className={`rounded-2xl border px-3 py-3 text-sm font-bold transition-all ${getStatusButtonClasses(sessionStatus, status === sessionStatus)}`}
                 >
                   {getSessionStatusLabel(sessionStatus)}
                 </button>

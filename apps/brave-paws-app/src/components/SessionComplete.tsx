@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Session } from '../types';
+import { Session, SessionStatus } from '../types';
 import { Save, Smile, Meh, Frown, Sparkles } from 'lucide-react';
 
 type Props = {
@@ -7,12 +7,14 @@ type Props = {
   onSave: (session: Session) => void;
 };
 
+type FinalSessionStatus = Exclude<SessionStatus, 'pending'>;
+
 export function SessionComplete({ session, onSave }: Props) {
   const [score, setScore] = useState<0 | 1 | 2 | undefined>(session.anxietyScore);
   const [exercisedLevel, setExercisedLevel] = useState<0 | 1 | 2 | 3 | 4 | 5 | undefined>(session.exercisedLevel);
   const [anyoneHome, setAnyoneHome] = useState(session.anyoneHome || '');
   const [notes, setNotes] = useState(session.notes || '');
-  const [status, setStatus] = useState<'completed' | 'aborted'>(session.status === 'aborted' ? 'aborted' : 'completed');
+  const [status, setStatus] = useState<FinalSessionStatus>(session.status === 'aborted' ? 'aborted' : 'completed');
 
   const handleSave = () => {
     if (score === undefined) return;

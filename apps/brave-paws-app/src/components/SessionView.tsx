@@ -13,7 +13,15 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { getAbortedStepCount, getCompletedStepCount, getSessionStatusLabel, getStepStatusLabel } from '../utils/sessionStatus';
+import {
+  getAbortedStepCount,
+  getCompletedStepCount,
+  getSessionStatusBadgeClasses,
+  getSessionStatusLabel,
+  getStatusButtonClasses,
+  getStepStatusBadgeClasses,
+  getStepStatusLabel,
+} from '../utils/sessionStatus';
 
 type Props = {
   session: Session;
@@ -144,7 +152,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   const chartData = session.steps.map((step, index) => ({
     step: `Step ${index + 1}`,
     duration: step.durationSeconds,
-    status: getStepStatusLabel(step.status),
+    statusLabel: getStepStatusLabel(step.status),
   }));
 
   const getAnxietyLabel = (score?: number) => {
@@ -155,18 +163,6 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   };
 
   const anxietyInfo = getAnxietyLabel(session.anxietyScore);
-
-  const getSessionStatusClasses = (status: Session['status']) => {
-    if (status === 'completed') return 'text-emerald-700 bg-emerald-50';
-    if (status === 'aborted') return 'text-amber-700 bg-amber-50';
-    return 'text-slate-700 bg-slate-100';
-  };
-
-  const getStepStatusClasses = (status: Step['status']) => {
-    if (status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (status === 'aborted') return 'bg-amber-50 text-amber-700 border-amber-200';
-    return 'bg-slate-100 text-slate-700 border-slate-200';
-  };
 
   return (
     <div 
@@ -189,7 +185,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
           {!isEditing && (
             <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
               <p className="text-sm text-slate-500 font-medium">{format(new Date(session.date), 'MMMM d, yyyy')}</p>
-              <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${getSessionStatusClasses(session.status)}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${getSessionStatusBadgeClasses(session.status)}`}>
                 {getSessionStatusLabel(session.status)}
               </span>
             </div>
@@ -240,15 +236,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
                 <button
                   key={status}
                   onClick={() => setDraftStatus(status)}
-                  className={`rounded-2xl border px-4 py-3 text-sm font-bold transition-all ${
-                    draftStatus === status
-                      ? status === 'completed'
-                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200'
-                        : status === 'aborted'
-                        ? 'border-amber-300 bg-amber-50 text-amber-700 ring-2 ring-amber-200'
-                        : 'border-slate-300 bg-slate-100 text-slate-700 ring-2 ring-slate-200'
-                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                  }`}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-bold transition-all ${getStatusButtonClasses(status, draftStatus === status)}`}
                 >
                   {getSessionStatusLabel(status)}
                 </button>
@@ -399,7 +387,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
           <Clock className="text-rose-400 mb-2" size={24} />
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Max Duration</p>
@@ -425,7 +413,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Exercise</p>
           <p className="text-xl font-bold text-slate-800">{session.exercisedLevel ?? 'N/A'}</p>
         </div>
-        <div className={`p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center ${getSessionStatusClasses(session.status)}`}>
+        <div className={`p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center ${getSessionStatusBadgeClasses(session.status)}`}>
           <Calendar className="mb-2 opacity-80" size={24} />
           <p className="text-xs font-bold uppercase tracking-wider mb-1 opacity-80">Session</p>
           <p className="text-xl font-bold">{getSessionStatusLabel(session.status)}</p>
@@ -503,7 +491,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
                 <p className="font-bold text-slate-800">Step {index + 1}</p>
                 <p className="text-sm text-slate-500">{formatDuration(step.durationSeconds)}</p>
               </div>
-              <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${getStepStatusClasses(step.status)}`}>
+              <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${getStepStatusBadgeClasses(step.status)}`}>
                 {getStepStatusLabel(step.status)}
               </span>
             </div>

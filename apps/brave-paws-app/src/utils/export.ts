@@ -35,27 +35,42 @@ function parseCSVLine(line: string): string[] {
   return values;
 }
 
-function parseStepStatus(value: string | undefined, fallback: StepStatus): StepStatus {
+function parseStatusValue<TStatus extends StepStatus | SessionStatus>(value: string | undefined, fallback: TStatus): TStatus {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === 'completed') return 'completed';
-  if (normalized === 'aborted') return 'aborted';
-  if (normalized === 'pending' || normalized === 'in progress') return 'pending';
+  if (normalized === 'completed') return 'completed' as TStatus;
+  if (normalized === 'aborted') return 'aborted' as TStatus;
+  if (normalized === 'pending' || normalized === 'in progress') return 'pending' as TStatus;
   return fallback;
 }
 
 function parseSessionStatus(value: string | undefined, fallback: SessionStatus): SessionStatus {
-  const normalized = value?.trim().toLowerCase();
-  if (normalized === 'completed') return 'completed';
-  if (normalized === 'aborted') return 'aborted';
-  if (normalized === 'pending' || normalized === 'in progress') return 'pending';
-  return fallback;
+  return parseStatusValue(value, fallback);
+}
+
+function parseStepStatus(value: string | undefined, fallback: StepStatus): StepStatus {
+  return parseStatusValue(value, fallback);
+}
+
+function getAnxietyScoreLabel(score?: Session['anxietyScore']): string {
+  if (score === 0) return 'Calm';
+  if (score === 1) return 'Coping';
+  if (score === 2) return 'Panicking';
+  return 'N/A';
+}
+
+function detectTotalSteps(columns: string[], getValue: (columns: string[], header: string) => string): number {
+  return Array.from({ length: STEP_COLUMN_COUNT }, (_, stepIndex) => {
+    const durationValue = getValue(columns, `Step ${stepIndex + 1} Duration (s)`);
+    const statusValue = getValue(columns, `Step ${stepIndex + 1} Status`);
+    return durationValue || statusValue ? stepIndex + 1 : 0;
+  }).reduce((max, current) => Math.max(max, current), 0);
 }
 
 export function generateCSVContent(sessions: Session[]): string {
   const rows = sessions.map((session) => {
     const completedSteps = getCompletedStepCount(session.steps);
     const abortedSteps = getAbortedStepCount(session.steps);
-    const score = session.anxietyScore === 0 ? 'Calm' : session.anxietyScore === 1 ? 'Coping' : session.anxietyScore === 2 ? 'Panicking' : 'N/A';
+    const score = getAnxietyScoreLabel(session.anxietyScore);
     const notes = session.notes ? escapeCSVValue(session.notes) : '';
     const exercisedLevel = session.exercisedLevel ?? '';
     const anyoneHome = session.anyoneHome ? escapeCSVValue(session.anyoneHome) : '';
@@ -128,11 +143,7 @@ export function parseCSV(csvContent: string): Session[] {
     const abortedSteps = parseInt(getValue(columns, 'Aborted Steps'), 10) || 0;
     const declaredTotalSteps = parseInt(getValue(columns, 'Total Steps'), 10) || 0;
 
-    const detectedTotalSteps = Array.from({ length: STEP_COLUMN_COUNT }, (_, stepIndex) => {
-      const durationValue = getValue(columns, `Step ${stepIndex + 1} Duration (s)`);
-      const statusValue = getValue(columns, `Step ${stepIndex + 1} Status`);
-      return durationValue || statusValue ? stepIndex + 1 : 0;
-    }).reduce((max, current) => Math.max(max, current), 0);
+    const detectedTotalSteps = detectTotalSteps(columns, getValue);
 
     const totalSteps = declaredTotalSteps || detectedTotalSteps || 1;
 
@@ -153,8 +164,9 @@ export function parseCSV(csvContent: string): Session[] {
     for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
       const durationStr = getValue(columns, `Step ${stepIndex + 1} Duration (s)`);
       const durationSeconds = parseInt(durationStr, 10);
-      const inferredStatus: StepStatus =
-        stepIndex < completedSteps ? 'completed' : stepIndex < completedSteps + abortedSteps ? 'aborted' : 'pending';
+      const isCompletedStep = stepIndex < completedSteps;
+      const isAbortedStep = !isCompletedStep && stepIndex < completedSteps + abortedSteps;
+      const inferredStatus: StepStatus = isCompletedStep ? 'completed' : isAbortedStep ? 'aborted' : 'pending';
 
       steps.push({
         id: crypto.randomUUID(),

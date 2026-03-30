@@ -20,6 +20,34 @@ export function getSessionStatusLabel(status: SessionStatus): string {
   return 'In Progress';
 }
 
+export function getSessionStatusBadgeClasses(status: SessionStatus): string {
+  if (status === 'completed') return 'text-emerald-700 bg-emerald-50';
+  if (status === 'aborted') return 'text-amber-700 bg-amber-50';
+  return 'text-slate-700 bg-slate-100';
+}
+
+export function getStepStatusBadgeClasses(status: StepStatus): string {
+  if (status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (status === 'aborted') return 'bg-amber-50 text-amber-700 border-amber-200';
+  return 'bg-slate-100 text-slate-700 border-slate-200';
+}
+
+export function getStatusButtonClasses(status: SessionStatus | StepStatus, isSelected: boolean): string {
+  if (!isSelected) {
+    return 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700';
+  }
+
+  if (status === 'completed') {
+    return 'border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200';
+  }
+
+  if (status === 'aborted') {
+    return 'border-amber-300 bg-amber-50 text-amber-700 ring-2 ring-amber-200';
+  }
+
+  return 'border-slate-300 bg-slate-100 text-slate-700 ring-2 ring-slate-200';
+}
+
 export function getCompletedStepCount(steps: Step[]): number {
   return steps.filter((step) => step.status === 'completed').length;
 }
@@ -53,6 +81,8 @@ export function normalizeStep(value: unknown): Step | null {
       ? Math.max(0, candidate.durationSeconds)
       : 0;
 
+  // Legacy data only stored a boolean completed flag, where false meant the step
+  // had not been resolved yet. Preserve that as pending for backwards compatibility.
   const status = isStepStatus(candidate.status)
     ? candidate.status
     : candidate.completed === true
@@ -112,6 +142,8 @@ export function normalizeSession(value: unknown): Session | null {
       ? Math.max(0, candidate.totalDurationSeconds)
       : 0;
 
+  // Older saved sessions always used completed=true at save time, so a legacy
+  // false value most commonly represents an in-progress session snapshot.
   const status = isSessionStatus(candidate.status)
     ? candidate.status
     : candidate.completed === true

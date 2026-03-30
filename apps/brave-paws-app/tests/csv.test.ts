@@ -33,7 +33,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 }
 
 const SESSION = makeSession();
-const EXTENDED_CSV_COLUMN_COUNT = 31;
+const TOTAL_CSV_COLUMN_COUNT = 31;
 
 // ── generateCSVContent ────────────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ test('generateCSVContent produces the expected header row', () => {
   assert.equal(cols[11], 'Step 1 Duration (s)');
   assert.equal(cols[21], 'Step 1 Status');
   // 31 columns total: 11 fixed + 10 duration + 10 status columns
-  assert.equal(cols.length, EXTENDED_CSV_COLUMN_COUNT);
+  assert.equal(cols.length, TOTAL_CSV_COLUMN_COUNT);
 });
 
 test('generateCSVContent encodes anxiety scores as text labels', () => {

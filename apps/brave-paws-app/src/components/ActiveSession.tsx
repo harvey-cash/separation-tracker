@@ -85,7 +85,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     setSessionElapsed(getElapsedSeconds(sessionClockRef.current, now));
   }, []);
 
-  const resolveStep = useCallback((index: number, status: StepStatus, now = Date.now()) => {
+  const finalizeStep = useCallback((index: number, status: StepStatus, now = Date.now()) => {
     updateStepClock({ startedAt: null, accumulatedMs: 0 });
     setStepRemaining(0);
     isStepRunningRef.current = false;
@@ -122,9 +122,9 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     setStepRemaining(remaining);
 
       if (isStepRunningRef.current && remaining === 0) {
-        resolveStep(currentStepIndexRef.current, 'completed', now);
+        finalizeStep(currentStepIndexRef.current, 'completed', now);
       }
-  }, [resolveStep]);
+  }, [finalizeStep]);
 
   // Background Stopwatch
   useEffect(() => {
@@ -440,7 +440,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                 </button>
 
                 <button
-                  onClick={() => resolveStep(currentStepIndex, 'aborted')}
+                  onClick={() => finalizeStep(currentStepIndex, 'aborted')}
                   className="w-16 h-16 flex items-center justify-center bg-white border-2 border-slate-200 hover:border-amber-400 hover:text-amber-500 hover:bg-amber-50 text-slate-400 rounded-full shadow-sm transition-all active:scale-95"
                   title="Abort step"
                   aria-label="Abort Step"
@@ -450,7 +450,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                 
                 <button
                   onClick={() => {
-                    resolveStep(currentStepIndex, 'completed');
+                    finalizeStep(currentStepIndex, 'completed');
                   }}
                   className="w-16 h-16 flex items-center justify-center bg-white border-2 border-slate-200 hover:border-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 text-slate-400 rounded-full shadow-sm transition-all active:scale-95"
                   title="Mark step complete"

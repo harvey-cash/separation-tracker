@@ -58,7 +58,7 @@ test.describe('Session flow', () => {
     await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
     await expect(page.getByText('Aborted').first()).toBeVisible();
 
-    await page.locator('div.bg-white.p-6.rounded-3xl').first().click();
+    await page.getByText('Aborted').first().click();
     await expect(page.getByRole('heading', { name: 'Session Details' })).toBeVisible();
     await expect(page.getByText('Step Outcomes')).toBeVisible();
     await expect(page.getByText('Session').first()).toBeVisible();
