@@ -18,13 +18,13 @@ type Props = {
 
 export function GraphView({ sessions, onBack }: Props) {
   const completedSessions = sessions
-    .filter((s) => s.completed)
+    .filter((s) => s.status === 'completed')
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const data = completedSessions.map((session) => {
     const maxDuration = Math.max(
       0,
-      ...session.steps.filter((s) => s.completed).map((s) => s.durationSeconds)
+      ...session.steps.filter((s) => s.status === 'completed').map((s) => s.durationSeconds)
     );
     return {
       date: format(new Date(session.date), 'MMM d'),

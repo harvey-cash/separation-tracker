@@ -3,7 +3,7 @@
 This repository contains three first-class web and desktop surfaces:
 
 1. `Brave Paws Landing` in `apps/brave-paws-landing`, the public entrypoint for `harvey.cash/separation/`.
-2. `Brave Paws App` in `apps/brave-paws-app`, the React web app for planning, running, and reviewing separation-anxiety training sessions.
+2. `Brave Paws App` in `apps/brave-paws-app`, the React web app for planning, running, and reviewing separation-anxiety training sessions, including aborted step and session tracking.
 3. `Brave Paws Streamer` in `apps/brave-paws-streamer`, the Windows camera-streaming companion used to pair a live dog-camera feed with the app.
 
 Production hosting targets:

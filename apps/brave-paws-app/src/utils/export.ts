@@ -1,50 +1,93 @@
-import { Session, Step } from '../types';
+import { Session, SessionStatus, Step, StepStatus } from '../types';
 import { format } from 'date-fns';
+import { getAbortedStepCount, getCompletedStepCount } from './sessionStatus';
 
-const EXTENDED_FORMAT_MIN_COLUMN_COUNT = 19;
+const STEP_COLUMN_COUNT = 10;
+const HEADERS = [
+  'Date',
+  'Session Status',
+  'Total Duration (s)',
+  'Max Step Duration (s)',
+  'Completed Steps',
+  'Aborted Steps',
+  'Total Steps',
+  'Anxiety Score',
+  'Notes',
+  'Exercised Level',
+  'Anyone Home',
+  ...Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => `Step ${i + 1} Duration (s)`),
+  ...Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => `Step ${i + 1} Status`),
+];
+
+function escapeCSVValue(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function parseCSVLine(line: string): string[] {
+  const regex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,]*))/g;
+  const values: string[] = [];
+  let match;
+
+  while ((match = regex.exec(line)) !== null) {
+    values.push(match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2]);
+  }
+
+  return values;
+}
+
+function parseStepStatus(value: string | undefined, fallback: StepStatus): StepStatus {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === 'completed') return 'completed';
+  if (normalized === 'aborted') return 'aborted';
+  if (normalized === 'pending' || normalized === 'in progress') return 'pending';
+  return fallback;
+}
+
+function parseSessionStatus(value: string | undefined, fallback: SessionStatus): SessionStatus {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === 'completed') return 'completed';
+  if (normalized === 'aborted') return 'aborted';
+  if (normalized === 'pending' || normalized === 'in progress') return 'pending';
+  return fallback;
+}
 
 export function generateCSVContent(sessions: Session[]): string {
-  const headers = [
-    'Date',
-    'Total Duration (s)',
-    'Max Step Duration (s)',
-    'Completed Steps',
-    'Total Steps',
-    'Anxiety Score',
-    'Notes',
-    'Exercised Level',
-    'Anyone Home',
-    ...Array.from({ length: 10 }, (_, i) => `Step ${i + 1} Duration (s)`)
-  ];
+  const rows = sessions.map((session) => {
+    const completedSteps = getCompletedStepCount(session.steps);
+    const abortedSteps = getAbortedStepCount(session.steps);
+    const score = session.anxietyScore === 0 ? 'Calm' : session.anxietyScore === 1 ? 'Coping' : session.anxietyScore === 2 ? 'Panicking' : 'N/A';
+    const notes = session.notes ? escapeCSVValue(session.notes) : '';
+    const exercisedLevel = session.exercisedLevel ?? '';
+    const anyoneHome = session.anyoneHome ? escapeCSVValue(session.anyoneHome) : '';
 
-  const rows = sessions.map(s => {
-    const completedSteps = s.steps.filter(step => step.completed).length;
-    const score = s.anxietyScore === 0 ? 'Calm' : s.anxietyScore === 1 ? 'Coping' : s.anxietyScore === 2 ? 'Panicking' : 'N/A';
-    const notes = s.notes ? `"${s.notes.replace(/"/g, '""')}"` : '';
-    const exercisedLevel = s.exercisedLevel ?? '';
-    const anyoneHome = s.anyoneHome ? `"${s.anyoneHome.replace(/"/g, '""')}"` : '';
+    const maxDuration = session.steps.length > 0 ? Math.max(...session.steps.map((step) => step.durationSeconds)) : 0;
 
-    const maxDuration = s.steps.length > 0 ? Math.max(...s.steps.map(step => step.durationSeconds)) : 0;
+    const stepDurations = Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => {
+      return i < session.steps.length ? session.steps[i].durationSeconds : '';
+    });
 
-    const stepDurations = Array.from({ length: 10 }, (_, i) => {
-      return i < s.steps.length ? s.steps[i].durationSeconds : '';
+    const stepStatuses = Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => {
+      return i < session.steps.length ? session.steps[i].status : '';
     });
 
     return [
-      format(new Date(s.date), 'yyyy-MM-dd HH:mm:ss'),
-      s.totalDurationSeconds,
+      format(new Date(session.date), 'yyyy-MM-dd HH:mm:ss'),
+      session.status,
+      session.totalDurationSeconds,
       maxDuration,
       completedSteps,
-      s.steps.length,
+      abortedSteps,
+      session.steps.length,
       score,
       notes,
       exercisedLevel,
       anyoneHome,
-      ...stepDurations
+      ...stepDurations,
+      ...stepStatuses,
     ].join(',');
   });
 
-  return [headers.join(','), ...rows].join('\n');
+  return [HEADERS.join(','), ...rows].join('\n');
 }
 
 export function exportToCSV(sessions: Session[]) {
@@ -60,89 +103,63 @@ export function exportToCSV(sessions: Session[]) {
 }
 
 export function parseCSV(csvContent: string): Session[] {
-  const lines = csvContent.split('\n').filter(line => line.trim() !== '');
-  if (lines.length <= 1) return []; // Only headers or empty
+  const lines = csvContent.split('\n').filter((line) => line.trim() !== '');
+  if (lines.length <= 1) return [];
+
+  const headers = parseCSVLine(lines[0]);
+  const getIndex = (header: string) => headers.indexOf(header);
+  const getValue = (columns: string[], header: string) => {
+    const index = getIndex(header);
+    return index >= 0 ? columns[index] ?? '' : '';
+  };
 
   const sessions: Session[] = [];
-  
-  // Skip header line
+
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    // Simple CSV parser handling quotes
-    const regex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,]*))/g;
-    const matches = [];
-    let match;
-    while ((match = regex.exec(line)) !== null) {
-      if (match[1] !== undefined) {
-        matches.push(match[1].replace(/""/g, '"'));
-      } else {
-        matches.push(match[2]);
-      }
-    }
+    const columns = parseCSVLine(lines[i]);
+    if (columns.length < 7) continue;
 
-    if (matches.length < 7) continue;
-
-    const hasExtendedColumns = matches.length >= EXTENDED_FORMAT_MIN_COLUMN_COUNT;
-
-    const [
-      dateStr, 
-      totalDurationStr, 
-      maxDurationStr, // We parse it but don't strictly need it for reconstruction
-      completedStepsStr, 
-      totalStepsStr, 
-      scoreStr, 
-      notesStr,
-      ...restColumns
-    ] = matches;
-
-    const exercisedLevelStr = hasExtendedColumns ? restColumns[0] ?? '' : '';
-    const anyoneHomeStr = hasExtendedColumns ? restColumns[1] ?? '' : '';
-    const stepDurationStrs = hasExtendedColumns ? restColumns.slice(2) : restColumns;
-    
+    const dateStr = getValue(columns, 'Date');
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) continue;
+    if (Number.isNaN(date.getTime())) continue;
 
-    const totalDurationSeconds = parseInt(totalDurationStr, 10) || 0;
-    const totalSteps = parseInt(totalStepsStr, 10) || 1;
-    const completedSteps = parseInt(completedStepsStr, 10) || 0;
-    
+    const totalDurationSeconds = parseInt(getValue(columns, 'Total Duration (s)'), 10) || 0;
+    const completedSteps = parseInt(getValue(columns, 'Completed Steps'), 10) || 0;
+    const abortedSteps = parseInt(getValue(columns, 'Aborted Steps'), 10) || 0;
+    const declaredTotalSteps = parseInt(getValue(columns, 'Total Steps'), 10) || 0;
+
+    const detectedTotalSteps = Array.from({ length: STEP_COLUMN_COUNT }, (_, stepIndex) => {
+      const durationValue = getValue(columns, `Step ${stepIndex + 1} Duration (s)`);
+      const statusValue = getValue(columns, `Step ${stepIndex + 1} Status`);
+      return durationValue || statusValue ? stepIndex + 1 : 0;
+    }).reduce((max, current) => Math.max(max, current), 0);
+
+    const totalSteps = declaredTotalSteps || detectedTotalSteps || 1;
+
     let anxietyScore: 0 | 1 | 2 | undefined = undefined;
+    const scoreStr = getValue(columns, 'Anxiety Score');
     if (scoreStr === 'Calm') anxietyScore = 0;
     else if (scoreStr === 'Coping') anxietyScore = 1;
     else if (scoreStr === 'Panicking') anxietyScore = 2;
 
     let exercisedLevel: 0 | 1 | 2 | 3 | 4 | 5 | undefined = undefined;
-    const parsedExerciseLevel = parseInt(exercisedLevelStr, 10);
-    if (!isNaN(parsedExerciseLevel) && parsedExerciseLevel >= 0 && parsedExerciseLevel <= 5) {
+    const parsedExerciseLevel = parseInt(getValue(columns, 'Exercised Level'), 10);
+    if (!Number.isNaN(parsedExerciseLevel) && parsedExerciseLevel >= 0 && parsedExerciseLevel <= 5) {
       exercisedLevel = parsedExerciseLevel as 0 | 1 | 2 | 3 | 4 | 5;
     }
 
     const steps: Step[] = [];
-    
-    // Reconstruct steps from the 10 columns
-    for (let j = 0; j < Math.min(totalSteps, 10); j++) {
-      const durationStr = stepDurationStrs[j];
-      let durationSeconds = parseInt(durationStr, 10);
-      
-      // Fallback if the column is empty or invalid but we expect a step
-      if (isNaN(durationSeconds)) {
-         durationSeconds = 0;
-      }
+
+    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
+      const durationStr = getValue(columns, `Step ${stepIndex + 1} Duration (s)`);
+      const durationSeconds = parseInt(durationStr, 10);
+      const inferredStatus: StepStatus =
+        stepIndex < completedSteps ? 'completed' : stepIndex < completedSteps + abortedSteps ? 'aborted' : 'pending';
 
       steps.push({
         id: crypto.randomUUID(),
-        durationSeconds,
-        completed: j < completedSteps
-      });
-    }
-
-    // If there were more than 10 steps originally, we pad them with 0 duration
-    // so the total count matches, though we lost their actual durations.
-    for (let j = 10; j < totalSteps; j++) {
-      steps.push({
-        id: crypto.randomUUID(),
-        durationSeconds: 0,
-        completed: j < completedSteps
+        durationSeconds: Number.isNaN(durationSeconds) ? 0 : durationSeconds,
+        status: parseStepStatus(getValue(columns, `Step ${stepIndex + 1} Status`), inferredStatus),
       });
     }
 
@@ -153,9 +170,9 @@ export function parseCSV(csvContent: string): Session[] {
       steps,
       anxietyScore,
       exercisedLevel,
-      anyoneHome: anyoneHomeStr || '',
-      notes: notesStr || '',
-      completed: true
+      anyoneHome: getValue(columns, 'Anyone Home'),
+      notes: getValue(columns, 'Notes'),
+      status: parseSessionStatus(getValue(columns, 'Session Status'), 'completed'),
     });
   }
 

@@ -25,10 +25,11 @@ test.describe('Session flow', () => {
     // Wrap up the session without waiting for the timer
     await page.getByRole('button', { name: 'Wrap Up Session' }).click();
 
-    // Session Complete screen
-    await expect(page.getByRole('heading', { name: 'Session Complete' })).toBeVisible();
+    // Session wrap-up screen
+    await expect(page.getByRole('heading', { name: 'Wrap Up Session' })).toBeVisible();
 
     // Rate anxiety as Calm and save
+    await page.getByRole('button', { name: 'Completed' }).click();
     await page.getByRole('button', { name: 'Calm' }).click();
     await page.getByRole('button', { name: 'Save Session' }).click();
 
@@ -36,7 +37,32 @@ test.describe('Session flow', () => {
     await expect(page.getByRole('heading', { name: 'Brave Paws' })).toBeVisible();
     await expect(page.getByText('Recent Wins')).toBeVisible();
     // The session card shows completed steps
-    await expect(page.getByText(/steps completed/)).toBeVisible();
+    await expect(page.getByText(/completed/i)).toBeVisible();
+  });
+
+  test('can abort a step, save the session as aborted, and review the statuses', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Start Training' }).click();
+    await page.getByRole('button', { name: "Let's Go!" }).click();
+
+    await expect(page.getByRole('button', { name: 'Abort Step' })).toBeVisible();
+    await page.getByRole('button', { name: 'Abort Step' }).click();
+    await page.getByRole('button', { name: 'Wrap Up Session' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Wrap Up Session' })).toBeVisible();
+    await page.getByRole('button', { name: 'Aborted' }).click();
+    await page.getByRole('button', { name: 'Panicking' }).click();
+    await page.getByRole('button', { name: 'Save Session' }).click();
+
+    await page.getByRole('button', { name: 'History' }).click();
+    await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
+    await expect(page.getByText('Aborted').first()).toBeVisible();
+
+    await page.locator('div.bg-white.p-6.rounded-3xl').first().click();
+    await expect(page.getByRole('heading', { name: 'Session Details' })).toBeVisible();
+    await expect(page.getByText('Step Outcomes')).toBeVisible();
+    await expect(page.getByText('Session').first()).toBeVisible();
+    await expect(page.getByText('Aborted').first()).toBeVisible();
   });
 
   test('can add a step in session config', async ({ page }) => {

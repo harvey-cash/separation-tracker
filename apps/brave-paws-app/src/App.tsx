@@ -25,12 +25,12 @@ import { ArrowLeft } from 'lucide-react';
 type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view' | 'info';
 
 const DEFAULT_STEPS: Step[] = [
-  { id: crypto.randomUUID(), durationSeconds: 30, completed: false },
-  { id: crypto.randomUUID(), durationSeconds: 10, completed: false },
-  { id: crypto.randomUUID(), durationSeconds: 60, completed: false },
-  { id: crypto.randomUUID(), durationSeconds: 480, completed: false },
-  { id: crypto.randomUUID(), durationSeconds: 20, completed: false },
-  { id: crypto.randomUUID(), durationSeconds: 45, completed: false },
+  { id: crypto.randomUUID(), durationSeconds: 30, status: 'pending' },
+  { id: crypto.randomUUID(), durationSeconds: 10, status: 'pending' },
+  { id: crypto.randomUUID(), durationSeconds: 60, status: 'pending' },
+  { id: crypto.randomUUID(), durationSeconds: 480, status: 'pending' },
+  { id: crypto.randomUUID(), durationSeconds: 20, status: 'pending' },
+  { id: crypto.randomUUID(), durationSeconds: 45, status: 'pending' },
 ];
 
 export default function App() {
@@ -87,7 +87,7 @@ export default function App() {
       initialSteps = lastSession.steps.map(s => ({
         ...s,
         id: crypto.randomUUID(),
-        completed: false
+        status: 'pending',
       }));
     }
 
@@ -96,7 +96,7 @@ export default function App() {
       date: new Date().toISOString(),
       steps: initialSteps,
       totalDurationSeconds: 0,
-      completed: false,
+      status: 'pending',
     };
     
     setActiveSession(newSession);

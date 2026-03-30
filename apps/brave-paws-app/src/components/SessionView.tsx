@@ -13,6 +13,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { getAbortedStepCount, getCompletedStepCount, getSessionStatusLabel, getStepStatusLabel } from '../utils/sessionStatus';
 
 type Props = {
   session: Session;
@@ -34,6 +35,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   const [draftNotes, setDraftNotes] = useState(session.notes || '');
   const [draftSteps, setDraftSteps] = useState<Step[]>(session.steps);
   const [draftTotalDuration, setDraftTotalDuration] = useState(session.totalDurationSeconds);
+  const [draftStatus, setDraftStatus] = useState(session.status);
   const [newStepDuration, setNewStepDuration] = useState(30);
 
   // Reset draft state when session changes
@@ -45,6 +47,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
     setDraftNotes(session.notes || '');
     setDraftSteps(session.steps);
     setDraftTotalDuration(session.totalDurationSeconds);
+    setDraftStatus(session.status);
     setIsEditing(false);
   }, [session]);
 
@@ -90,6 +93,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
       notes: draftNotes,
       steps: draftSteps,
       totalDurationSeconds: draftTotalDuration,
+      status: draftStatus,
     });
     setIsEditing(false);
   };
@@ -102,6 +106,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
     setDraftNotes(session.notes || '');
     setDraftSteps(session.steps);
     setDraftTotalDuration(session.totalDurationSeconds);
+    setDraftStatus(session.status);
     setIsEditing(false);
   };
 
@@ -110,7 +115,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
     const newStep: Step = {
       id: crypto.randomUUID(),
       durationSeconds: newStepDuration,
-      completed: true,
+      status: 'completed',
     };
     setDraftSteps([...draftSteps, newStep]);
     setNewStepDuration(30);
@@ -126,12 +131,20 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
     ));
   };
 
+  const handleUpdateStepStatus = (id: string, status: Step['status']) => {
+    setDraftSteps(draftSteps.map((step) =>
+      step.id === id ? { ...step, status } : step
+    ));
+  };
+
   const maxStep = Math.max(...session.steps.map(s => s.durationSeconds), 0);
+  const completedSteps = getCompletedStepCount(session.steps);
+  const abortedSteps = getAbortedStepCount(session.steps);
   
   const chartData = session.steps.map((step, index) => ({
     step: `Step ${index + 1}`,
     duration: step.durationSeconds,
-    completed: step.completed
+    status: getStepStatusLabel(step.status),
   }));
 
   const getAnxietyLabel = (score?: number) => {
@@ -142,6 +155,18 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   };
 
   const anxietyInfo = getAnxietyLabel(session.anxietyScore);
+
+  const getSessionStatusClasses = (status: Session['status']) => {
+    if (status === 'completed') return 'text-emerald-700 bg-emerald-50';
+    if (status === 'aborted') return 'text-amber-700 bg-amber-50';
+    return 'text-slate-700 bg-slate-100';
+  };
+
+  const getStepStatusClasses = (status: Step['status']) => {
+    if (status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (status === 'aborted') return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-slate-100 text-slate-700 border-slate-200';
+  };
 
   return (
     <div 
@@ -162,7 +187,12 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
             {isEditing ? 'Edit Session' : 'Session Details'}
           </h1>
           {!isEditing && (
-            <p className="text-sm text-slate-500 mt-1 font-medium">{format(new Date(session.date), 'MMMM d, yyyy')}</p>
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+              <p className="text-sm text-slate-500 font-medium">{format(new Date(session.date), 'MMMM d, yyyy')}</p>
+              <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${getSessionStatusClasses(session.status)}`}>
+                {getSessionStatusLabel(session.status)}
+              </span>
+            </div>
           )}
         </div>
         <div className="w-24 flex justify-end gap-1">
@@ -204,6 +234,29 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
       {isEditing ? (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8 space-y-8">
           <div>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Session Status</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(['pending', 'completed', 'aborted'] as const).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setDraftStatus(status)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-bold transition-all ${
+                    draftStatus === status
+                      ? status === 'completed'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200'
+                        : status === 'aborted'
+                        ? 'border-amber-300 bg-amber-50 text-amber-700 ring-2 ring-amber-200'
+                        : 'border-slate-300 bg-slate-100 text-slate-700 ring-2 ring-slate-200'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                  }`}
+                >
+                  {getSessionStatusLabel(status)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Date</p>
             <input 
               type="date" 
@@ -228,7 +281,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
               {draftSteps.map((step, index) => (
                 <div
                   key={step.id}
-                  className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors group"
+                  className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors group"
                 >
                   <div className="text-slate-300 cursor-grab group-hover:text-slate-400">
                     <GripVertical size={20} />
@@ -242,6 +295,18 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
                   <span className="text-slate-500 w-16 text-right text-sm font-medium">
                     {formatDuration(step.durationSeconds)}
                   </span>
+                  <select
+                    value={step.status}
+                    onChange={(e) => handleUpdateStepStatus(step.id, e.target.value as Step['status'])}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-rose-300"
+                    aria-label={`Step ${index + 1} status`}
+                  >
+                    {(['pending', 'completed', 'aborted'] as const).map((status) => (
+                      <option key={status} value={status}>
+                        {getStepStatusLabel(status)}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     onClick={() => handleRemoveStep(step.id)}
                     className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
@@ -334,7 +399,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
           <Clock className="text-rose-400 mb-2" size={24} />
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Max Duration</p>
@@ -347,13 +412,23 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
         </div>
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
           <Calendar className="text-rose-400 mb-2" size={24} />
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Steps</p>
-          <p className="text-xl font-bold text-slate-800">{session.steps.filter(s => s.completed).length} / {session.steps.length}</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Completed Steps</p>
+          <p className="text-xl font-bold text-slate-800">{completedSteps}</p>
+        </div>
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+          <Calendar className="text-amber-500 mb-2" size={24} />
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Aborted Steps</p>
+          <p className="text-xl font-bold text-slate-800">{abortedSteps}</p>
         </div>
         <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
           <Activity className="text-sky-500 mb-2" size={24} />
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Exercise</p>
           <p className="text-xl font-bold text-slate-800">{session.exercisedLevel ?? 'N/A'}</p>
+        </div>
+        <div className={`p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center ${getSessionStatusClasses(session.status)}`}>
+          <Calendar className="mb-2 opacity-80" size={24} />
+          <p className="text-xs font-bold uppercase tracking-wider mb-1 opacity-80">Session</p>
+          <p className="text-xl font-bold">{getSessionStatusLabel(session.status)}</p>
         </div>
         <div className={`p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center ${anxietyInfo.color}`}>
           <Heart className="mb-2 opacity-80" size={24} fill="currentColor" />
@@ -414,6 +489,26 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
             </ResponsiveContainer>
           </div>
         )}
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+        <h2 className="text-lg font-bold text-slate-800 mb-6">Step Outcomes</h2>
+        <div className="space-y-3">
+          {session.steps.map((step, index) => (
+            <div
+              key={step.id}
+              className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
+            >
+              <div>
+                <p className="font-bold text-slate-800">Step {index + 1}</p>
+                <p className="text-sm text-slate-500">{formatDuration(step.durationSeconds)}</p>
+              </div>
+              <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${getStepStatusClasses(step.status)}`}>
+                {getStepStatusLabel(step.status)}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {session.notes && (

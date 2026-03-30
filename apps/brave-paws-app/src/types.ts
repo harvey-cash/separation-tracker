@@ -1,8 +1,12 @@
+export type StepStatus = 'pending' | 'completed' | 'aborted';
+
 export type Step = {
   id: string;
   durationSeconds: number;
-  completed: boolean;
+  status: StepStatus;
 };
+
+export type SessionStatus = 'pending' | 'completed' | 'aborted';
 
 export type Session = {
   id: string;
@@ -13,5 +17,5 @@ export type Session = {
   exercisedLevel?: 0 | 1 | 2 | 3 | 4 | 5;
   anyoneHome?: string;
   notes?: string;
-  completed: boolean;
+  status: SessionStatus;
 };

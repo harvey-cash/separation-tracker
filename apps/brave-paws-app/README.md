@@ -4,7 +4,7 @@
 
 # Brave Paws App
 
-Brave Paws is a client-side React + TypeScript app for planning, running, and reviewing gradual-desensitisation sessions for canine separation anxiety.
+Brave Paws is a client-side React + TypeScript app for planning, running, and reviewing gradual-desensitisation sessions for canine separation anxiety, including sessions or individual steps that need to be aborted when a dog goes over threshold.
 
 Session data is stored locally in the browser by default, with optional Google Drive backup if you connect your account.
 
@@ -57,3 +57,9 @@ If `VITE_GOOGLE_CLIENT_ID` is unset, the app falls back to the built-in default 
 - Training-method background: [INFO.md](INFO.md)
 - Repo overview and workspace commands: [../../README.md](../../README.md)
 - Release process: [../../RELEASE.md](../../RELEASE.md)
+
+## Session Status Tracking
+
+- Active-session controls can mark a single step as **Completed** or **Aborted**.
+- Session wrap-up can save the overall session as **Completed** or **Aborted** independently of the step outcomes.
+- Session details keep both step outcomes and the session outcome visible and editable, and CSV export/import preserves those statuses.

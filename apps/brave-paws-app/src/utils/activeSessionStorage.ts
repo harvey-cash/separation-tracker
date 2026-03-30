@@ -1,5 +1,6 @@
 import { Session } from '../types';
 import { TimerClock } from './timer';
+import { normalizeSession } from './sessionStatus';
 
 export const ACTIVE_SESSION_STORAGE_KEY = 'csa_tracker_active_session';
 
@@ -21,28 +22,40 @@ function isTimerClock(value: unknown): value is TimerClock {
   return (candidate.startedAt === null || typeof candidate.startedAt === 'number') && typeof candidate.accumulatedMs === 'number';
 }
 
-function isActiveSessionState(value: unknown): value is ActiveSessionState {
+function normalizeActiveSessionState(value: unknown): ActiveSessionState | null {
   if (!value || typeof value !== 'object') {
-    return false;
+    return null;
   }
 
   const candidate = value as Partial<ActiveSessionState>;
+  const session = normalizeSession(candidate.session);
 
-  return Boolean(
-    candidate.session &&
-      typeof candidate.session.id === 'string' &&
-      Array.isArray(candidate.session.steps) &&
-      typeof candidate.currentStepIndex === 'number' &&
-      typeof candidate.isSessionRunning === 'boolean' &&
-      typeof candidate.isStepRunning === 'boolean' &&
-      isTimerClock(candidate.sessionClock) &&
-      isTimerClock(candidate.stepClock)
-  );
+  if (
+    !session ||
+    typeof candidate.currentStepIndex !== 'number' ||
+    typeof candidate.isSessionRunning !== 'boolean' ||
+    typeof candidate.isStepRunning !== 'boolean' ||
+    !isTimerClock(candidate.sessionClock) ||
+    !isTimerClock(candidate.stepClock)
+  ) {
+    return null;
+  }
+
+  return {
+    session,
+    currentStepIndex: candidate.currentStepIndex,
+    isSessionRunning: candidate.isSessionRunning,
+    sessionClock: candidate.sessionClock,
+    isStepRunning: candidate.isStepRunning,
+    stepClock: candidate.stepClock,
+  };
 }
 
 export function createActiveSessionState(session: Session, now = Date.now()): ActiveSessionState {
+  const normalizedSession = normalizeSession(session) ?? session;
+
   return {
-    session,
+    session: normalizedSession,
     currentStepIndex: 0,
     isSessionRunning: true,
     sessionClock: {
@@ -65,7 +78,7 @@ export function loadActiveSessionState(storage = window.localStorage): ActiveSes
 
   try {
     const parsed = JSON.parse(stored);
-    return isActiveSessionState(parsed) ? parsed : null;
+    return normalizeActiveSessionState(parsed);
   } catch {
     return null;
   }

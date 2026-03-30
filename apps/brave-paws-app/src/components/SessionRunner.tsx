@@ -63,7 +63,7 @@ export function SessionRunner({
 
   const handleCompleteStep = () => {
     const newSteps = [...steps];
-    newSteps[currentStepIndex].completed = true;
+    newSteps[currentStepIndex].status = 'completed';
     setSteps(newSteps);
     setIsStepRunning(false);
     
@@ -83,7 +83,7 @@ export function SessionRunner({
       totalDurationSeconds: sessionTime,
       anxietyScore,
       notes,
-      completed: true
+      status: 'completed'
     });
   };
 

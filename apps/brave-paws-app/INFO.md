@@ -13,7 +13,7 @@ The most effective, welfare-friendly treatment is **gradual desensitisation** �
 - **Randomised in duration.** Steps within a session vary up and down rather than increasing in a straight line. This prevents the dog from learning that each absence is always longer than the last, which itself can trigger anxiety.
 - **Gradually extended over many sessions.** The maximum absence time creeps upward across days and weeks, but only when previous sessions show the dog remained calm.
 
-Each training session is a set of short departures performed back-to-back. After every session the owner assesses how the dog coped and decides whether to push slightly further next time or hold steady.
+Each training session is a set of short departures performed back-to-back. After every session the owner assesses how the dog coped and decides whether to push slightly further next time or hold steady. If the dog panics during a departure, the safest choice is to abort that step immediately, help the dog recover, and then decide whether the overall session should still count as completed or should be logged as aborted.
 
 ## How Brave Paws Helps
 
@@ -21,8 +21,8 @@ Brave Paws is a tracker built around this protocol. It lets you:
 
 1. **Plan** a session — create a list of timed steps (e.g. 30 s → 10 s → 1 min → 15 s → 2 min).
 2. **Run** the session — a per-step countdown timer guides each departure while a stopwatch tracks total training time.
-3. **Rate** the session — record whether your dog was Calm, Coping, or Panicking, and add notes.
-4. **Review** your history — browse past sessions, chart your dog's maximum independence time over weeks, and export data to CSV.
+3. **Rate** the session — record whether your dog was Calm, Coping, or Panicking, whether the session was completed or aborted, and add notes.
+4. **Review** your history — browse past sessions, inspect which steps were completed or aborted, chart your dog's maximum independence time over weeks, and export data to CSV.
 
 All data stays on your device in the browser — no account, no server, no cloud.
 

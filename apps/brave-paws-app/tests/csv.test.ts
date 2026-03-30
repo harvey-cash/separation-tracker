@@ -22,18 +22,18 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     exercisedLevel: 3,
     anyoneHome: 'Neighbor in living room',
     notes: 'Good day',
-    completed: true,
+    status: 'completed',
     steps: [
-      { id: 's1', durationSeconds: 30, completed: true },
-      { id: 's2', durationSeconds: 60, completed: true },
-      { id: 's3', durationSeconds: 480, completed: true },
+      { id: 's1', durationSeconds: 30, status: 'completed' },
+      { id: 's2', durationSeconds: 60, status: 'completed' },
+      { id: 's3', durationSeconds: 480, status: 'completed' },
     ],
     ...overrides,
   };
 }
 
 const SESSION = makeSession();
-const EXTENDED_CSV_COLUMN_COUNT = 19;
+const EXTENDED_CSV_COLUMN_COUNT = 31;
 
 // ── generateCSVContent ────────────────────────────────────────────────────────
 
@@ -43,13 +43,15 @@ test('generateCSVContent produces the expected header row', () => {
   const cols = header.split(',');
 
   assert.equal(cols[0], 'Date');
-  assert.equal(cols[1], 'Total Duration (s)');
-  assert.equal(cols[5], 'Anxiety Score');
-  assert.equal(cols[6], 'Notes');
-  assert.equal(cols[7], 'Exercised Level');
-  assert.equal(cols[8], 'Anyone Home');
-  assert.equal(cols[9], 'Step 1 Duration (s)');
-  // 19 columns total: 9 fixed + 10 step columns
+  assert.equal(cols[1], 'Session Status');
+  assert.equal(cols[2], 'Total Duration (s)');
+  assert.equal(cols[7], 'Anxiety Score');
+  assert.equal(cols[8], 'Notes');
+  assert.equal(cols[9], 'Exercised Level');
+  assert.equal(cols[10], 'Anyone Home');
+  assert.equal(cols[11], 'Step 1 Duration (s)');
+  assert.equal(cols[21], 'Step 1 Status');
+  // 31 columns total: 11 fixed + 10 duration + 10 status columns
   assert.equal(cols.length, EXTENDED_CSV_COLUMN_COUNT);
 });
 
@@ -58,9 +60,9 @@ test('generateCSVContent encodes anxiety scores as text labels', () => {
   const coping = parseCSVRow(generateCSVContent([makeSession({ anxietyScore: 1 })]));
   const panicking = parseCSVRow(generateCSVContent([makeSession({ anxietyScore: 2 })]));
 
-  assert.equal(calm[5], 'Calm');
-  assert.equal(coping[5], 'Coping');
-  assert.equal(panicking[5], 'Panicking');
+  assert.equal(calm[7], 'Calm');
+  assert.equal(coping[7], 'Coping');
+  assert.equal(panicking[7], 'Panicking');
 });
 
 test('generateCSVContent escapes double-quotes in notes', () => {
@@ -99,6 +101,21 @@ test('roundtrip preserves anxiety score', () => {
   assert.equal(restored.anxietyScore, SESSION.anxietyScore);
 });
 
+test('roundtrip preserves session status and step statuses', () => {
+  const session = makeSession({
+    status: 'aborted',
+    steps: [
+      { id: 's1', durationSeconds: 30, status: 'completed' },
+      { id: 's2', durationSeconds: 60, status: 'aborted' },
+      { id: 's3', durationSeconds: 480, status: 'pending' },
+    ],
+  });
+  const [restored] = parseCSV(generateCSVContent([session]));
+
+  assert.equal(restored.status, 'aborted');
+  assert.deepEqual(restored.steps.map((step) => step.status), ['completed', 'aborted', 'pending']);
+});
+
 test('roundtrip preserves notes (including special characters)', () => {
   const session = makeSession({ notes: 'Great session, very calm!' });
   const [restored] = parseCSV(generateCSVContent([session]));
@@ -123,11 +140,11 @@ test('roundtrip preserves notes containing double-quotes', () => {
   assert.equal(restored.notes, session.notes);
 });
 
-test('roundtrip preserves total duration and completed status', () => {
+test('roundtrip preserves total duration and session status', () => {
   const csv = generateCSVContent([SESSION]);
   const [restored] = parseCSV(csv);
   assert.equal(restored.totalDurationSeconds, SESSION.totalDurationSeconds);
-  assert.equal(restored.completed, true);
+  assert.equal(restored.status, 'completed');
 });
 
 test('roundtrip handles multiple sessions', () => {
@@ -137,7 +154,8 @@ test('roundtrip handles multiple sessions', () => {
     exercisedLevel: undefined,
     anyoneHome: '',
     notes: '',
-    steps: [{ id: 'x', durationSeconds: 120, completed: false }],
+    status: 'aborted',
+    steps: [{ id: 'x', durationSeconds: 120, status: 'aborted' }],
   });
   const restored = parseCSV(generateCSVContent([SESSION, session2]));
   assert.equal(restored.length, 2);
@@ -145,6 +163,8 @@ test('roundtrip handles multiple sessions', () => {
   assert.equal(restored[1].exercisedLevel, undefined);
   assert.equal(restored[1].anyoneHome, '');
   assert.equal(restored[1].steps[0].durationSeconds, 120);
+  assert.equal(restored[1].steps[0].status, 'aborted');
+  assert.equal(restored[1].status, 'aborted');
 });
 
 test('parseCSV supports legacy format without exercise and anyone-home columns', () => {
@@ -157,6 +177,20 @@ test('parseCSV supports legacy format without exercise and anyone-home columns',
   assert.equal(restored.anyoneHome, '');
   assert.equal(restored.steps.length, 3);
   assert.equal(restored.steps[2].durationSeconds, 480);
+  assert.equal(restored.status, 'completed');
+  assert.deepEqual(restored.steps.map((step) => step.status), ['completed', 'completed', 'completed']);
+});
+
+test('parseCSV infers aborted steps from aborted count when step status columns are absent', () => {
+  const csv = [
+    'Date,Session Status,Total Duration (s),Max Step Duration (s),Completed Steps,Aborted Steps,Total Steps,Anxiety Score,Notes,Exercised Level,Anyone Home,Step 1 Duration (s),Step 2 Duration (s),Step 3 Duration (s)',
+    '2024-06-15 09:30:00,aborted,635,480,1,1,3,Panicking,"Too hard",2,,30,60,480',
+  ].join('\n');
+
+  const [restored] = parseCSV(csv);
+
+  assert.equal(restored.status, 'aborted');
+  assert.deepEqual(restored.steps.map((step) => step.status), ['completed', 'aborted', 'pending']);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
