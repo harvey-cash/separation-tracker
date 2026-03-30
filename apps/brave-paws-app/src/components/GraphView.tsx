@@ -16,22 +16,21 @@ type Props = {
   onBack: () => void;
 };
 
-export function GraphView({ sessions, onBack }: Props) {
-  const completedSessions = sessions
-    .filter((s) => s.status === 'completed')
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+export function getGraphData(sessions: Session[]) {
+  return [...sessions]
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((session) => {
+      const maxDuration = Math.max(0, ...session.steps.map((step) => step.durationSeconds));
+      return {
+        date: format(new Date(session.date), 'MMM d'),
+        maxDurationMinutes: parseFloat((maxDuration / 60).toFixed(2)),
+        score: session.anxietyScore,
+      };
+    });
+}
 
-  const data = completedSessions.map((session) => {
-    const maxDuration = Math.max(
-      0,
-      ...session.steps.filter((s) => s.status === 'completed').map((s) => s.durationSeconds)
-    );
-    return {
-      date: format(new Date(session.date), 'MMM d'),
-      maxDurationMinutes: parseFloat((maxDuration / 60).toFixed(2)),
-      score: session.anxietyScore,
-    };
-  });
+export function GraphView({ sessions, onBack }: Props) {
+  const data = getGraphData(sessions);
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">

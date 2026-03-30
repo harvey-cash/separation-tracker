@@ -33,9 +33,9 @@ test.describe('Session flow', () => {
     await page.getByRole('button', { name: 'Calm' }).click();
     await page.getByRole('button', { name: 'Save Session' }).click();
 
-    // Should be back on dashboard with the new session in Recent Wins
+    // Should be back on dashboard with the new session in Recent Sessions
     await expect(page.getByRole('heading', { name: 'Brave Paws' })).toBeVisible();
-    await expect(page.getByText('Recent Wins')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent Sessions' })).toBeVisible();
     // The session card shows completed steps
     await expect(page.getByText('0 completed • 0 aborted')).toBeVisible();
   });
