@@ -37,7 +37,7 @@ test.describe('Session flow', () => {
     await expect(page.getByRole('heading', { name: 'Brave Paws' })).toBeVisible();
     await expect(page.getByText('Recent Wins')).toBeVisible();
     // The session card shows completed steps
-    await expect(page.getByText(/completed/i)).toBeVisible();
+    await expect(page.getByText('0 completed • 0 aborted')).toBeVisible();
   });
 
   test('can abort a step, save the session as aborted, and review the statuses', async ({ page }) => {
