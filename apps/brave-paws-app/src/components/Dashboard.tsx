@@ -17,6 +17,12 @@ type Props = {
 
 const STREAMER_RELEASE_URL = 'https://github.com/harvey-cash/separation-tracker/releases/latest';
 
+export function getRecentSessions(sessions: Session[]) {
+  return [...sessions]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+}
+
 export function Dashboard({
   sessions,
   onStartNew,
@@ -26,11 +32,8 @@ export function Dashboard({
   onViewSession,
   driveSync,
 }: Props) {
-  const completedSessions = sessions.filter((s) => s.status === 'completed');
   const abortedSessions = sessions.filter((s) => s.status === 'aborted');
-  const recentSessions = [...completedSessions]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
+  const recentSessions = getRecentSessions(sessions);
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-8">
@@ -102,10 +105,10 @@ export function Dashboard({
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-serif font-bold text-slate-800">Recent Wins</h2>
+          <h2 className="text-xl font-serif font-bold text-slate-800">Recent Sessions</h2>
           {sessions.length > 0 && (
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              {completedSessions.length} completed • {abortedSessions.length} aborted
+              {sessions.length} total{abortedSessions.length > 0 ? ` • ${abortedSessions.length} aborted` : ''}
             </p>
           )}
         </div>
