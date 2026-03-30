@@ -108,7 +108,7 @@ export function Dashboard({
           <h2 className="text-xl font-serif font-bold text-slate-800">Recent Sessions</h2>
           {sessions.length > 0 && (
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              {sessions.length} total{abortedSessions.length > 0 ? ` • ${abortedSessions.length} aborted` : ''}
+              {sessions.length} total {abortedSessions.length > 0 ? `• ${abortedSessions.length} aborted` : ''}
             </p>
           )}
         </div>
