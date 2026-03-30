@@ -31,10 +31,10 @@ function createSession(): Session {
     id: 'session-1',
     date: '2026-03-14T00:00:00.000Z',
     totalDurationSeconds: 0,
-    completed: false,
+    status: 'pending',
     steps: [
-      { id: 'step-1', durationSeconds: 30, completed: false },
-      { id: 'step-2', durationSeconds: 10, completed: false },
+      { id: 'step-1', durationSeconds: 30, status: 'pending' },
+      { id: 'step-2', durationSeconds: 10, status: 'pending' },
     ],
   };
 }
@@ -67,6 +67,37 @@ test('loadActiveSessionState ignores malformed data', () => {
   storage.setItem(ACTIVE_SESSION_STORAGE_KEY, '{"session":true}');
 
   assert.equal(loadActiveSessionState(storage), null);
+});
+
+test('loadActiveSessionState normalizes legacy completion booleans', () => {
+  const storage = createStorage();
+
+  storage.setItem(
+    ACTIVE_SESSION_STORAGE_KEY,
+    JSON.stringify({
+      session: {
+        id: 'legacy-session',
+        date: '2026-03-14T00:00:00.000Z',
+        totalDurationSeconds: 12,
+        completed: false,
+        steps: [
+          { id: 'step-1', durationSeconds: 30, completed: true },
+          { id: 'step-2', durationSeconds: 10, completed: false },
+        ],
+      },
+      currentStepIndex: 1,
+      isSessionRunning: false,
+      sessionClock: { startedAt: null, accumulatedMs: 12_000 },
+      isStepRunning: false,
+      stepClock: { startedAt: null, accumulatedMs: 0 },
+    })
+  );
+
+  const restored = loadActiveSessionState(storage);
+
+  assert.ok(restored);
+  assert.equal(restored?.session.status, 'pending');
+  assert.deepEqual(restored?.session.steps.map((step) => step.status), ['completed', 'pending']);
 });
 
 test('clearActiveSessionState removes persisted state', () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Session, Step } from './types';
+import { Session } from './types';
+import { normalizeSession, normalizeSessions } from './utils/sessionStatus';
 
 const STORAGE_KEY = 'csa_tracker_sessions';
 
@@ -8,7 +9,7 @@ export function useSessions() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        return normalizeSessions(JSON.parse(stored));
       } catch (e) {
         console.error('Failed to parse sessions', e);
       }
@@ -21,12 +22,22 @@ export function useSessions() {
   }, [sessions]);
 
   const addSession = (session: Session) => {
-    setSessions((prev) => [...prev, session]);
+    const normalized = normalizeSession(session);
+    if (!normalized) {
+      return;
+    }
+
+    setSessions((prev) => [...prev, normalized]);
   };
 
   const updateSession = (updated: Session) => {
+    const normalized = normalizeSession(updated);
+    if (!normalized) {
+      return;
+    }
+
     setSessions((prev) =>
-      prev.map((s) => (s.id === updated.id ? updated : s))
+      prev.map((s) => (s.id === normalized.id ? normalized : s))
     );
   };
 
@@ -35,7 +46,7 @@ export function useSessions() {
   };
 
   const replaceSessions = (incoming: Session[]) => {
-    setSessions(incoming);
+    setSessions(normalizeSessions(incoming));
   };
 
   return { sessions, addSession, updateSession, deleteSession, replaceSessions };

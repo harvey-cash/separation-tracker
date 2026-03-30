@@ -4,6 +4,7 @@ import { formatDuration } from '../utils/format';
 import { format } from 'date-fns';
 import { Trash2, Edit2, Plus, CalendarHeart, Download, Upload } from 'lucide-react';
 import { SessionEditModal } from './SessionEditModal';
+import { getAbortedStepCount, getCompletedStepCount, getSessionStatusLabel } from '../utils/sessionStatus';
 
 export function HistoryList({ 
   sessions, 
@@ -48,7 +49,7 @@ export function HistoryList({
       date: new Date().toISOString(),
       steps: [],
       totalDurationSeconds: 0,
-      completed: true,
+      status: 'completed',
     };
     setEditingSession(newSession);
     setIsAddingNew(true);
@@ -80,6 +81,12 @@ export function HistoryList({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const getSessionStatusClasses = (status: Session['status']) => {
+    if (status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (status === 'aborted') return 'bg-amber-50 text-amber-700 border-amber-200';
+    return 'bg-slate-100 text-slate-700 border-slate-200';
   };
 
   return (
@@ -140,7 +147,7 @@ export function HistoryList({
                   <div>
                     <h3 className="font-bold text-slate-800 text-lg">{format(new Date(session.date), 'MMM d, yyyy')}</h3>
                     <p className="text-sm text-slate-500 mt-1 font-medium">
-                      {session.steps.length} steps • Max: {formatDuration(maxStep)}
+                      {session.steps.length} steps • {getCompletedStepCount(session.steps)} completed • {getAbortedStepCount(session.steps)} aborted
                     </p>
                   </div>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -166,6 +173,9 @@ export function HistoryList({
                 </div>
                 
                 <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-50">
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${getSessionStatusClasses(session.status)}`}>
+                    {getSessionStatusLabel(session.status)}
+                  </span>
                   <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${getAnxietyColor(session.anxietyScore)}`}>
                     {getAnxietyLabel(session.anxietyScore)}
                   </span>

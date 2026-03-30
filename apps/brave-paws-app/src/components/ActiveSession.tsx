@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Session } from '../types';
+import { Session, StepStatus } from '../types';
 import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff, RotateCcw, Minimize2, Maximize2 } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
@@ -85,14 +85,18 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     setSessionElapsed(getElapsedSeconds(sessionClockRef.current, now));
   }, []);
 
-  const completeStep = useCallback((index: number, now = Date.now()) => {
+  const finalizeStep = useCallback((index: number, status: StepStatus, now = Date.now()) => {
     updateStepClock({ startedAt: null, accumulatedMs: 0 });
     setStepRemaining(0);
+    isStepRunningRef.current = false;
+    setIsStepRunning(false);
 
     setSession((prev) => {
       const newSteps = [...prev.steps];
-      newSteps[index] = { ...newSteps[index], completed: true };
-      return { ...prev, steps: newSteps };
+      newSteps[index] = { ...newSteps[index], status };
+      const updatedSession = { ...prev, steps: newSteps };
+      sessionRef.current = updatedSession;
+      return updatedSession;
     });
     
     if (index < sessionRef.current.steps.length - 1) {
@@ -100,15 +104,10 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       currentStepIndexRef.current = nextStepIndex;
       setCurrentStepIndex(nextStepIndex);
       setStepRemaining(sessionRef.current.steps[nextStepIndex].durationSeconds);
-      isStepRunningRef.current = false;
-      setIsStepRunning(false);
     } else {
-      // All steps completed
       const pausedSessionClock = pauseTimer(sessionClockRef.current, now);
       updateSessionClock(pausedSessionClock);
       setSessionElapsed(getElapsedSeconds(pausedSessionClock, now));
-      isStepRunningRef.current = false;
-      setIsStepRunning(false);
       setIsSessionRunning(false);
     }
   }, [updateSessionClock, updateStepClock]);
@@ -122,10 +121,10 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     const remaining = getRemainingSeconds(currentStep.durationSeconds, stepClockRef.current, now);
     setStepRemaining(remaining);
 
-    if (isStepRunningRef.current && remaining === 0) {
-      completeStep(currentStepIndexRef.current, now);
-    }
-  }, [completeStep]);
+      if (isStepRunningRef.current && remaining === 0) {
+        finalizeStep(currentStepIndexRef.current, 'completed', now);
+      }
+  }, [finalizeStep]);
 
   // Background Stopwatch
   useEffect(() => {
@@ -238,7 +237,8 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   };
 
   const currentStep = session.steps[currentStepIndex];
-  const isFinished = currentStepIndex >= session.steps.length - 1 && session.steps[session.steps.length - 1].completed;
+  const isFinished = session.steps.every((step) => step.status !== 'pending');
+  const abortedSteps = session.steps.filter((step) => step.status === 'aborted').length;
   const streamUrl = buildCameraStreamUrl(cameraUrl);
   const hasValidCameraUrl = streamUrl.length > 0;
   const activePreviewUrl = hasValidCameraUrl && isPreviewConnected ? streamUrl : '';
@@ -434,17 +434,27 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                 <button
                   onClick={handleToggleStep}
                   className="w-24 h-24 flex items-center justify-center bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-lg shadow-rose-200 transition-all active:scale-95"
+                  aria-label={isStepRunning ? 'Pause Step' : 'Start Step'}
                 >
                   {isStepRunning ? <Pause size={36} /> : <Play size={36} className="ml-2" fill="currentColor" />}
+                </button>
+
+                <button
+                  onClick={() => finalizeStep(currentStepIndex, 'aborted')}
+                  className="w-16 h-16 flex items-center justify-center bg-white border-2 border-slate-200 hover:border-amber-400 hover:text-amber-500 hover:bg-amber-50 text-slate-400 rounded-full shadow-sm transition-all active:scale-95"
+                  title="Abort step"
+                  aria-label="Abort Step"
+                >
+                  <X size={28} />
                 </button>
                 
                 <button
                   onClick={() => {
-                    setIsStepRunning(false);
-                    completeStep(currentStepIndex);
+                    finalizeStep(currentStepIndex, 'completed');
                   }}
                   className="w-16 h-16 flex items-center justify-center bg-white border-2 border-slate-200 hover:border-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 text-slate-400 rounded-full shadow-sm transition-all active:scale-95"
                   title="Mark step complete"
+                  aria-label="Complete Step"
                 >
                   <CheckCircle2 size={28} />
                 </button>
@@ -452,11 +462,15 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
             </>
           ) : (
             <div className="text-center space-y-6">
-              <div className="w-24 h-24 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${abortedSteps > 0 ? 'bg-amber-100 text-amber-500' : 'bg-emerald-100 text-emerald-500'}`}>
                 <Heart size={48} fill="currentColor" />
               </div>
-              <h2 className="text-4xl font-serif font-bold text-slate-800">All Done!</h2>
-              <p className="text-slate-500 italic">Every small step is a big victory.</p>
+              <h2 className="text-4xl font-serif font-bold text-slate-800">
+                {abortedSteps > 0 ? 'Step Log Complete' : 'All Done!'}
+              </h2>
+              <p className="text-slate-500 italic">
+                {abortedSteps > 0 ? 'You can mark the overall session as completed or aborted on the wrap-up screen.' : 'Every small step is a big victory.'}
+              </p>
             </div>
           )}
         </div>
@@ -474,20 +488,30 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                 className={`flex items-center justify-between p-3 rounded-2xl transition-colors ${
                   idx === currentStepIndex && !isFinished
                     ? 'bg-rose-50 border border-rose-100'
-                    : step.completed
+                    : step.status === 'completed'
                     ? 'bg-slate-50 opacity-60'
+                    : step.status === 'aborted'
+                    ? 'bg-amber-50 border border-amber-100'
                     : 'bg-white border border-slate-100'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  {step.completed ? (
+                  {step.status === 'completed' ? (
                     <CheckCircle2 size={20} className="text-emerald-400" />
+                  ) : step.status === 'aborted' ? (
+                    <X size={20} className="text-amber-500" />
                   ) : idx === currentStepIndex && !isFinished ? (
                     <Play size={20} className="text-rose-500" fill="currentColor" />
                   ) : (
                     <Circle size={20} className="text-slate-300" />
                   )}
-                  <span className={`font-medium ${step.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                  <span className={`font-medium ${
+                    step.status === 'completed'
+                      ? 'text-slate-400 line-through'
+                      : step.status === 'aborted'
+                      ? 'text-amber-700 line-through'
+                      : 'text-slate-700'
+                  }`}>
                     Step {idx + 1}
                   </span>
                 </div>

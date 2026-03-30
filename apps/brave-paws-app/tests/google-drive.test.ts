@@ -115,9 +115,9 @@ test('loadLastSync returns 0 when nothing is stored', () => {
 
 test('getLatestSessionDateMs returns the most recent valid session timestamp', () => {
   const sessions = [
-    { id: '1', date: '2024-01-01T00:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
-    { id: '2', date: 'not-a-date', steps: [], totalDurationSeconds: 0, completed: true },
-    { id: '3', date: '2024-02-01T12:30:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: '1', date: '2024-01-01T00:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
+    { id: '2', date: 'not-a-date', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
+    { id: '3', date: '2024-02-01T12:30:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
 
   assert.equal(getLatestSessionDateMs(sessions), new Date('2024-02-01T12:30:00.000Z').getTime());
@@ -125,10 +125,10 @@ test('getLatestSessionDateMs returns the most recent valid session timestamp', (
 
 test('isRemoteSessionSetNewer returns false when local sessions are more recent', () => {
   const localSessions = [
-    { id: 'local-1', date: '2024-03-01T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'local-1', date: '2024-03-01T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
   const remoteSessions = [
-    { id: 'remote-1', date: '2024-02-28T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'remote-1', date: '2024-02-28T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
 
   assert.equal(isRemoteSessionSetNewer(localSessions, remoteSessions), false);
@@ -136,10 +136,10 @@ test('isRemoteSessionSetNewer returns false when local sessions are more recent'
 
 test('isRemoteSessionSetNewer returns true when remote sessions are more recent', () => {
   const localSessions = [
-    { id: 'local-1', date: '2024-03-01T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'local-1', date: '2024-03-01T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
   const remoteSessions = [
-    { id: 'remote-1', date: '2024-03-02T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'remote-1', date: '2024-03-02T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
 
   assert.equal(isRemoteSessionSetNewer(localSessions, remoteSessions), true);
@@ -147,10 +147,10 @@ test('isRemoteSessionSetNewer returns true when remote sessions are more recent'
 
 test('shouldUseRemoteData keeps local data on a fresh sync when local sessions are newer', () => {
   const localSessions = [
-    { id: 'local-1', date: '2024-03-03T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'local-1', date: '2024-03-03T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
   const remoteSessions = [
-    { id: 'remote-1', date: '2024-03-02T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'remote-1', date: '2024-03-02T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
 
   assert.equal(shouldUseRemoteData({
@@ -163,10 +163,10 @@ test('shouldUseRemoteData keeps local data on a fresh sync when local sessions a
 
 test('shouldUseRemoteData uses cloud data on a fresh sync when remote sessions are newer', () => {
   const localSessions = [
-    { id: 'local-1', date: '2024-03-01T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'local-1', date: '2024-03-01T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
   const remoteSessions = [
-    { id: 'remote-1', date: '2024-03-04T10:00:00.000Z', steps: [], totalDurationSeconds: 0, completed: true },
+    { id: 'remote-1', date: '2024-03-04T10:00:00.000Z', steps: [], totalDurationSeconds: 0, status: 'completed' as const },
   ];
 
   assert.equal(shouldUseRemoteData({

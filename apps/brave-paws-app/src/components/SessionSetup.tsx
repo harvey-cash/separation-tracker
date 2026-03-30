@@ -10,7 +10,7 @@ export function SessionSetup({ initialSteps, onStart, onCancel }: { initialSteps
   const addStep = () => {
     const duration = parseInt(newDuration, 10);
     if (!isNaN(duration) && duration > 0) {
-      setSteps([...steps, { id: crypto.randomUUID(), durationSeconds: duration, completed: false }]);
+      setSteps([...steps, { id: crypto.randomUUID(), durationSeconds: duration, status: 'pending' }]);
       setNewDuration('');
     }
   };

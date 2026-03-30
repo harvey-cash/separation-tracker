@@ -4,6 +4,7 @@ import { X, Plus, Trash2, GripVertical } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatDuration } from '../utils/format';
 import { DurationInput } from './DurationInput';
+import { getSessionStatusLabel, getStatusButtonClasses, getStepStatusLabel } from '../utils/sessionStatus';
 
 export function SessionEditModal({ 
   session, 
@@ -22,6 +23,7 @@ export function SessionEditModal({
   const [steps, setSteps] = useState<Step[]>(session.steps);
   const [newStepDuration, setNewStepDuration] = useState(30);
   const [totalDurationSeconds, setTotalDurationSeconds] = useState(session.totalDurationSeconds);
+  const [status, setStatus] = useState(session.status);
 
   const handleAddStep = () => {
     if (newStepDuration <= 0) return;
@@ -29,7 +31,7 @@ export function SessionEditModal({
     const newStep: Step = {
       id: crypto.randomUUID(),
       durationSeconds: newStepDuration,
-      completed: true, // Assume completed for historical entries
+      status: 'completed',
     };
 
     setSteps([...steps, newStep]);
@@ -46,6 +48,12 @@ export function SessionEditModal({
     ));
   };
 
+  const handleUpdateStepStatus = (id: string, nextStatus: Step['status']) => {
+    setSteps(steps.map((step) => (
+      step.id === id ? { ...step, status: nextStatus } : step
+    )));
+  };
+
   const handleSaveClick = () => {
     onSave({ 
       ...session, 
@@ -56,7 +64,7 @@ export function SessionEditModal({
       notes,
       steps,
       totalDurationSeconds,
-      completed: true
+      status,
     });
   };
 
@@ -82,6 +90,21 @@ export function SessionEditModal({
           </div>
 
           <div>
+            <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Session Status</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(['pending', 'completed', 'aborted'] as const).map((sessionStatus) => (
+                <button
+                  key={sessionStatus}
+                  onClick={() => setStatus(sessionStatus)}
+                  className={`rounded-2xl border px-3 py-3 text-sm font-bold transition-all ${getStatusButtonClasses(sessionStatus, status === sessionStatus)}`}
+                >
+                  {getSessionStatusLabel(sessionStatus)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Total Duration</p>
             <DurationInput
               valueSeconds={totalDurationSeconds}
@@ -96,7 +119,7 @@ export function SessionEditModal({
               {steps.map((step, index) => (
                 <div
                   key={step.id}
-                  className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors group"
+                  className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors group"
                 >
                   <div className="text-slate-300 cursor-grab group-hover:text-slate-400">
                     <GripVertical size={20} />
@@ -110,6 +133,18 @@ export function SessionEditModal({
                   <span className="text-slate-500 w-16 text-right text-sm font-medium">
                     {formatDuration(step.durationSeconds)}
                   </span>
+                  <select
+                    value={step.status}
+                    onChange={(e) => handleUpdateStepStatus(step.id, e.target.value as Step['status'])}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-rose-300"
+                    aria-label={`Step ${index + 1} status`}
+                  >
+                    {(['pending', 'completed', 'aborted'] as const).map((stepStatus) => (
+                      <option key={stepStatus} value={stepStatus}>
+                        {getStepStatusLabel(stepStatus)}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     onClick={() => handleRemoveStep(step.id)}
                     className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"

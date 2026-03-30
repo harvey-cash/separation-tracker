@@ -3,6 +3,7 @@ import { formatDuration } from '../utils/format';
 import { Play, BarChart2, History, Heart, Info, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ReactNode } from 'react';
+import { getAbortedStepCount, getCompletedStepCount } from '../utils/sessionStatus';
 
 type Props = {
   sessions: Session[];
@@ -25,7 +26,8 @@ export function Dashboard({
   onViewSession,
   driveSync,
 }: Props) {
-  const completedSessions = sessions.filter((s) => s.completed);
+  const completedSessions = sessions.filter((s) => s.status === 'completed');
+  const abortedSessions = sessions.filter((s) => s.status === 'aborted');
   const recentSessions = [...completedSessions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
@@ -101,6 +103,11 @@ export function Dashboard({
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-serif font-bold text-slate-800">Recent Wins</h2>
+          {sessions.length > 0 && (
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              {completedSessions.length} completed • {abortedSessions.length} aborted
+            </p>
+          )}
         </div>
 
         {recentSessions.length === 0 ? (
@@ -122,7 +129,7 @@ export function Dashboard({
                       {format(new Date(session.date), 'MMM d, yyyy')}
                     </div>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      {session.steps.filter((s) => s.completed).length} / {session.steps.length} steps completed
+                      {getCompletedStepCount(session.steps)} completed • {getAbortedStepCount(session.steps)} aborted
                     </div>
                   </div>
                   <div className="text-right">

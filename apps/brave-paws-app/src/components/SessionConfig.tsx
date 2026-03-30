@@ -23,7 +23,7 @@ export function SessionConfig({ initialSession, cameraUrl = '', onCameraUrlChang
     const newStep: Step = {
       id: crypto.randomUUID(),
       durationSeconds: newStepDuration,
-      completed: false,
+      status: 'pending',
     };
 
     setSession((prev) => ({

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Session } from '../types';
+import { Session, SessionStatus } from '../types';
 import { Save, Smile, Meh, Frown, Sparkles } from 'lucide-react';
 
 type Props = {
@@ -7,11 +7,14 @@ type Props = {
   onSave: (session: Session) => void;
 };
 
+type FinalSessionStatus = Exclude<SessionStatus, 'pending'>;
+
 export function SessionComplete({ session, onSave }: Props) {
   const [score, setScore] = useState<0 | 1 | 2 | undefined>(session.anxietyScore);
   const [exercisedLevel, setExercisedLevel] = useState<0 | 1 | 2 | 3 | 4 | 5 | undefined>(session.exercisedLevel);
   const [anyoneHome, setAnyoneHome] = useState(session.anyoneHome || '');
   const [notes, setNotes] = useState(session.notes || '');
+  const [status, setStatus] = useState<FinalSessionStatus>(session.status === 'aborted' ? 'aborted' : 'completed');
 
   const handleSave = () => {
     if (score === undefined) return;
@@ -21,21 +24,49 @@ export function SessionComplete({ session, onSave }: Props) {
       exercisedLevel,
       anyoneHome,
       notes,
-      completed: true,
+      status,
     });
   };
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-8 min-h-screen flex flex-col justify-center">
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center justify-center p-3 bg-rose-100 text-rose-500 rounded-full mb-2">
+        <div className={`inline-flex items-center justify-center p-3 rounded-full mb-2 ${status === 'aborted' ? 'bg-amber-100 text-amber-500' : 'bg-rose-100 text-rose-500'}`}>
           <Sparkles size={32} />
         </div>
-        <h1 className="text-4xl font-serif font-bold text-slate-800">Session Complete</h1>
-        <p className="text-slate-500 italic">How did your brave pup do today?</p>
+        <h1 className="text-4xl font-serif font-bold text-slate-800">Wrap Up Session</h1>
+        <p className="text-slate-500 italic">Record whether this session was completed or intentionally aborted.</p>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 space-y-8">
+        <div>
+          <label className="block text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
+            Session Outcome
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => setStatus('completed')}
+              className={`rounded-2xl border-2 p-4 text-sm font-bold transition-all ${
+                status === 'completed'
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-700 shadow-sm'
+                  : 'border-slate-100 text-slate-500 hover:border-emerald-200 hover:text-emerald-600'
+              }`}
+            >
+              Completed
+            </button>
+            <button
+              onClick={() => setStatus('aborted')}
+              className={`rounded-2xl border-2 p-4 text-sm font-bold transition-all ${
+                status === 'aborted'
+                  ? 'border-amber-400 bg-amber-50 text-amber-700 shadow-sm'
+                  : 'border-slate-100 text-slate-500 hover:border-amber-200 hover:text-amber-600'
+              }`}
+            >
+              Aborted
+            </button>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">
             Anxiety Score
@@ -127,7 +158,9 @@ export function SessionComplete({ session, onSave }: Props) {
       <button
         onClick={handleSave}
         disabled={score === undefined}
-        className="w-full flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-200 text-white p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-xl font-bold"
+        className={`w-full flex items-center justify-center gap-2 disabled:bg-slate-200 text-white p-5 rounded-3xl shadow-sm hover:shadow-md transition-all text-xl font-bold ${
+          status === 'aborted' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-rose-500 hover:bg-rose-600'
+        }`}
       >
         <Save size={24} />
         Save Session
