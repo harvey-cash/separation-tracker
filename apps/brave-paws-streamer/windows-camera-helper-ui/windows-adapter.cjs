@@ -20,7 +20,7 @@ const MOCK_DEVICES = {
 const LOCAL_PREVIEW_PROFILE = 'local-quality';
 const LOCAL_PREVIEW_MODE = 'mse';
 const REMOTE_PREVIEW_PROFILE = 'remote-low-latency';
-const REMOTE_PREVIEW_MODE = 'mse,mp4,mjpeg';
+const REMOTE_PREVIEW_MODE = 'mp4,mjpeg';
 const REMOTE_ENCODING_PROFILE = {
   videoTemplate: 'brave_paws_h264_low_latency',
   audioTemplate: 'brave_paws_aac_low_latency',
