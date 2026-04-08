@@ -301,7 +301,7 @@ function applyRemotePreviewHint(preview) {
   }
 
   const remoteProfile = preview?.remoteProfile || 'remote-low-latency';
-  const remoteMode = preview?.remoteMode || 'mse,mp4,mjpeg';
+  const remoteMode = preview?.remoteMode || 'mp4,mjpeg';
   elements.remotePreviewHint.textContent = `Remote preview uses ${remoteProfile} (${remoteMode}).`;
 }
 
