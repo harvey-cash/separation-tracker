@@ -8,7 +8,7 @@ test('SessionConfig and ActiveSession use the shared camera link input', () => {
   const activeSession = readFileSync(resolve(process.cwd(), 'src/components/ActiveSession.tsx'), 'utf8');
 
   assert.match(sessionConfig, /CameraLinkInput/);
-  assert.match(sessionConfig, /simplified camera URL/i);
+  assert.match(sessionConfig, /full pairing link/i);
   assert.match(activeSession, /CameraLinkInput/);
   assert.match(activeSession, /Disconnect/);
   assert.match(activeSession, /Reconnect/);
@@ -17,7 +17,7 @@ test('SessionConfig and ActiveSession use the shared camera link input', () => {
   assert.match(activeSession, /Paste a camera URL to start the live preview/);
 });
 
-test('shared camera link input supports simplified camera URL entry', () => {
+test('shared camera link input supports pairing-link or direct camera URL entry', () => {
   const cameraLinkInput = readFileSync(resolve(process.cwd(), 'src/components/CameraLinkInput.tsx'), 'utf8');
 
   assert.match(cameraLinkInput, /Scan QR Code/);
