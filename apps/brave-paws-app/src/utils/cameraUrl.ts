@@ -87,13 +87,43 @@ function extractCameraLaunchConfig(value: string): CameraLaunchConfig {
   };
 }
 
-export function normalizeCameraUrlValue(value: string): string {
-  const config = extractCameraLaunchConfig(value);
+function serializeCameraLaunchConfig(config: CameraLaunchConfig, options: { preservePairingLink?: boolean } = {}): string {
   if (!config.cameraUrl) {
     return '';
   }
 
-  return config.cameraUrl;
+  const sanitizedCameraUrl = sanitizeCameraUrl(config.cameraUrl);
+  if (!sanitizedCameraUrl) {
+    return '';
+  }
+
+  const profile = sanitizeCameraProfile(config.profile);
+  const mode = sanitizeCameraMode(config.mode || getDefaultModeForProfile(profile));
+
+  if (!options.preservePairingLink && profile === DEFAULT_CAMERA_STREAM_PROFILE && mode === DEFAULT_CAMERA_STREAM_MODE) {
+    return sanitizedCameraUrl;
+  }
+
+  return buildCameraPairingUrl(sanitizedCameraUrl, BRAVE_PAWS_PAIRING_URL, { profile, mode });
+}
+
+export function normalizeCameraUrlValue(value: string): string {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return '';
+  }
+
+  let preservePairingLink = false;
+
+  try {
+    const url = new URL(trimmed);
+    preservePairingLink = url.searchParams.has(CAMERA_URL_QUERY_PARAM);
+  } catch {
+    preservePairingLink = false;
+  }
+
+  return serializeCameraLaunchConfig(extractCameraLaunchConfig(value), { preservePairingLink });
 }
 
 export function sanitizeCameraUrl(value: string): string {
@@ -164,8 +194,19 @@ export function buildCameraPairingUrl(
 
 export function getCameraUrlFromSearch(search: string): string {
   const params = new URLSearchParams(search);
-  const cameraUrl = sanitizeCameraUrl(params.get(CAMERA_URL_QUERY_PARAM) || '');
-  return cameraUrl;
+  const cameraUrl = params.get(CAMERA_URL_QUERY_PARAM) || '';
+  const profileParam = params.get(CAMERA_PROFILE_QUERY_PARAM) || '';
+  const modeParam = params.get(CAMERA_MODE_QUERY_PARAM) || '';
+  const profile: CameraStreamProfile | undefined = profileParam
+    ? sanitizeCameraProfile(profileParam)
+    : undefined;
+
+  return normalizeCameraUrlValue(
+    buildCameraPairingUrl(cameraUrl, BRAVE_PAWS_PAIRING_URL, {
+      profile,
+      mode: modeParam || undefined,
+    }),
+  );
 }
 
 export function getCameraUrlValidationMessage(value: string): string {
@@ -174,6 +215,6 @@ export function getCameraUrlValidationMessage(value: string): string {
   }
 
   return isCameraUrlValid(value)
-    ? 'Camera URL looks good. Brave Paws will use it for remote preview.'
-    : 'Use the simplified Brave Paws camera URL, or http only for localhost testing.';
+    ? 'Camera link looks good. Brave Paws will use it for remote preview.'
+    : 'Use the Brave Paws pairing link, or http only for localhost testing.';
 }

@@ -72,29 +72,29 @@ test('buildCameraPairingUrl encodes the cloudflare link into the Brave Paws URL'
   );
 });
 
-test('normalizeCameraUrlValue simplifies Brave Paws pairing links to the direct camera URL', () => {
+test('normalizeCameraUrlValue preserves Brave Paws pairing links so profile metadata survives scanning', () => {
   assert.equal(
     normalizeCameraUrlValue(`${BRAVE_PAWS_PAIRING_URL}?${CAMERA_URL_QUERY_PARAM}=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`),
-    'https://demo.trycloudflare.com',
+    `${BRAVE_PAWS_PAIRING_URL}?${CAMERA_URL_QUERY_PARAM}=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`,
   );
 });
 
-test('getCameraUrlFromSearch extracts and sanitizes the deep-link query parameter', () => {
+test('getCameraUrlFromSearch preserves pairing metadata from the deep-link query parameters', () => {
   assert.equal(
     getCameraUrlFromSearch(`?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com%2F&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`),
-    'https://demo.trycloudflare.com',
+    `${BRAVE_PAWS_PAIRING_URL}?${CAMERA_URL_QUERY_PARAM}=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`,
   );
 });
 
 test('getCameraUrlFromSearch sanitizes invalid remote profile values to the default low-latency profile', () => {
   assert.equal(
     getCameraUrlFromSearch(`?cameraUrl=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=definitely-invalid-profile`),
-    'https://demo.trycloudflare.com',
+    `${BRAVE_PAWS_PAIRING_URL}?${CAMERA_URL_QUERY_PARAM}=https%3A%2F%2Fdemo.trycloudflare.com&${CAMERA_PROFILE_QUERY_PARAM}=remote-low-latency&${CAMERA_MODE_QUERY_PARAM}=mse%2Cmp4%2Cmjpeg`,
   );
 });
 
 test('getCameraUrlValidationMessage explains empty and invalid values', () => {
   assert.match(getCameraUrlValidationMessage(''), /Brave Paws Streamer/i);
-  assert.match(getCameraUrlValidationMessage('invalid'), /camera url/i);
-  assert.match(getCameraUrlValidationMessage('https://demo.trycloudflare.com'), /camera url looks good/i);
+  assert.match(getCameraUrlValidationMessage('invalid'), /pairing link/i);
+  assert.match(getCameraUrlValidationMessage('https://demo.trycloudflare.com'), /camera link looks good/i);
 });
