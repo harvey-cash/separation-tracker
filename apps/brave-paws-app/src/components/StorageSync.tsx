@@ -29,6 +29,7 @@ export function StorageSync({ providers, selectedProviderId, onSelectProvider }:
             <button
               key={provider.id}
               type="button"
+              aria-label={`${provider.label} storage provider`}
               onClick={() => onSelectProvider(provider.id)}
               className={`rounded-2xl border p-4 text-left transition-colors ${isSelected ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}
             >
