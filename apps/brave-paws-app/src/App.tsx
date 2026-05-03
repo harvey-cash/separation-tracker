@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSessions } from './store';
 import { Session, Step } from './types';
 import { Dashboard } from './components/Dashboard';
@@ -71,9 +71,9 @@ export default function App() {
     clearActiveSessionState();
   }, [activeSessionState]);
 
-  const handleImportSessions = (imported: Session[]) => {
+  const handleImportSessions = useCallback((imported: Session[]) => {
     replaceSessions(imported);
-  };
+  }, [replaceSessions]);
 
   const storageSync = useStorageSync(sessions, handleImportSessions);
 

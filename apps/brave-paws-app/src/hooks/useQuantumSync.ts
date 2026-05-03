@@ -100,6 +100,7 @@ export function useQuantumSync(
   const apiBaseUrl = getApiBaseUrl();
 
   const sessionsRef = useRef(sessions);
+  const onReplaceSessionsRef = useRef(onReplaceSessions);
   const syncStatusTimeoutRef = useRef<number | null>(null);
   const autoPushTimeoutRef = useRef<number | null>(null);
   const initialHydrationDoneRef = useRef(false);
@@ -109,6 +110,7 @@ export function useQuantumSync(
   const pendingHydrationNeedsPushRef = useRef(false);
 
   sessionsRef.current = sessions;
+  onReplaceSessionsRef.current = onReplaceSessions;
 
   useEffect(() => {
     return () => {
@@ -241,7 +243,7 @@ export function useQuantumSync(
       if (sessionsChanged) {
         pendingHydrationSnapshotRef.current = nextSnapshot;
         pendingHydrationNeedsPushRef.current = needsPush;
-        onReplaceSessions(nextSessions);
+        onReplaceSessionsRef.current(nextSessions);
 
         if (!needsPush) {
           finishSuccess(nextSessions, remote.updatedAt);
@@ -259,7 +261,7 @@ export function useQuantumSync(
       initialHydrationDoneRef.current = true;
       hydrationInFlightRef.current = false;
     }
-  }, [finishSuccess, onReplaceSessions, pullSessions, scheduleAutoPush]);
+  }, [finishSuccess, pullSessions, scheduleAutoPush]);
 
   useEffect(() => {
     let cancelled = false;
