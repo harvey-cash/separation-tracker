@@ -18,7 +18,7 @@ Build v0.2 around these principles:
 1. **Keep Brave Paws local-first** in the browser.
 2. **Replace direct Google Drive coupling with a sync-provider boundary**.
 3. Implement **QUANTUM-over-Tailnet as the first real backend/sync provider**.
-4. Have **QUANTUM serve the landing page, app, streamer UI assets, and backend API** from one local deployment.
+4. Have **QUANTUM serve the landing page, app, and backend API** from one local deployment.
 5. Keep everything **Tailnet-only** for now; do **not** deploy to `harvey.cash` yet.
 6. Use a **feature branch + PR workflow** so development can move quickly without triggering current `main`-only CD.
 7. Widen CI so **all feature branches / arbitrary branch names** get validated, while CD remains `main`-only.
@@ -43,7 +43,7 @@ The current architecture was reasonable for an early public-friendly prototype, 
 - Google Drive backup is an awkward fit for active development and observability.
 - Quantum cannot easily inspect or reason about generated session data in-place.
 - Staging and iteration are more awkward than they need to be.
-- The app and streamer still assume hosted production URLs in several places.
+- The app still assumes hosted production URLs in several places, and the old streamer architecture leaves behind scope and deployment baggage that v0.2 no longer needs.
 - The current design is optimized for hypothetical generic distribution more than Harvey's real near-term needs.
 
 ### Expected benefits of v0.2
@@ -66,18 +66,18 @@ This section is here so a follow-on agent does not need to rediscover the basics
 
 ### Repo structure today
 
-The repo is an npm workspaces monorepo with three main surfaces:
+The repo is an npm workspaces monorepo with three main surfaces today:
 
 1. `apps/brave-paws-landing`
 2. `apps/brave-paws-app`
-3. `apps/brave-paws-streamer`
+3. `apps/brave-paws-streamer` (to be retired/removed from v0.2 scope)
 
 ### Product behavior today
 
 - Brave Paws App is currently **client-side React + TypeScript**.
 - Session data is stored locally in the browser.
 - There is optional **Google Drive backup/sync**.
-- The streamer is a **Windows helper + hosted UI** model.
+- There is also an older **Windows helper + hosted UI streamer** model, which should be treated as retired architecture for v0.2 and removed aggressively rather than carried forward.
 
 ### Important implementation facts already visible in the repo
 
@@ -88,19 +88,13 @@ Hard-coded production path assumptions exist today:
 - `apps/brave-paws-app/vite.config.ts` uses `base: '/separation/app/'`
 - `apps/brave-paws-landing/vite.config.js` uses `base: '/separation/'`
 - `apps/brave-paws-app/src/utils/cameraUrl.ts` hard-codes `https://harvey.cash/separation/app/`
-- streamer docs/tests/assets refer to `https://harvey.cash/separation/streamer/`
+- old streamer docs/tests/assets refer to `https://harvey.cash/separation/streamer/`
 
-#### Streamer URL configuration status
+#### Streamer retirement status
 
-The streamer already has a useful partial abstraction:
+The repo still contains the older streamer surface (`apps/brave-paws-streamer`) and related docs/tests/assets.
 
-- `BRAVE_PAWS_STREAMER_UI_URL`
-- `BRAVE_PAWS_APP_URL`
-- `STREAMER_ALLOWED_ORIGINS`
-
-in `apps/brave-paws-streamer/windows-camera-helper-ui/loopback-contract.cjs`.
-
-That means the streamer side is already partway toward local/Tailnet hosting.
+For v0.2, the correct direction is **not** to adapt that Windows helper to the new local deployment. The correct direction is to **remove it thoroughly** and simplify the architecture around directly consuming the existing `picam` video+audio stream.
 
 #### Google Drive coupling status
 
@@ -215,7 +209,6 @@ Recommended shape:
 QUANTUM should serve:
 - landing site
 - app build
-- streamer hosted UI assets
 - backend API
 
 This keeps v0.2 coherent and makes local staging much simpler.
@@ -226,8 +219,8 @@ Recommended local path layout:
 
 - `https://quantum.tail080401.ts.net/separation/`
 - `https://quantum.tail080401.ts.net/separation/app/`
-- `https://quantum.tail080401.ts.net/separation/streamer/`
 - `https://quantum.tail080401.ts.net/separation/api/...`
+- optional future stream-facing path(s) under the same origin if needed, but **no separate streamer app for v0.2**
 
 Reason:
 - minimizes path churn vs current production assumptions
@@ -266,7 +259,7 @@ Recommended new workspace/service:
   - or `services/brave-paws-server`
 
 Responsibilities:
-- serve built `landing`, `app`, and `streamer` assets
+- serve built `landing` and `app` assets
 - expose `/separation/api/...`
 - expose health endpoints
 - read/write persistent session data
@@ -388,14 +381,15 @@ Key touchpoints:
 - `apps/brave-paws-app/vite.config.ts`
 - tests that assert `harvey.cash` URLs
 
-### Streamer
+### Removal of streamer-specific assumptions
 
-The streamer is already partway there, but the full stack needs to actually use local/Tailnet URLs in practice.
+The old streamer stack should be removed rather than migrated.
 
 Key touchpoints:
-- `apps/brave-paws-streamer/windows-camera-helper-ui/loopback-contract.cjs`
-- README/docs/tests/assets referencing `harvey.cash`
-- `STREAMER_ALLOWED_ORIGINS`
+- `apps/brave-paws-streamer/` and its subfiles
+- README/docs/tests/assets referencing the streamer or `harvey.cash/separation/streamer/`
+- CI/release steps that still validate or package the streamer
+- copy in the landing/app that points users toward the retired Windows companion
 
 ### Landing page
 
@@ -427,38 +421,32 @@ Recommended behavior:
 
 ---
 
-## Streamer and camera implications
+## Camera implications for v0.2
 
 This is important because Brave Paws is not just CRUD.
 
-## Current streamer model
+## v0.2 camera direction
 
-The Windows helper currently assumes a hosted UI and builds pairing URLs against the app URL.
-That is good news: this can be redirected to QUANTUM-hosted URLs rather than redesigned from scratch.
+Brave Paws Streamer should **not** exist in v0.2.
 
-## v0.2 objective
+The frontend should simply consume an already-available camera stream, and for Harvey that source is `picam`, which already provides video + audio.
 
-Make the streamer work against the QUANTUM-hosted paths instead of `harvey.cash`.
-
-### Requirements
-
-- streamer hosted UI must launch on QUANTUM Tailnet URL
-- loopback origin checks must allow that URL
-- pairing URLs must target QUANTUM app URL
-- docs/tests/assets must reflect local-hosted mode
+That means v0.2 should:
+- remove the old Windows streamer surface entirely
+- remove hosted-streamer assumptions from docs, tests, UI copy, CI, and release flow
+- simplify the app so camera input is just a configured/remembered stream origin consumed by the frontend
 
 ## Picam implication
 
-Picam integration should be treated as **compatible future work**, not the blocking first milestone for v0.2.
-
-However, v0.2 should avoid closing that door.
+Picam is no longer "future-compatible extra scope"; it is the intended camera source for v0.2.
 
 Recommended stance:
-- ensure camera URLs can point to QUANTUM-hosted/Tailnet HTTPS origins
-- prefer an HTTPS-compatible path for remote preview
-- avoid building assumptions that only the Windows helper can be a camera source
+- ensure camera URLs can point to a QUANTUM-hosted/Tailnet HTTPS origin
+- if needed, have QUANTUM present a clean same-origin or same-tailnet stream-facing path in front of picam
+- aggressively simplify the app around "consume stream" rather than "pair with helper"
+- remove assumptions that a separate Windows helper, QR pairing flow, or hosted control UI must exist
 
-Important note: the app currently only accepts `https:` camera URLs except for localhost `http:`. That means current raw `http://100.120.103.101:8888/...` style Tailnet camera URLs are not a clean long-term fit for the app UX. v0.2 should therefore prefer a QUANTUM-served HTTPS-compatible camera origin/path if picam is pulled into the same ecosystem later.
+Important note: the app currently only accepts `https:` camera URLs except for localhost `http:`. That means current raw `http://100.120.103.101:8888/...` style Tailnet camera URLs are not a clean long-term fit for the app UX. v0.2 should therefore prefer a QUANTUM-served HTTPS-compatible camera origin/path in front of picam, or otherwise update the validation/path strategy intentionally rather than inheriting old streamer-era assumptions.
 
 ---
 
@@ -499,7 +487,7 @@ On non-`main` branches, require at least:
 - unit tests
 - typecheck/lint
 - app build
-- streamer health check
+- any backend tests added for v0.2
 
 If e2e becomes too heavy for every branch push, keep it on PRs and/or important pushes, but prefer not to silently lose coverage.
 
@@ -545,10 +533,11 @@ Deliverables:
 ## Phase 1 — hosting/config abstraction
 
 Deliverables:
-- remove hard-coded `harvey.cash` assumptions from app/streamer paths
-- parameterize app URL / streamer UI URL / API base as needed
+- remove hard-coded `harvey.cash` assumptions from app paths
+- parameterize app URL / API base as needed
 - preserve `/separation/...` path structure
 - prove the stack can build for QUANTUM-hosted URLs
+- identify and begin removing streamer-era assumptions from docs/UI/tests
 
 ## Phase 2 — QUANTUM backend skeleton
 
@@ -575,7 +564,8 @@ Deliverables:
 - systemd unit installed
 - Tailnet HTTPS exposure working
 - local deployed origin reachable from Harvey devices
-- app + landing + streamer UI all working from QUANTUM origin
+- app + landing working from QUANTUM origin
+- picam-backed stream consumption working cleanly in the frontend
 
 ## Phase 5 — validation and cleanup
 
@@ -610,14 +600,12 @@ This section is intentionally operational.
 - `apps/brave-paws-landing/vite.config.js`
 - copy/docs that assume public hosting only
 
-## Streamer
+## Streamer removal / cleanup
 
-- `apps/brave-paws-streamer/windows-camera-helper-ui/loopback-contract.cjs`
-- `apps/brave-paws-streamer/windows-camera-helper-ui/server.cjs`
-- `apps/brave-paws-streamer/windows-camera-helper/README.md`
-- `apps/brave-paws-streamer/README.md`
-- `apps/brave-paws-streamer/LOOPBACK_API.md`
+- `apps/brave-paws-streamer/` and its subfiles for deletion or archival removal
 - streamer tests/docs/assets with hard-coded production URLs
+- any app/landing copy that references the retired streamer companion
+- CI/release workflow steps that still test, package, or publish streamer artifacts
 
 ## New backend/server
 
@@ -652,18 +640,15 @@ Use explicit environment variables rather than hard-coded hostnames.
 For app/server deployment:
 - `BRAVE_PAWS_PUBLIC_BASE_URL`
 - `BRAVE_PAWS_APP_URL`
-- `BRAVE_PAWS_STREAMER_UI_URL`
 - `BRAVE_PAWS_API_BASE_URL`
 - `BRAVE_PAWS_DATA_DIR`
 - `BRAVE_PAWS_AUTH_TOKEN` (optional/simple)
+- optional stream base/origin variable if the frontend should derive the picam-facing URL from config
 
 For retaining legacy Google Drive support if desired:
 - `VITE_GOOGLE_CLIENT_ID`
 
-For streamer helper:
-- `BRAVE_PAWS_STREAMER_UI_URL`
-- `BRAVE_PAWS_APP_URL`
-- `STREAMER_ALLOWED_ORIGINS`
+Streamer-specific environment variables should be removed with the retired streamer surface unless a narrowly-scoped migration shim temporarily needs them during cleanup.
 
 ---
 
@@ -682,12 +667,13 @@ Mitigation:
 - support staged migration of existing session history
 - treat Google Drive as a legacy provider during transition if useful
 
-## Risk: URL/path breakage across app + streamer
+## Risk: leftover streamer-era assumptions contaminate the new design
 
 Mitigation:
-- keep `/separation/...` path structure
+- treat streamer removal as explicit scope, not optional cleanup
+- keep `/separation/...` path structure for the surviving surfaces
 - centralize config
-- update tests that currently hard-code `harvey.cash`
+- update tests/copy/docs that still assume pairing via a separate helper
 
 ## Risk: backend dependency complexity slows delivery
 
@@ -708,12 +694,14 @@ Mitigation:
 Brave Paws v0.2 is successful when all of the following are true:
 
 1. Brave Paws can be opened at a QUANTUM Tailnet URL.
-2. The landing page, app, and streamer hosted UI are all served by QUANTUM.
+2. The landing page and app are served by QUANTUM.
 3. Session data can be saved and retrieved through the QUANTUM backend.
 4. Quantum can inspect the stored data directly on QUANTUM.
-5. The app is no longer hard-coupled to Google Drive as its only sync story.
-6. Feature branch work gets CI without triggering public CD.
-7. The repo is still in a shape that can later be adapted back to `harvey.cash` deployment.
+5. The frontend can consume the intended picam video+audio stream cleanly without Brave Paws Streamer.
+6. The old streamer surface and its obvious leftover edges have been removed or explicitly retired behind a short-lived cleanup shim.
+7. The app is no longer hard-coupled to Google Drive as its only sync story.
+8. Feature branch work gets CI without triggering public CD.
+9. The repo is still in a shape that can later be adapted back to `harvey.cash` deployment.
 
 ---
 
@@ -736,7 +724,7 @@ The next agent should treat this as an implementation brief, not just a research
 
 ## Mission
 
-Implement Brave Paws v0.2 so QUANTUM serves the frontend and backend locally over Tailnet, while the repo remains PR-friendly and CD-safe.
+Implement Brave Paws v0.2 so QUANTUM serves the frontend and backend locally over Tailnet, the app consumes picam directly, and the old Brave Paws Streamer architecture is removed cleanly.
 
 ## First actions
 
@@ -744,13 +732,13 @@ Implement Brave Paws v0.2 so QUANTUM serves the frontend and backend locally ove
 2. Audit and remove hard-coded `harvey.cash` assumptions.
 3. Update CI branch triggers so arbitrary feature branches run checks.
 4. Add the backend/server workspace skeleton.
-5. Make a local QUANTUM-hosted build of:
+5. Remove or quarantine the Brave Paws Streamer surface and its leftover references.
+6. Make a local QUANTUM-hosted build of:
    - landing
    - app
-   - streamer UI
-6. Introduce the sync/provider abstraction in the app.
-7. Implement the QUANTUM backend provider.
-8. Prove local Tailnet access works end-to-end.
+7. Introduce the sync/provider abstraction in the app.
+8. Implement the QUANTUM backend provider.
+9. Prove local Tailnet access works end-to-end, including clean picam consumption from the frontend.
 
 ## Important constraints
 
@@ -783,9 +771,10 @@ Data layer + provider abstraction:
 - migration path from current local/Drive model
 
 ### PR 4
-Streamer + deployment integration:
-- streamer UI/app local URL wiring
-- origin/config updates
+Streamer removal + picam consumption cleanup:
+- remove streamer surface and references
+- simplify frontend camera flow around consuming picam
+- clean CI/release/docs leftovers
 - full local Tailnet validation
 
 ### PR 5
@@ -793,9 +782,10 @@ Polish / cleanup:
 - docs
 - tests
 - optional legacy Google Drive compatibility cleanup
+- final sweep for streamer-era leftovers
 
 ---
 
 ## Final recommendation in one sentence
 
-Build Brave Paws v0.2 as a **Harvey-first, local-first, QUANTUM-hosted Tailnet app with a clean backend/provider boundary**, and use branch/CI changes to make iterative PR development safe without waking up public deployment.
+Build Brave Paws v0.2 as a **Harvey-first, local-first, QUANTUM-hosted Tailnet app with a clean backend/provider boundary, direct picam consumption, and no Brave Paws Streamer baggage**, and use branch/CI changes to make iterative PR development safe without waking up public deployment.
