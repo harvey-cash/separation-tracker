@@ -9,12 +9,14 @@ This repo now includes a single local-first server workspace for Brave Paws v0.2
 - API: `/separation/api/`
 - picam proxy: `/separation/camera/`
 
-The intended public-facing origin for v0.2 is Tailnet-only:
+The intended public-facing origin for v0.2 is Tailnet-only.
 
-- `https://quantum.tail080401.ts.net/separation/`
-- `https://quantum.tail080401.ts.net/separation/app/`
-- `https://quantum.tail080401.ts.net/separation/api/health`
-- `https://quantum.tail080401.ts.net/separation/camera/live.stream/`
+If `:443` is already occupied by public Funnel-backed routes on QUANTUM, expose Brave Paws on a dedicated Tailnet-only HTTPS port instead. The current live deployment target is:
+
+- `https://quantum.tail080401.ts.net:7447/separation/`
+- `https://quantum.tail080401.ts.net:7447/separation/app/`
+- `https://quantum.tail080401.ts.net:7447/separation/api/health`
+- `https://quantum.tail080401.ts.net:7447/separation/camera/live.stream/`
 
 ## Local build and run
 

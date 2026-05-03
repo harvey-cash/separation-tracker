@@ -8,7 +8,7 @@ Type=simple
 WorkingDirectory=/mnt/q/repos/separation-tracker
 Environment=BRAVE_PAWS_HOST=127.0.0.1
 Environment=BRAVE_PAWS_PORT=4310
-Environment=BRAVE_PAWS_PUBLIC_BASE_URL=https://quantum.tail080401.ts.net
+Environment=BRAVE_PAWS_PUBLIC_BASE_URL=https://quantum.tail080401.ts.net:7447
 Environment="BRAVE_PAWS_DATA_DIR=/mnt/q/home/family/Brave Paws/data"
 Environment=BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL=http://127.0.0.1:18888/
 ExecStart=/usr/bin/env npm --prefix /mnt/q/repos/separation-tracker run server:start
