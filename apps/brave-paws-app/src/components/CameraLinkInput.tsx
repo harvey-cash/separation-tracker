@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Camera, CheckCircle2, ExternalLink, Keyboard, Link2, ScanLine, X } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle2, ExternalLink, Keyboard, Link2, ScanLine, X, Server } from 'lucide-react';
 import { buildCameraStreamUrl, getCameraUrlValidationMessage, isCameraUrlValid, normalizeCameraUrlValue } from '../utils/cameraUrl';
+import { getDefaultCameraUrl } from '../config';
 
 type Props = {
   cameraUrl: string;
@@ -55,6 +56,7 @@ export function CameraLinkInput({
     typeof navigator !== 'undefined' &&
     typeof navigator.mediaDevices?.getUserMedia === 'function' &&
     getBarcodeDetector() !== null;
+  const suggestedCameraUrl = getDefaultCameraUrl();
 
   useEffect(() => {
     setManualUrl(cameraUrl);
@@ -128,7 +130,7 @@ export function CameraLinkInput({
 
               const nextUrl = normalizeCameraUrlValue(detected.rawValue);
               if (!nextUrl) {
-                setScanError('That QR code did not contain a usable Brave Paws camera link.');
+                setScanError('That QR code did not contain a usable Brave Paws stream link.');
                 return;
               }
 
@@ -206,6 +208,12 @@ export function CameraLinkInput({
     onDone?.();
   };
 
+  const useSuggestedCamera = () => {
+    setManualUrl(suggestedCameraUrl);
+    onCameraUrlChange(suggestedCameraUrl);
+    onDone?.();
+  };
+
   const applyScannedUrl = () => {
     if (!scannedUrl) {
       return;
@@ -269,8 +277,8 @@ export function CameraLinkInput({
               <Camera size={18} />
             </div>
             <div>
-              <p className="font-medium text-slate-800">Point your phone at the QR code shown by Brave Paws Streamer.</p>
-              <p className={`${descriptionClass} text-slate-500 mt-1`}>Brave Paws will save the paired stream automatically after scanning.</p>
+              <p className="font-medium text-slate-800">Point your phone at a Brave Paws stream QR code.</p>
+              <p className={`${descriptionClass} text-slate-500 mt-1`}>Brave Paws will save the stream automatically after scanning.</p>
             </div>
           </div>
 
@@ -317,7 +325,7 @@ export function CameraLinkInput({
             </>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-              Live QR scanning is not available in this browser yet. Use Manual Entry on this device after opening the helper link in a browser once.
+              Live QR scanning is not available in this browser yet. Use manual entry or the QUANTUM picam shortcut instead.
             </div>
           )}
 
@@ -352,8 +360,16 @@ export function CameraLinkInput({
         </div>
       ) : (
         <div className="space-y-3">
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-2">
+            <Server size={16} className="shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Quick start on QUANTUM</p>
+              <p className="mt-1 text-xs sm:text-sm">Use the built-in same-origin picam proxy when you want the easiest v0.2 setup.</p>
+            </div>
+          </div>
+
           <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Camera URL</label>
+            <label className="text-sm font-medium text-slate-700">Stream URL</label>
             <input
               type="url"
               value={manualUrl}
@@ -364,7 +380,7 @@ export function CameraLinkInput({
                   commitManualUrl();
                 }
               }}
-              placeholder="https://demo.trycloudflare.com"
+              placeholder="https://quantum.tail080401.ts.net/separation/camera/live.stream/"
               className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-700 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-mono text-sm"
             />
             <p className={`${descriptionClass} ${isCameraUrlValid(manualUrl) ? 'text-emerald-700' : 'text-slate-500'}`}>
@@ -375,12 +391,20 @@ export function CameraLinkInput({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
+              onClick={useSuggestedCamera}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
+            >
+              <Server size={16} />
+              Use QUANTUM picam
+            </button>
+            <button
+              type="button"
               onClick={commitManualUrl}
               disabled={!isCameraUrlValid(manualUrl)}
               className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-3 text-sm font-medium text-white hover:bg-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
             >
               <Link2 size={16} />
-               {onDone ? 'Use Camera URL' : 'Save Camera URL'}
+              {onDone ? 'Use Stream URL' : 'Save Stream URL'}
             </button>
             {(manualUrl || cameraUrl) && (
               <button
@@ -412,7 +436,7 @@ export function CameraLinkInput({
               className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-800"
             >
               <ExternalLink size={16} />
-              Open current camera preview
+              Open current stream preview
             </a>
           )}
         </div>

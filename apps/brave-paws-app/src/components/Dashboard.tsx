@@ -1,6 +1,6 @@
 import { Session } from '../types';
 import { formatDuration } from '../utils/format';
-import { Play, BarChart2, History, Heart, Info, ExternalLink } from 'lucide-react';
+import { Play, BarChart2, History, Heart, Info, Server } from 'lucide-react';
 import { format } from 'date-fns';
 import { ReactNode } from 'react';
 import { getAbortedStepCount, getCompletedStepCount } from '../utils/sessionStatus';
@@ -12,10 +12,8 @@ type Props = {
   onViewHistory: () => void;
   onViewInfo: () => void;
   onViewSession: (session: Session) => void;
-  driveSync?: ReactNode;
+  storageSync?: ReactNode;
 };
-
-const STREAMER_RELEASE_URL = 'https://github.com/harvey-cash/separation-tracker/releases/latest';
 
 export function getRecentSessions(sessions: Session[]) {
   return [...sessions]
@@ -30,7 +28,7 @@ export function Dashboard({
   onViewHistory,
   onViewInfo,
   onViewSession,
-  driveSync,
+  storageSync,
 }: Props) {
   const abortedSessions = sessions.filter((s) => s.status === 'aborted');
   const recentSessions = getRecentSessions(sessions);
@@ -150,23 +148,18 @@ export function Dashboard({
         )}
       </div>
 
-      {driveSync}
+      {storageSync}
 
       <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Brave Paws Streamer</p>
-        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Brave Paws v0.2</p>
+        <div className="mt-2 flex items-start gap-3">
+          <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-500">
+            <Server size={18} />
+          </div>
           <p className="text-sm text-slate-500">
-            Looking for the Windows camera companion? Download the latest Streamer release for easy app pairing.
+            Brave Paws now favours the local QUANTUM Tailnet setup: same-origin session sync, direct picam playback,
+            and no separate Windows streamer companion.
           </p>
-          <a
-            href={STREAMER_RELEASE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-rose-200 hover:text-rose-500"
-          >
-            Latest release
-            <ExternalLink size={16} />
-          </a>
         </div>
       </section>
 

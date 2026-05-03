@@ -1,8 +1,10 @@
+import { getAppUrl } from '../config';
+
 export const CAMERA_URL_STORAGE_KEY = 'csa_camera_url';
 export const CAMERA_URL_QUERY_PARAM = 'cameraUrl';
 export const CAMERA_PROFILE_QUERY_PARAM = 'cameraProfile';
 export const CAMERA_MODE_QUERY_PARAM = 'cameraMode';
-export const BRAVE_PAWS_PAIRING_URL = 'https://harvey.cash/separation/app/';
+export const BRAVE_PAWS_PAIRING_URL = getAppUrl('https://local.brave-paws.invalid');
 export const LOW_LATENCY_CAMERA_STREAM_PROFILE = 'remote-low-latency';
 export const LOW_LATENCY_CAMERA_STREAM_MODE = 'mse,mp4,mjpeg';
 export const DEFAULT_CAMERA_STREAM_PROFILE = LOW_LATENCY_CAMERA_STREAM_PROFILE;
@@ -104,7 +106,7 @@ function serializeCameraLaunchConfig(config: CameraLaunchConfig, options: { pres
     return sanitizedCameraUrl;
   }
 
-  return buildCameraPairingUrl(sanitizedCameraUrl, BRAVE_PAWS_PAIRING_URL, { profile, mode });
+  return buildCameraPairingUrl(sanitizedCameraUrl, getAppUrl(), { profile, mode });
 }
 
 export function normalizeCameraUrlValue(value: string): string {
@@ -145,8 +147,8 @@ export function sanitizeCameraUrl(value: string): string {
       return '';
     }
 
-    url.pathname = url.pathname.replace(/\/+$/, '');
-    return url.toString().replace(/\/+$/, '');
+    url.pathname = url.pathname.replace(/\/+$/, '') || '/';
+    return url.toString().replace(/\/+$/, (match, offset, fullValue) => (fullValue.endsWith('/') ? '/' : ''));
   } catch {
     return '';
   }
@@ -162,20 +164,12 @@ export function isCameraUrlValid(value: string): boolean {
 
 export function buildCameraStreamUrl(value: string): string {
   const config = extractCameraLaunchConfig(value);
-
-  if (!config.cameraUrl) {
-    return '';
-  }
-
-  const streamUrl = new URL('/stream.html', `${config.cameraUrl.replace(/\/+$/, '')}/`);
-  streamUrl.searchParams.set('src', 'camera');
-  streamUrl.searchParams.set('mode', config.mode);
-  return streamUrl.toString();
+  return config.cameraUrl;
 }
 
 export function buildCameraPairingUrl(
   cameraUrl: string,
-  appUrl = BRAVE_PAWS_PAIRING_URL,
+  appUrl = getAppUrl(),
   options: { profile?: CameraStreamProfile; mode?: string } = {},
 ): string {
   const sanitizedCameraUrl = sanitizeCameraUrl(cameraUrl);
@@ -202,7 +196,7 @@ export function getCameraUrlFromSearch(search: string): string {
     : undefined;
 
   return normalizeCameraUrlValue(
-    buildCameraPairingUrl(cameraUrl, BRAVE_PAWS_PAIRING_URL, {
+    buildCameraPairingUrl(cameraUrl, getAppUrl(), {
       profile,
       mode: modeParam || undefined,
     }),
@@ -211,10 +205,10 @@ export function getCameraUrlFromSearch(search: string): string {
 
 export function getCameraUrlValidationMessage(value: string): string {
   if (!value.trim()) {
-    return 'Add a camera URL or scan the QR code from Brave Paws Streamer.';
+    return 'Add a stream URL, use the QUANTUM picam shortcut, or scan a Brave Paws stream QR code.';
   }
 
   return isCameraUrlValid(value)
-    ? 'Camera link looks good. Brave Paws will use it for remote preview.'
-    : 'Use the Brave Paws pairing link, or http only for localhost testing.';
+    ? 'Stream link looks good. Brave Paws will use it for remote preview.'
+    : 'Use a Brave Paws stream link, or http only for localhost testing.';
 }
