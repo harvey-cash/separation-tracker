@@ -217,9 +217,9 @@ This keeps v0.2 coherent and makes local staging much simpler.
 
 Recommended local path layout:
 
-- `https://quantum.tail080401.ts.net/separation/`
-- `https://quantum.tail080401.ts.net/separation/app/`
-- `https://quantum.tail080401.ts.net/separation/api/...`
+- `https://tailnet-host.example.ts.net/separation/`
+- `https://tailnet-host.example.ts.net/separation/app/`
+- `https://tailnet-host.example.ts.net/separation/api/...`
 - optional future stream-facing path(s) under the same origin if needed, but **no separate streamer app for v0.2**
 
 Reason:
@@ -236,7 +236,7 @@ Reason:
 Tailnet-only for now.
 
 Recommended canonical origin:
-- `https://quantum.tail080401.ts.net`
+- `https://tailnet-host.example.ts.net`
 
 Do not expose publicly.
 Do not wire this into `harvey.cash` yet.

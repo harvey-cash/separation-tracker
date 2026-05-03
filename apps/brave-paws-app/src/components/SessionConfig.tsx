@@ -132,7 +132,7 @@ export function SessionConfig({ initialSession, cameraUrl = '', onCameraUrlChang
           <h2 className="text-lg font-bold text-slate-800">Camera Stream (Optional)</h2>
         </div>
         <p className="text-sm text-slate-500 mb-4">
-          Use the QUANTUM picam shortcut, scan a Brave Paws stream QR code, or paste the full stream link manually.
+          Use a one-time pairing link, scan a Brave Paws stream QR code, or paste the full stream link manually.
         </p>
         <CameraLinkInput
           cameraUrl={cameraUrl}

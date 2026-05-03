@@ -6,7 +6,7 @@
     <title>Brave Paws</title>
     <meta
       name="description"
-      content="Brave Paws helps dog guardians plan separation-anxiety training with a local-first session tracker, a QUANTUM-hosted Tailnet backend, and direct picam playback."
+      content="Brave Paws helps dog guardians plan separation-anxiety training with a local-first session tracker, safe pairing links for private camera access, and direct picam playback."
     />
     <script type="module" src="./version.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -28,7 +28,7 @@
           <div>
             <h1>Thoughtful tools for gradual separation-anxiety training.</h1>
             <p class="hero-copy">
-              Brave Paws is now a Harvey-first, local-first setup: a session tracker for the plan, direct picam playback for live checking, and a QUANTUM-hosted Tailnet backend for inspectable sync.
+              Brave Paws is now a Harvey-first, local-first setup: a session tracker for the plan, direct picam playback for live checking, and a self-hosted backend that can pair a safe public frontend to a private camera path.
             </p>
             <div class="hero-actions">
               <a class="button button-primary" href="./app/">Open Brave Paws App</a>
@@ -96,7 +96,7 @@
               <li>Create varied session steps with short absences.</li>
               <li>Run sessions with a guided countdown and total training timer.</li>
               <li>Record calm, coping, or panicking outcomes with notes.</li>
-              <li>Review history, charts, CSV exports, and QUANTUM sync.</li>
+              <li>Review history, charts, CSV exports, and inspectable sync.</li>
             </ul>
             <a class="button button-primary" href="./app/">Go to the App</a>
           </article>
@@ -104,15 +104,15 @@
           <article class="panel product-panel tailnet-panel">
             <div class="section-heading compact">
               <p class="eyebrow">Brave Paws v0.2</p>
-              <h2>QUANTUM-hosted frontend, backend, and same-origin picam access.</h2>
+              <h2>Safe public frontend, private pairing links, and same-origin picam access.</h2>
             </div>
             <p>
-              v0.2 retires the old Brave Paws Streamer helper. QUANTUM now serves the landing page, app, API, and a same-origin camera path in front of picam so the app can stay HTTPS-friendly over Tailnet.
+              v0.2 retires the old Brave Paws Streamer helper. The frontend can stay public-safe by default, while pairing links and a same-origin camera path handle private picam access without embedding private origins in the bundle.
             </p>
             <div class="architecture-card card">
               <div>
-                <p class="label">Tailnet app</p>
-                <p class="mono">quantum.tail080401.ts.net/separation/</p>
+                <p class="label">Public-safe app</p>
+                <p class="mono">brave-paws.example/separation/app/?pairingToken=…</p>
               </div>
               <div class="architecture-arrow">↔</div>
               <div>
@@ -131,7 +131,7 @@
           </div>
           <div class="repo-row">
             <p>
-              Brave Paws is built as an open-source monorepo with the landing page, app, QUANTUM server, and deployment workflows in one place.
+              Brave Paws is built as an open-source monorepo with the landing page, app, self-hosted server, and deployment workflows in one place.
             </p>
             <a class="button button-secondary" href="https://github.com/harvey-cash/separation-tracker" target="_blank" rel="noopener noreferrer">
               View GitHub Repo

@@ -13,10 +13,10 @@ The intended public-facing origin for v0.2 is Tailnet-only.
 
 If `:443` is already occupied by public Funnel-backed routes on QUANTUM, expose Brave Paws on a dedicated Tailnet-only HTTPS port instead. The current live deployment target is:
 
-- `https://quantum.tail080401.ts.net:7447/separation/`
-- `https://quantum.tail080401.ts.net:7447/separation/app/`
-- `https://quantum.tail080401.ts.net:7447/separation/api/health`
-- `https://quantum.tail080401.ts.net:7447/separation/camera/live.stream/`
+- `https://tailnet-host.example.ts.net:7447/separation/`
+- `https://tailnet-host.example.ts.net:7447/separation/app/`
+- `https://tailnet-host.example.ts.net:7447/separation/api/health`
+- `https://tailnet-host.example.ts.net:7447/separation/camera/live.stream/`
 
 ## Local build and run
 
@@ -34,7 +34,7 @@ Default bind:
 
 | Variable | Example |
 | --- | --- |
-| `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://quantum.tail080401.ts.net` |
+| `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://tailnet-host.example.ts.net` |
 | `BRAVE_PAWS_DATA_DIR` | `/mnt/q/fermi/brave-paws/data` |
 | `BRAVE_PAWS_AUTH_TOKEN` | `replace-with-shared-secret-if-needed` |
 | `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` |

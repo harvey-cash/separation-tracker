@@ -16,9 +16,10 @@ The intended architecture is now:
 
 - landing page at `/separation/`
 - app at `/separation/app/`
-- QUANTUM-hosted API at `/separation/api/`
+- self-hosted API at `/separation/api/`
 - same-origin picam proxy at `/separation/camera/`
-- Tailnet-first hosting on `quantum.tail080401.ts.net`
+- optional one-time pairing links at `/separation/app/?pairingToken=…`
+- public-safe defaults with environment-specific hosts supplied at deploy time
 
 ## Workspace commands
 
@@ -31,7 +32,8 @@ From the repo root:
 | `npm test` | Run app and server unit tests. |
 | `npm run lint` | Type-check app and server workspaces. |
 | `npm run test:e2e` | Run app Playwright tests. |
-| `npm run server:start` | Start the compiled QUANTUM server locally. |
+| `npm run server:start` | Start the compiled Brave Paws server locally. |
+| `npm run server:create-pairing -- --camera-url https://camera.example/live.stream` | Mint a one-time pairing URL when the pairing broker is enabled. |
 
 ## Workspace layout
 
@@ -50,6 +52,6 @@ apps/
 
 ## Notes
 
-- Browser-local persistence remains first-class, with automatic QUANTUM hydration/push around it.
-- Canonical synced data now lives under `Q:/fermi/brave-paws/data` on QUANTUM.
+- Browser-local persistence remains first-class, with automatic backend hydration/push around it.
+- Canonical synced data can live on the self-hosted server while public bundles stay free of private camera origins.
 - Public CD remains `main`-only; feature branches get CI without triggering deploy.
