@@ -120,19 +120,8 @@ function isWriteAuthorized(request: IncomingMessage, config: BravePawsServerConf
   return headerToken === config.authToken;
 }
 
-function getRequestOrigin(request: IncomingMessage, config: BravePawsServerConfig): string | null {
-  if (config.publicBaseUrl) {
-    return config.publicBaseUrl;
-  }
-
-  const host = request.headers.host;
-  if (!host) {
-    return null;
-  }
-
-  const forwardedProto = request.headers['x-forwarded-proto'];
-  const protocol = typeof forwardedProto === 'string' && forwardedProto ? forwardedProto.split(',')[0]?.trim() : 'http';
-  return `${protocol || 'http'}://${host}`;
+function getRequestOrigin(config: BravePawsServerConfig): string | null {
+  return config.publicBaseUrl;
 }
 
 function getMimeType(filePath: string): string {
@@ -531,6 +520,13 @@ async function handleApiRequest(
     }
 
     if (request.method === 'POST') {
+      if (!config.authToken) {
+        sendJson(response, 503, {
+          error: 'Pairing creation requires BRAVE_PAWS_AUTH_TOKEN to be configured',
+        });
+        return;
+      }
+
       if (!isWriteAuthorized(request, config)) {
         sendJson(response, 401, { error: 'Unauthorized' });
         return;
@@ -551,7 +547,7 @@ async function handleApiRequest(
           },
           { ttlHours: payload.ttlHours },
         );
-        const requestOrigin = getRequestOrigin(request, config);
+        const requestOrigin = getRequestOrigin(config);
         const pairingUrl = requestOrigin ? buildPairingAppUrl(requestOrigin, config.appBasePath, record.token) : null;
 
         sendJson(response, 201, {
@@ -577,7 +573,7 @@ async function handleApiRequest(
     }
 
     if (request.method === 'GET') {
-      const token = decodeURIComponent(pathname.slice(`${pairingCollectionPath}/`.length));
+      const token = pathname.slice(`${pairingCollectionPath}/`.length);
       const record = await consumePairing(config.pairingStoreFilePath, token);
 
       if (!record) {
@@ -703,11 +699,13 @@ export function createBravePawsServer(config = resolveConfig()) {
 
       notFound(response);
     } catch (error) {
-      sendText(
-        response,
-        500,
-        error instanceof Error ? error.stack || error.message : 'Unknown server error',
-      );
+      if (error instanceof TypeError) {
+        sendJson(response, 400, { error: 'Invalid request URL' });
+        return;
+      }
+
+      console.error('Brave Paws server request failed', error);
+      sendText(response, 500, 'Internal server error');
     }
   });
 
@@ -730,6 +728,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`Session store: ${config.dataFilePath}`);
     if (config.pairingEnabled) {
       console.log(`Pairing broker: http://${config.host}:${config.port}${config.apiBasePath}pairings`);
+      if (!config.authToken) {
+        console.warn('Pairing creation over HTTP is disabled until BRAVE_PAWS_AUTH_TOKEN is configured.');
+      }
+      if (!config.publicBaseUrl) {
+        console.warn('Pairing tokens can still be minted, but absolute pairing URLs require BRAVE_PAWS_PUBLIC_BASE_URL.');
+      }
     }
   });
 }

@@ -22,7 +22,38 @@ async function close(server: http.Server) {
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
 
-async function withFixtureServer(run: (context: { baseUrl: string; config: BravePawsServerConfig }) => Promise<void>) {
+async function requestRaw(baseUrl: string, requestPath: string) {
+  const url = new URL(baseUrl);
+
+  return new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
+    const request = http.request(
+      {
+        host: url.hostname,
+        port: url.port,
+        path: requestPath,
+        method: 'GET',
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        response.on('end', () => {
+          resolve({
+            statusCode: response.statusCode || 0,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      },
+    );
+
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+async function withFixtureServer(
+  run: (context: { baseUrl: string; config: BravePawsServerConfig }) => Promise<void>,
+  configOverrides: Partial<BravePawsServerConfig> = {},
+) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-server-'));
   const landingDir = path.join(tempDir, 'landing');
   const appDir = path.join(tempDir, 'app');
@@ -58,6 +89,7 @@ async function withFixtureServer(run: (context: { baseUrl: string; config: Brave
     pairingEnabled: false,
     cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
     authToken: null,
+    ...configOverrides,
   };
 
   const server = createBravePawsServer(config);
@@ -316,6 +348,43 @@ test('pairing broker is disabled by default for public-safety', async () => {
   });
 });
 
+test('pairing broker requires BRAVE_PAWS_AUTH_TOKEN for HTTP pairing creation', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cameraUrl: 'https://private.example/live.stream' }),
+    });
+
+    assert.equal(response.status, 503);
+    assert.match(await response.text(), /BRAVE_PAWS_AUTH_TOKEN/);
+  }, {
+    pairingEnabled: true,
+  });
+});
+
+test('pairing broker only returns absolute pairing URLs from BRAVE_PAWS_PUBLIC_BASE_URL', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-brave-paws-token': 'secret-token',
+        host: 'evil.example',
+        'x-forwarded-proto': 'https',
+      },
+      body: JSON.stringify({ cameraUrl: 'https://private.example/live.stream' }),
+    });
+
+    assert.equal(response.status, 201);
+    const payload = await response.json() as { pairingUrl: string | null };
+    assert.equal(payload.pairingUrl, null);
+  }, {
+    pairingEnabled: true,
+    authToken: 'secret-token',
+  });
+});
+
 test('pairing broker creates one-time pairing URLs and consumes them once', async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-server-pairings-'));
   const landingDir = path.join(tempDir, 'landing');
@@ -389,6 +458,18 @@ test('pairing broker creates one-time pairing URLs and consumes them once', asyn
     await close(upstream);
     await fs.rm(tempDir, { recursive: true, force: true });
   }
+});
+
+test('malformed pairing tokens do not trigger a server error or stack leak', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await requestRaw(baseUrl, '/separation/api/pairings/%ZZ');
+    assert.equal(response.statusCode, 404);
+    assert.match(response.body, /Pairing token not found or expired/);
+    assert.doesNotMatch(response.body, /TypeError|at createBravePawsServer/);
+  }, {
+    pairingEnabled: true,
+    authToken: 'secret-token',
+  });
 });
 
 test('serves landing and app static files from the configured paths', async () => {

@@ -20,6 +20,7 @@ The intended architecture is now:
 - same-origin picam proxy at `/separation/camera/`
 - optional one-time pairing links at `/separation/app/?pairingToken=…`
 - public-safe defaults with environment-specific hosts supplied at deploy time
+- pairing creation only over explicit auth, with absolute links emitted only from configured public base URLs
 
 ## Workspace commands
 
@@ -54,4 +55,5 @@ apps/
 
 - Browser-local persistence remains first-class, with automatic backend hydration/push around it.
 - Canonical synced data can live on the self-hosted server while public bundles stay free of private camera origins.
+- Pairing records reject credential-bearing camera URLs so secrets do not leak into stored broker state or client responses.
 - Public CD remains `main`-only; feature branches get CI without triggering deploy.

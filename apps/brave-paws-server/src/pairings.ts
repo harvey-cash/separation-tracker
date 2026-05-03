@@ -8,6 +8,8 @@ export const DEFAULT_CAMERA_STREAM_MODE = 'mse,mp4,mjpeg';
 const DEFAULT_PAIRING_TTL_HOURS = 24 * 7;
 const PRUNE_CONSUMED_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const ALLOWED_CAMERA_STREAM_MODES = new Set(['webrtc', 'webrtc/tcp', 'mse', 'hls', 'mp4', 'mjpeg']);
+const PAIRING_TOKEN_PATTERN = /^[A-Za-z0-9_-]{10,}$/;
+const pairingStoreLocks = new Map<string, Promise<void>>();
 
 export type CameraStreamProfile = 'local-quality' | 'remote-low-latency';
 
@@ -47,10 +49,11 @@ function sanitizeCameraUrl(value: string): string {
     const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1';
     const hasValidProtocol = url.protocol === 'https:' || (isLocalhost && url.protocol === 'http:');
 
-    if (!hasValidProtocol) {
+    if (!hasValidProtocol || url.username || url.password) {
       return '';
     }
 
+    url.hash = '';
     url.pathname = url.pathname.replace(/\/+$/, '') || '/';
     return url.toString().replace(/\/+$/, (match, offset, fullValue) => (fullValue.endsWith('/') ? '/' : ''));
   } catch {
@@ -167,8 +170,36 @@ async function writePairingStore(filePath: string, pairings: PairingRecord[]): P
     pairings: prunePairings(pairings),
   };
 
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  const tempFilePath = path.join(path.dirname(filePath), `${path.basename(filePath)}.${process.pid}.${crypto.randomUUID()}.tmp`);
+  await fs.writeFile(tempFilePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await fs.rename(tempFilePath, filePath);
   return payload;
+}
+
+async function withPairingStoreLock<T>(filePath: string, operation: () => Promise<T>): Promise<T> {
+  const previous = pairingStoreLocks.get(filePath) || Promise.resolve();
+  let releaseLock = () => {};
+  const current = new Promise<void>((resolve) => {
+    releaseLock = resolve;
+  });
+  const next = previous.catch(() => undefined).then(() => current);
+  pairingStoreLocks.set(filePath, next);
+
+  await previous.catch(() => undefined);
+
+  try {
+    return await operation();
+  } finally {
+    releaseLock();
+    if (pairingStoreLocks.get(filePath) === next) {
+      pairingStoreLocks.delete(filePath);
+    }
+  }
+}
+
+function normalizePairingToken(token: string): string {
+  const normalized = token.trim();
+  return PAIRING_TOKEN_PATTERN.test(normalized) ? normalized : '';
 }
 
 export async function createPairing(
@@ -178,53 +209,57 @@ export async function createPairing(
 ): Promise<PairingRecord> {
   const launchConfig = normalizeCameraLaunchConfig(candidate);
   if (!launchConfig) {
-    throw new Error('A valid https:// camera URL is required for pairing creation');
+    throw new Error('A valid https:// camera URL without embedded credentials is required for pairing creation');
   }
 
-  const store = await readPairingStore(filePath);
-  const ttlHours = Number.isFinite(options.ttlHours) ? Math.max(1, Math.trunc(options.ttlHours as number)) : DEFAULT_PAIRING_TTL_HOURS;
-  const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + (ttlHours * 60 * 60 * 1000)).toISOString();
+  return withPairingStoreLock(filePath, async () => {
+    const store = await readPairingStore(filePath);
+    const ttlHours = Number.isFinite(options.ttlHours) ? Math.max(1, Math.trunc(options.ttlHours as number)) : DEFAULT_PAIRING_TTL_HOURS;
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + (ttlHours * 60 * 60 * 1000)).toISOString();
 
-  const record: PairingRecord = {
-    token: crypto.randomBytes(18).toString('base64url'),
-    createdAt,
-    expiresAt,
-    consumedAt: null,
-    launchConfig,
-  };
+    const record: PairingRecord = {
+      token: crypto.randomBytes(18).toString('base64url'),
+      createdAt,
+      expiresAt,
+      consumedAt: null,
+      launchConfig,
+    };
 
-  await writePairingStore(filePath, [...store.pairings, record]);
-  return record;
+    await writePairingStore(filePath, [...store.pairings, record]);
+    return record;
+  });
 }
 
 export async function consumePairing(filePath: string, token: string): Promise<PairingRecord | null> {
-  const trimmedToken = token.trim();
-  if (!trimmedToken) {
+  const normalizedToken = normalizePairingToken(token);
+  if (!normalizedToken) {
     return null;
   }
 
-  const store = await readPairingStore(filePath);
-  const recordIndex = store.pairings.findIndex((entry) => entry.token === trimmedToken);
-  if (recordIndex < 0) {
-    return null;
-  }
+  return withPairingStoreLock(filePath, async () => {
+    const store = await readPairingStore(filePath);
+    const recordIndex = store.pairings.findIndex((entry) => entry.token === normalizedToken);
+    if (recordIndex < 0) {
+      return null;
+    }
 
-  const record = store.pairings[recordIndex];
-  if (!record || record.consumedAt || isExpired(record)) {
-    await writePairingStore(filePath, store.pairings);
-    return null;
-  }
+    const record = store.pairings[recordIndex];
+    if (!record || record.consumedAt || isExpired(record)) {
+      await writePairingStore(filePath, store.pairings);
+      return null;
+    }
 
-  const consumedRecord: PairingRecord = {
-    ...record,
-    consumedAt: new Date().toISOString(),
-  };
+    const consumedRecord: PairingRecord = {
+      ...record,
+      consumedAt: new Date().toISOString(),
+    };
 
-  const nextPairings = [...store.pairings];
-  nextPairings[recordIndex] = consumedRecord;
-  await writePairingStore(filePath, nextPairings);
-  return consumedRecord;
+    const nextPairings = [...store.pairings];
+    nextPairings[recordIndex] = consumedRecord;
+    await writePairingStore(filePath, nextPairings);
+    return consumedRecord;
+  });
 }
 
 export function buildPairingAppUrl(baseUrl: string, appBasePath: string, token: string): string {

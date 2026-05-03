@@ -22,7 +22,8 @@ async function main() {
   const cameraUrl = readFlagValue(args, '--camera-url') || args[0];
 
   if (!cameraUrl) {
-    console.error('Usage: npm run create-pairing --workspace brave-paws-server -- --camera-url https://camera.example/live.stream');
+    console.error('Usage: npm run create-pairing -- --camera-url https://camera.example/live.stream');
+    console.error('   or: npm run server:create-pairing -- --camera-url https://camera.example/live.stream');
     process.exitCode = 1;
     return;
   }

@@ -36,7 +36,7 @@ Default bind:
 | --- | --- |
 | `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://tailnet-host.example.ts.net` |
 | `BRAVE_PAWS_DATA_DIR` | `/mnt/q/fermi/brave-paws/data` |
-| `BRAVE_PAWS_AUTH_TOKEN` | `replace-with-shared-secret-if-needed` |
+| `BRAVE_PAWS_AUTH_TOKEN` | `replace-with-long-random-secret-before-enabling-pairing` |
 | `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` |
 
 ## Session storage
@@ -69,4 +69,5 @@ If Harvey drops a fresher `brave_paws_sessions.csv` into the data folder, the se
 ## Notes
 
 - The camera path is a same-origin proxy in front of picam / MediaMTX, and directory-style preview URLs such as `/separation/camera/live.stream` are redirected to the working trailing-slash preview page automatically.
+- If you enable pairing, also set `BRAVE_PAWS_AUTH_TOKEN`; otherwise the HTTP pairing-creation endpoint stays disabled on purpose and only the local CLI can mint tokens.
 - Local browser persistence still exists in the app; QUANTUM hydrates on open and automatically pushes changes back to the inspectable QUANTUM data folder.
