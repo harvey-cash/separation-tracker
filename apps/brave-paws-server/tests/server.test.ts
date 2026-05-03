@@ -138,7 +138,7 @@ test('session CRUD endpoints expose individual sessions', async () => {
   });
 });
 
-test('camera proxy forwards requests to the configured upstream', async () => {
+test('camera proxy forwards manifest and asset requests to the configured upstream', async () => {
   await withFixtureServer(async ({ baseUrl }) => {
     const response = await fetch(`${baseUrl}/separation/camera/live.stream/index.m3u8`);
     assert.equal(response.status, 200);
@@ -146,11 +146,23 @@ test('camera proxy forwards requests to the configured upstream', async () => {
   });
 });
 
+test('camera preview path serves the Brave Paws compatibility player page', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/camera/live.stream/`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') || '', /text\/html/);
+    const html = await response.text();
+    assert.match(html, /Brave Paws Picam Preview/);
+    assert.match(html, /video1_stream\.m3u8/);
+    assert.match(html, /hls\.min\.js/);
+  });
+});
+
 test('camera proxy normalizes directory-style stream paths without a trailing slash', async () => {
   await withFixtureServer(async ({ baseUrl }) => {
     const response = await fetch(`${baseUrl}/separation/camera/live.stream`);
     assert.equal(response.status, 200);
-    assert.equal(await response.text(), 'camera:/live.stream/');
+    assert.match(await response.text(), /Brave Paws Picam Preview/);
   });
 });
 

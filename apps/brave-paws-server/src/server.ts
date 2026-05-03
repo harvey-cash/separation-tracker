@@ -119,12 +119,204 @@ async function serveStaticSite(
   notFound(response);
 }
 
+function isCameraPreviewPath(pathname: string, config: BravePawsServerConfig): boolean {
+  return pathname === `${config.cameraBasePath}live.stream/`;
+}
+
+function buildCameraPreviewHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brave Paws Picam Preview</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #0f172a;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #0f172a;
+    }
+
+    #status {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      text-align: center;
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+      background: rgba(15, 23, 42, 0.25);
+    }
+
+    body.ready #status {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" muted autoplay playsinline></video>
+  <div id="status">Connecting to picam…</div>
+
+  <script src="hls.min.js"></script>
+  <script>
+    const MANIFEST_URL = 'video1_stream.m3u8' + window.location.search;
+    const video = document.getElementById('video');
+    const statusEl = document.getElementById('status');
+    let hls = null;
+    let lastAdvanceAt = Date.now();
+    let lastTime = 0;
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+      document.body.classList.remove('ready');
+    }
+
+    function markReady() {
+      document.body.classList.add('ready');
+    }
+
+    function destroyPlayer() {
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+      video.removeAttribute('src');
+      video.load();
+    }
+
+    function startPlayer() {
+      destroyPlayer();
+      setStatus('Connecting to picam…');
+
+      if (window.Hls && Hls.isSupported()) {
+        hls = new Hls({
+          lowLatencyMode: false,
+          liveSyncDurationCount: 3,
+          liveMaxLatencyDurationCount: 8,
+          maxLiveSyncPlaybackRate: 1.2,
+          manifestLoadingMaxRetry: 6,
+          levelLoadingMaxRetry: 6,
+          fragLoadingMaxRetry: 6,
+          backBufferLength: 30,
+        });
+
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          hls.loadSource(MANIFEST_URL);
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+        });
+
+        hls.on(Hls.Events.FRAG_BUFFERED, () => {
+          markReady();
+        });
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (!data || !data.fatal) {
+            return;
+          }
+
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            setStatus('Reconnecting to picam…');
+            try {
+              hls.startLoad();
+            } catch {
+              window.setTimeout(startPlayer, 1000);
+            }
+            return;
+          }
+
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            setStatus('Recovering video…');
+            try {
+              hls.recoverMediaError();
+            } catch {
+              window.setTimeout(startPlayer, 1000);
+            }
+            return;
+          }
+
+          setStatus('Restarting preview…');
+          window.setTimeout(startPlayer, 1000);
+        });
+
+        hls.attachMedia(video);
+        return;
+      }
+
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = MANIFEST_URL;
+        video.addEventListener('loadeddata', markReady, { once: true });
+        video.play().catch(() => {});
+        return;
+      }
+
+      setStatus('This browser cannot play the picam preview.');
+    }
+
+    video.addEventListener('playing', () => {
+      lastAdvanceAt = Date.now();
+      lastTime = video.currentTime;
+      markReady();
+    });
+
+    video.addEventListener('timeupdate', () => {
+      if (video.currentTime > lastTime + 0.05) {
+        lastTime = video.currentTime;
+        lastAdvanceAt = Date.now();
+        markReady();
+      }
+    });
+
+    window.setInterval(() => {
+      if (document.hidden) {
+        return;
+      }
+
+      if (video.paused) {
+        video.play().catch(() => {});
+      }
+
+      if (Date.now() - lastAdvanceAt > 4000) {
+        setStatus('Preview stalled. Reconnecting…');
+        startPlayer();
+      }
+    }, 2000);
+
+    startPlayer();
+  </script>
+</body>
+</html>`;
+}
+
 async function proxyCameraRequest(
   request: IncomingMessage,
   response: ServerResponse,
   pathname: string,
   config: BravePawsServerConfig,
 ) {
+  if (request.method === 'GET' && isCameraPreviewPath(pathname, config)) {
+    sendText(response, 200, buildCameraPreviewHtml(), 'text/html; charset=utf-8');
+    return;
+  }
+
   const suffix = pathname.slice(config.cameraBasePath.length);
   const targetUrl = new URL(suffix + (request.url?.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), config.cameraUpstreamBaseUrl);
 
