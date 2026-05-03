@@ -49,6 +49,7 @@ async function withFixtureServer(run: (context: { baseUrl: string; config: Brave
     apiBasePath: '/separation/api/',
     cameraBasePath: '/separation/camera/',
     healthPath: '/separation/api/health',
+    clientDiagnosticsPath: '/separation/api/client-diagnostics',
     landingDistDir: landingDir,
     appDistDir: appDir,
     dataDir,
@@ -187,6 +188,49 @@ test('imports newer CSV drops into the canonical session store on read', async (
 
     const stored = JSON.parse(await fs.readFile(config.dataFilePath, 'utf8')) as { sessions: Array<{ notes?: string }> };
     assert.equal(stored.sessions[0]?.notes, 'CSV import');
+  });
+});
+
+test('client diagnostics endpoint appends sanitized frontend events to disk', async () => {
+  await withFixtureServer(async ({ baseUrl, config }) => {
+    const response = await fetch(`${baseUrl}${config.clientDiagnosticsPath}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        category: 'quantum_sync_error',
+        severity: 'error',
+        message: 'Sync exploded',
+        fingerprint: 'quantum-sync:error',
+        pageUrl: 'https://quantum.tail080401.ts.net:7447/separation/app/',
+        details: {
+          stage: 'push',
+          nested: {
+            reason: 'timeout',
+          },
+        },
+      }),
+    });
+
+    assert.equal(response.status, 202);
+
+    const diagnosticsFilePath = path.join(config.dataDir, 'client_diagnostics.jsonl');
+    const raw = await fs.readFile(diagnosticsFilePath, 'utf8');
+    const record = JSON.parse(raw.trim()) as {
+      category: string;
+      severity: string;
+      message: string;
+      fingerprint: string;
+      pageUrl: string;
+      details: { stage: string; nested: { reason: string } };
+    };
+
+    assert.equal(record.category, 'quantum_sync_error');
+    assert.equal(record.severity, 'error');
+    assert.equal(record.message, 'Sync exploded');
+    assert.equal(record.fingerprint, 'quantum-sync:error');
+    assert.equal(record.pageUrl, 'https://quantum.tail080401.ts.net:7447/separation/app/');
+    assert.equal(record.details.stage, 'push');
+    assert.equal(record.details.nested.reason, 'timeout');
   });
 });
 

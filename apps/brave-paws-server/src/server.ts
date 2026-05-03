@@ -4,7 +4,14 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 
 import { resolveConfig, type BravePawsServerConfig } from './config.js';
-import { getSessionsCsvFilePath, readSessionStore, upsertSession, writeSessionStore } from './storage.js';
+import {
+  appendClientDiagnostic,
+  getClientDiagnosticsFilePath,
+  getSessionsCsvFilePath,
+  readSessionStore,
+  upsertSession,
+  writeSessionStore,
+} from './storage.js';
 import type { Session } from './types.js';
 
 const JSON_HEADERS = {
@@ -29,6 +36,64 @@ function notFound(response: ServerResponse, message = 'Not found') {
   sendJson(response, 404, {
     error: message,
   });
+}
+
+function trimString(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+}
+
+function sanitizeJsonValue(value: unknown, depth = 0): unknown {
+  if (value == null || typeof value === 'boolean' || typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return trimString(value, 500);
+  }
+
+  if (depth >= 4) {
+    return '[truncated]';
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((entry) => sanitizeJsonValue(entry, depth + 1));
+  }
+
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .slice(0, 20)
+        .map(([key, entry]) => [trimString(key, 80), sanitizeJsonValue(entry, depth + 1)]),
+    );
+  }
+
+  return trimString(String(value), 500);
+}
+
+function sanitizeClientDiagnosticPayload(payload: unknown, request: IncomingMessage) {
+  const candidate = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const category = typeof candidate.category === 'string' ? trimString(candidate.category, 80) : 'frontend_error';
+  const severity = candidate.severity === 'info' || candidate.severity === 'warn' || candidate.severity === 'error'
+    ? candidate.severity
+    : 'error';
+  const message = typeof candidate.message === 'string' ? trimString(candidate.message, 500) : 'Client diagnostic';
+  const fingerprint = typeof candidate.fingerprint === 'string' ? trimString(candidate.fingerprint, 200) : `${category}:${message}`;
+  const occurredAt = typeof candidate.occurredAt === 'string' ? trimString(candidate.occurredAt, 80) : null;
+  const pageUrl = typeof candidate.pageUrl === 'string' ? trimString(candidate.pageUrl, 300) : null;
+  const userAgent = typeof candidate.userAgent === 'string' ? trimString(candidate.userAgent, 300) : null;
+
+  return {
+    receivedAt: new Date().toISOString(),
+    remoteAddress: request.socket.remoteAddress || null,
+    category,
+    severity,
+    message,
+    fingerprint,
+    occurredAt,
+    pageUrl,
+    userAgent,
+    details: sanitizeJsonValue(candidate.details ?? {}),
+  };
 }
 
 async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
@@ -368,8 +433,10 @@ async function handleApiRequest(
       appBasePath: config.appBasePath,
       apiBasePath: config.apiBasePath,
       cameraBasePath: config.cameraBasePath,
+      clientDiagnosticsPath: config.clientDiagnosticsPath,
       dataFilePath: config.dataFilePath,
       csvFilePath: getSessionsCsvFilePath(config.dataFilePath),
+      clientDiagnosticsFilePath: getClientDiagnosticsFilePath(config.dataFilePath),
       sessionCount: store.sessions.length,
       updatedAt: store.updatedAt,
     });
@@ -379,6 +446,7 @@ async function handleApiRequest(
   const sessionsCollectionPath = `${config.apiBasePath}sessions`;
   const syncPullPath = `${config.apiBasePath}sync/pull`;
   const syncPushPath = `${config.apiBasePath}sync/push`;
+  const clientDiagnosticsPath = config.clientDiagnosticsPath;
 
   if (request.method === 'GET' && pathname === sessionsCollectionPath) {
     const store = await readSessionStore(config.dataFilePath);
@@ -419,6 +487,17 @@ async function handleApiRequest(
     const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
     const store = await writeSessionStore(config.dataFilePath, sessions);
     sendJson(response, 200, store);
+    return;
+  }
+
+  if (request.method === 'POST' && pathname === clientDiagnosticsPath) {
+    const payload = await readJsonBody(request);
+    const record = sanitizeClientDiagnosticPayload(payload, request);
+    const diagnosticsFilePath = await appendClientDiagnostic(config.dataFilePath, record);
+    sendJson(response, 202, {
+      status: 'accepted',
+      diagnosticsFilePath,
+    });
     return;
   }
 

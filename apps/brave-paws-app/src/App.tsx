@@ -13,6 +13,7 @@ import { StorageSync } from './components/StorageSync';
 import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
+import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
 import {
   ActiveSessionState,
   clearActiveSessionState,
@@ -43,6 +44,8 @@ export default function App() {
   const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
 
   useEffect(() => {
+    installGlobalClientDiagnostics();
+
     const pairedCameraUrl = getCameraUrlFromSearch(window.location.search);
     if (!pairedCameraUrl) {
       return;

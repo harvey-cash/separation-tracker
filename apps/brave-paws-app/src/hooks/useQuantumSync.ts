@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '../types';
 import { getApiBaseUrl } from '../config';
 import { mergeSessionsById, serializeSessionsForComparison } from '../utils/sessionSync';
+import { reportClientDiagnostic } from '../utils/clientDiagnostics';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
@@ -179,9 +180,21 @@ export function useQuantumSync(
       const response = await pushSessions(nextSessions);
       finishSuccess(nextSessions, response.updatedAt);
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'QUANTUM sync failed';
       setSyncStatus('error');
-      setSyncError(error instanceof Error ? error.message : 'QUANTUM sync failed');
+      setSyncError(message);
       setIsAvailable(false);
+      reportClientDiagnostic({
+        category: 'quantum_sync_error',
+        severity: 'error',
+        message,
+        fingerprint: `quantum-sync-push:${message}`,
+        details: {
+          stage: 'push',
+          sessionCount: sessionsRef.current.length,
+          error,
+        },
+      });
     } finally {
       pushInFlightRef.current = false;
     }
@@ -254,9 +267,22 @@ export function useQuantumSync(
         finishSuccess(localSessions, remote.updatedAt);
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'QUANTUM sync failed';
       setSyncStatus('error');
-      setSyncError(error instanceof Error ? error.message : 'QUANTUM sync failed');
+      setSyncError(message);
       setIsAvailable(false);
+      reportClientDiagnostic({
+        category: 'quantum_sync_error',
+        severity: 'error',
+        message,
+        fingerprint: `quantum-sync-hydrate:${reason}:${message}`,
+        details: {
+          stage: 'hydrate',
+          reason,
+          sessionCount: sessionsRef.current.length,
+          error,
+        },
+      });
     } finally {
       initialHydrationDoneRef.current = true;
       hydrationInFlightRef.current = false;
@@ -278,8 +304,19 @@ export function useQuantumSync(
         }
       } catch (error) {
         if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'QUANTUM API unavailable';
           setIsAvailable(false);
-          setSyncError(error instanceof Error ? error.message : 'QUANTUM API unavailable');
+          setSyncError(message);
+          reportClientDiagnostic({
+            category: 'quantum_sync_error',
+            severity: 'warn',
+            message,
+            fingerprint: `quantum-sync-health:${message}`,
+            details: {
+              stage: 'health',
+              error,
+            },
+          });
         }
       }
     };

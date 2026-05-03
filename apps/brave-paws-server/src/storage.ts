@@ -15,6 +15,7 @@ const EMPTY_STORE: SessionStoreData = {
 };
 
 const SESSIONS_CSV_FILENAME = 'brave_paws_sessions.csv';
+const CLIENT_DIAGNOSTICS_FILENAME = 'client_diagnostics.jsonl';
 
 async function ensureParentDirectory(filePath: string) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -115,6 +116,17 @@ export async function upsertSession(filePath: string, session: Session): Promise
   return writeSessionStore(filePath, current.sessions);
 }
 
+export async function appendClientDiagnostic(filePath: string, payload: unknown): Promise<string> {
+  const diagnosticsFilePath = path.join(path.dirname(filePath), CLIENT_DIAGNOSTICS_FILENAME);
+  await ensureParentDirectory(diagnosticsFilePath);
+  await fs.appendFile(diagnosticsFilePath, `${JSON.stringify(payload)}\n`, 'utf8');
+  return diagnosticsFilePath;
+}
+
 export function getSessionsCsvFilePath(filePath: string): string {
   return getCsvFilePath(filePath);
+}
+
+export function getClientDiagnosticsFilePath(filePath: string): string {
+  return path.join(path.dirname(filePath), CLIENT_DIAGNOSTICS_FILENAME);
 }

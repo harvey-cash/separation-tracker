@@ -38,6 +38,7 @@ export type BravePawsServerConfig = {
   apiBasePath: string;
   cameraBasePath: string;
   healthPath: string;
+  clientDiagnosticsPath: string;
   landingDistDir: string;
   appDistDir: string;
   dataDir: string;
@@ -62,6 +63,7 @@ export function resolveConfig(env = process.env): BravePawsServerConfig {
     apiBasePath,
     cameraBasePath,
     healthPath: `${apiBasePath}health`,
+    clientDiagnosticsPath: `${apiBasePath}client-diagnostics`,
     landingDistDir: path.resolve(env.BRAVE_PAWS_LANDING_DIST_DIR || path.join(repoRoot, 'apps', 'brave-paws-landing', 'dist')),
     appDistDir: path.resolve(env.BRAVE_PAWS_APP_DIST_DIR || path.join(repoRoot, 'apps', 'brave-paws-app', 'dist')),
     dataDir,
