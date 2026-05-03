@@ -8,7 +8,7 @@ export const DEFAULT_CAMERA_STREAM_MODE = 'mse,mp4,mjpeg';
 const DEFAULT_PAIRING_TTL_HOURS = 24 * 7;
 const PRUNE_CONSUMED_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const ALLOWED_CAMERA_STREAM_MODES = new Set(['webrtc', 'webrtc/tcp', 'mse', 'hls', 'mp4', 'mjpeg']);
-const PAIRING_TOKEN_PATTERN = /^[A-Za-z0-9_-]{10,}$/;
+const PAIRING_TOKEN_PATTERN = /^[A-Za-z0-9_-]{10,200}$/;
 const pairingStoreLocks = new Map<string, Promise<void>>();
 
 export type CameraStreamProfile = 'local-quality' | 'remote-low-latency';

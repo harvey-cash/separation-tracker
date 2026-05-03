@@ -75,3 +75,21 @@ test('consumePairing only succeeds once under concurrent reads', async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   }
 });
+
+test('consumePairing rejects excessively long tokens', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-pairings-token-length-'));
+  const filePath = path.join(tempDir, 'pairings.json');
+
+  try {
+    const created = await createPairing(filePath, {
+      cameraUrl: 'https://private.example/live.stream',
+      profile: 'remote-low-latency',
+      mode: 'mse,mp4,mjpeg',
+    });
+
+    assert.equal(await consumePairing(filePath, `${created.token}${'a'.repeat(201)}`), null);
+    assert.ok(await consumePairing(filePath, created.token));
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});

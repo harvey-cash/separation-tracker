@@ -46,8 +46,7 @@ async function main() {
 
   if (!config.publicBaseUrl) {
     console.error('Pairing was created, but BRAVE_PAWS_PUBLIC_BASE_URL is not configured, so no absolute URL could be printed.');
-    console.error(`Token: ${record.token}`);
-    process.exitCode = 1;
+    console.log(record.token);
     return;
   }
 

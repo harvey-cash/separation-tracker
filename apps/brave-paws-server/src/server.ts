@@ -532,9 +532,8 @@ async function handleApiRequest(
         return;
       }
 
-      const payload = await readJsonBody<{ cameraUrl?: string; profile?: string; mode?: string; ttlHours?: number }>(request);
-
       try {
+        const payload = await readJsonBody<{ cameraUrl?: string; profile?: string; mode?: string; ttlHours?: number }>(request);
         const record = await createPairing(
           config.pairingStoreFilePath,
           {

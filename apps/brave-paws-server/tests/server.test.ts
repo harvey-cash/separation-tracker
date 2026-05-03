@@ -363,6 +363,25 @@ test('pairing broker requires BRAVE_PAWS_AUTH_TOKEN for HTTP pairing creation', 
   });
 });
 
+test('pairing broker returns 400 for malformed JSON bodies', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-brave-paws-token': 'secret-token',
+      },
+      body: '{"cameraUrl":',
+    });
+
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /Could not create pairing|JSON|Unexpected/i);
+  }, {
+    pairingEnabled: true,
+    authToken: 'secret-token',
+  });
+});
+
 test('pairing broker only returns absolute pairing URLs from BRAVE_PAWS_PUBLIC_BASE_URL', async () => {
   await withFixtureServer(async ({ baseUrl }) => {
     const response = await fetch(`${baseUrl}/separation/api/pairings`, {
