@@ -276,7 +276,7 @@ h3 {
   color: var(--rose);
 }
 
-.streamer-panel {
+.tailnet-panel {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(249, 244, 236, 0.9));
 }
 

@@ -56,7 +56,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   });
   const [previewReloadToken, setPreviewReloadToken] = useState(0);
   const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'live' | 'degraded' | 'disconnected'>('idle');
-  const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a camera URL to start the live preview.');
+  const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a stream URL or use the QUANTUM picam shortcut to start the live preview.');
   const [isPreviewConnected, setIsPreviewConnected] = useState(() => isCameraUrlValid(cameraUrl));
   const [isPreviewMinimized, setIsPreviewMinimized] = useState(false);
   const sessionRef = useRef(session);
@@ -253,13 +253,13 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   useEffect(() => {
     if (!hasValidCameraUrl) {
       setPreviewStatus('idle');
-      setPreviewStatusMessage('Paste a camera URL to start the live preview.');
+      setPreviewStatusMessage('Paste a stream URL or use the QUANTUM picam shortcut to start the live preview.');
       return;
     }
 
     if (!isPreviewConnected) {
       setPreviewStatus('disconnected');
-      setPreviewStatusMessage('Camera preview disconnected. Paste a new URL or reconnect.');
+      setPreviewStatusMessage('Camera preview disconnected. Paste a new stream URL or reconnect.');
       return;
     }
 
@@ -356,7 +356,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
             <div className="w-full bg-slate-100 rounded-xl border border-slate-200 border-dashed p-4 flex flex-col items-center justify-center text-slate-500 gap-3">
               <div className="flex items-center gap-2 text-slate-400">
                 <VideoOff size={20} />
-                <span className="text-sm font-medium">Paste Camera URL</span>
+                <span className="text-sm font-medium">Add Stream URL</span>
               </div>
               <div className="w-full">
                 <CameraLinkInput

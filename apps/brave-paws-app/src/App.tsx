@@ -9,8 +9,8 @@ import { GraphView } from './components/GraphView';
 import { HistoryList } from './components/HistoryList';
 import { SessionView } from './components/SessionView';
 import { InfoView } from './components/InfoView';
-import { GoogleDriveSync } from './components/GoogleDriveSync';
-import { useGoogleDrive } from './hooks/useGoogleDrive';
+import { StorageSync } from './components/StorageSync';
+import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
 import {
@@ -75,7 +75,7 @@ export default function App() {
     replaceSessions(imported);
   };
 
-  const drive = useGoogleDrive(sessions, handleImportSessions);
+  const storageSync = useStorageSync(sessions, handleImportSessions);
 
   const handleStartNew = () => {
     let initialSteps = DEFAULT_STEPS;
@@ -145,17 +145,11 @@ export default function App() {
             setPreviousView('dashboard');
             setCurrentView('session-view');
           }}
-          driveSync={
-            <GoogleDriveSync
-              isConnected={drive.isConnected}
-              syncStatus={drive.syncStatus}
-              syncError={drive.syncError}
-              conflictData={drive.conflictData}
-              onConnect={drive.connect}
-              onDisconnect={drive.disconnect}
-              onSyncNow={drive.syncNow}
-              onAcceptRemote={drive.acceptRemote}
-              onKeepLocal={drive.keepLocal}
+          storageSync={
+            <StorageSync
+              providers={storageSync.providerList}
+              selectedProviderId={storageSync.selectedProviderId}
+              onSelectProvider={storageSync.setSelectedProviderId}
             />
           }
         />

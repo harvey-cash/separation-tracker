@@ -6,16 +6,16 @@
   "workspaces": [
     "apps/brave-paws-landing",
     "apps/brave-paws-app",
-    "apps/brave-paws-streamer"
+    "apps/brave-paws-server"
   ],
   "scripts": {
     "dev": "npm run app:dev",
-    "build": "npm run app:build && npm run landing:build",
+    "build": "npm run app:build && npm run landing:build && npm run server:build",
     "preview": "npm run app:preview",
-    "test": "npm run app:test",
-    "lint": "npm run app:lint",
+    "test": "npm run app:test && npm run server:test",
+    "lint": "npm run app:lint && npm run server:lint",
     "test:e2e": "npm run app:test:e2e",
-    "clean": "npm run app:clean && npm run landing:clean && npm run streamer:clean",
+    "clean": "npm run app:clean && npm run landing:clean && npm run server:clean",
     "app:dev": "npm run dev --workspace brave-paws-app",
     "app:build": "npm run build --workspace brave-paws-app",
     "app:preview": "npm run preview --workspace brave-paws-app",
@@ -27,10 +27,11 @@
     "landing:build": "npm run build --workspace brave-paws-landing",
     "landing:preview": "npm run preview --workspace brave-paws-landing",
     "landing:clean": "npm run clean --workspace brave-paws-landing",
-    "camera-helper:gui": "npm run gui --workspace brave-paws-streamer",
-    "camera-helper:health": "npm run health --workspace brave-paws-streamer",
-    "camera-helper:bundle": "npm run bundle --workspace brave-paws-streamer",
-    "streamer:test": "npm run test --workspace brave-paws-streamer",
-    "streamer:clean": "npm run clean --workspace brave-paws-streamer"
+    "server:dev": "npm run dev --workspace brave-paws-server",
+    "server:build": "npm run build --workspace brave-paws-server",
+    "server:lint": "npm run lint --workspace brave-paws-server",
+    "server:start": "npm run start --workspace brave-paws-server",
+    "server:test": "npm run test --workspace brave-paws-server",
+    "server:clean": "npm run clean --workspace brave-paws-server"
   }
 }

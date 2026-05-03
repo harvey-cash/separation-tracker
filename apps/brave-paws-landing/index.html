@@ -6,7 +6,7 @@
     <title>Brave Paws</title>
     <meta
       name="description"
-      content="Brave Paws helps dog guardians plan separation-anxiety training with a session tracker, a hosted streamer UI, and a lightweight Windows helper."
+      content="Brave Paws helps dog guardians plan separation-anxiety training with a local-first session tracker, a QUANTUM-hosted Tailnet backend, and direct picam playback."
     />
     <script type="module" src="./version.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -28,11 +28,11 @@
           <div>
             <h1>Thoughtful tools for gradual separation-anxiety training.</h1>
             <p class="hero-copy">
-              Brave Paws is a small set of tools for dog guardians working through cue-less, below-threshold separation training: a session tracker for the plan, and a lightweight streamer companion for remote camera pairing.
+              Brave Paws is now a Harvey-first, local-first setup: a session tracker for the plan, direct picam playback for live checking, and a QUANTUM-hosted Tailnet backend for inspectable sync.
             </p>
             <div class="hero-actions">
               <a class="button button-primary" href="./app/">Open Brave Paws App</a>
-              <a class="button button-secondary" href="./streamer/">Open Streamer UI</a>
+              <a class="button button-secondary" href="https://github.com/harvey-cash/separation-tracker" target="_blank" rel="noopener noreferrer">View GitHub Repo</a>
             </div>
           </div>
           <div class="hero-card card">
@@ -90,48 +90,48 @@
               <h2>Plan, run, rate, and review your training sessions.</h2>
             </div>
             <p>
-              The app is a client-side tracker for building timed sessions, running step-by-step countdowns, logging outcomes, and reviewing trends over time. It keeps the training method practical when you are repeating small sessions every day.
+              The app is a local-first tracker for building timed sessions, running step-by-step countdowns, logging outcomes, and reviewing trends over time. It keeps the training method practical when you are repeating small sessions every day.
             </p>
             <ul class="feature-list">
               <li>Create varied session steps with short absences.</li>
               <li>Run sessions with a guided countdown and total training timer.</li>
               <li>Record calm, coping, or panicking outcomes with notes.</li>
-              <li>Review history, charts, and CSV exports.</li>
+              <li>Review history, charts, CSV exports, and QUANTUM sync.</li>
             </ul>
             <a class="button button-primary" href="./app/">Go to the App</a>
           </article>
 
-          <article class="panel product-panel streamer-panel">
+          <article class="panel product-panel tailnet-panel">
             <div class="section-heading compact">
-              <p class="eyebrow">Brave Paws Streamer</p>
-              <h2>Hosted control UI, local helper, and remote camera pairing.</h2>
+              <p class="eyebrow">Brave Paws v0.2</p>
+              <h2>QUANTUM-hosted frontend, backend, and same-origin picam access.</h2>
             </div>
             <p>
-              The streamer is split across two surfaces: a hosted control page and a local Windows helper that handles device access, process management, and secure tunnel creation. That keeps the UI easy to update while keeping the trusted machine-specific work local.
+              v0.2 retires the old Brave Paws Streamer helper. QUANTUM now serves the landing page, app, API, and a same-origin camera path in front of picam so the app can stay HTTPS-friendly over Tailnet.
             </p>
             <div class="architecture-card card">
               <div>
-                <p class="label">Hosted</p>
-                <p class="mono">harvey.cash/separation/streamer/</p>
+                <p class="label">Tailnet app</p>
+                <p class="mono">quantum.tail080401.ts.net/separation/</p>
               </div>
               <div class="architecture-arrow">↔</div>
               <div>
-                <p class="label">Loopback helper</p>
-                <p class="mono">127.0.0.1 + session token</p>
+                <p class="label">Picam proxy</p>
+                <p class="mono">/separation/camera/live.stream/</p>
               </div>
             </div>
-            <a class="button button-secondary" href="./streamer/">Go to the Streamer</a>
+            <a class="button button-secondary" href="./app/">Open the App</a>
           </article>
         </section>
 
         <section class="panel section-panel">
           <div class="section-heading">
             <p class="eyebrow">Open Source</p>
-            <h2>The code, packaging, and deployment are all in the open.</h2>
+            <h2>The code, deployment docs, and local-first architecture are all in the open.</h2>
           </div>
           <div class="repo-row">
             <p>
-              Brave Paws is built as an open-source monorepo with the app, streamer helper, hosted streamer UI, and deployment workflows in one place.
+              Brave Paws is built as an open-source monorepo with the landing page, app, QUANTUM server, and deployment workflows in one place.
             </p>
             <a class="button button-secondary" href="https://github.com/harvey-cash/separation-tracker" target="_blank" rel="noopener noreferrer">
               View GitHub Repo
@@ -150,11 +150,10 @@
         </div>
         <div class="footer-links">
           <a href="./app/">App</a>
-          <a href="./streamer/">Streamer</a>
           <a href="https://github.com/harvey-cash/separation-tracker" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
       </footer>
       <p class="version-text" id="app-version" aria-label="Brave Paws version"></p>
     </div>
   </body>
-  </html>
+</html>

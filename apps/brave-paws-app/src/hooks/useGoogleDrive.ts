@@ -17,15 +17,12 @@ import {
 } from '../utils/googleDrive';
 import { Session } from '../types';
 import { generateCSVContent, parseCSV } from '../utils/export';
+import { getGoogleClientId } from '../config';
 
 /** Duration (ms) to show the "Synced" success badge before returning to idle. */
 const SUCCESS_MESSAGE_DURATION_MS = 3000;
 
-// Access Vite env at runtime. A `vite-env.d.ts` provides the proper type for
-// build-time checking; the double cast here guards against environments where
-// that augmentation isn't present.
-const CLIENT_ID = (import.meta as unknown as { env: Record<string, string> }).env
-  .VITE_GOOGLE_CLIENT_ID as string | undefined;
+const CLIENT_ID = getGoogleClientId();
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
