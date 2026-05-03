@@ -27,10 +27,8 @@ jobs:
         run: |
           mkdir -p site-dist
           mkdir -p site-dist/app
-          mkdir -p site-dist/streamer
           cp -r apps/brave-paws-landing/dist/* site-dist/
           cp -r apps/brave-paws-app/dist/* site-dist/app/
-          cp -r apps/brave-paws-streamer/windows-camera-helper-ui/public/* site-dist/streamer/
       - name: Archive build output
         run: cd site-dist && zip -r ../dist.zip .
       - name: Create GitHub Release
@@ -66,14 +64,11 @@ jobs:
           mkdir -p website/separation
           rm -rf website/separation/assets
           rm -rf website/separation/app
-          rm -rf website/separation/streamer
           mkdir -p website/separation/app
-          mkdir -p website/separation/streamer
           find website/separation -maxdepth 1 -type f -delete
           cp -r site-dist/*.html website/separation/
           cp -r site-dist/assets website/separation/
           cp -r site-dist/app/* website/separation/app/
-          cp -r site-dist/streamer/* website/separation/streamer/
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
@@ -82,5 +77,5 @@ jobs:
           branch: deploy/separation-${{ github.event.inputs.version }}
           title: "Deploy separation-tracker ${{ github.event.inputs.version }}"
           body: |
-            Automated deployment of separation-tracker ${{ github.event.inputs.version }} to `/separation/`, `/separation/app/`, and `/separation/streamer/`.
+            Automated deployment of separation-tracker ${{ github.event.inputs.version }} to `/separation/` and `/separation/app/`.
           commit-message: "deploy separation-tracker ${{ github.event.inputs.version }}"

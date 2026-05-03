@@ -1,0 +1,21 @@
+export type StepStatus = 'pending' | 'completed' | 'aborted';
+
+export type Step = {
+  id: string;
+  durationSeconds: number;
+  status: StepStatus;
+};
+
+export type SessionStatus = 'pending' | 'completed' | 'aborted';
+
+export type Session = {
+  id: string;
+  date: string;
+  steps: Step[];
+  totalDurationSeconds: number;
+  anxietyScore?: 0 | 1 | 2;
+  exercisedLevel?: 0 | 1 | 2 | 3 | 4 | 5;
+  anyoneHome?: string;
+  notes?: string;
+  status: SessionStatus;
+};

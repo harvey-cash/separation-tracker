@@ -1,0 +1,153 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+
+import { createBravePawsServer } from '../src/server.ts';
+import { type BravePawsServerConfig } from '../src/config.ts';
+
+async function listen(server: http.Server, host = '127.0.0.1') {
+  await new Promise<void>((resolve) => server.listen(0, host, resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Could not determine server address');
+  }
+  return `http://${host}:${address.port}`;
+}
+
+async function close(server: http.Server) {
+  await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+}
+
+async function withFixtureServer(run: (context: { baseUrl: string; config: BravePawsServerConfig }) => Promise<void>) {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-server-'));
+  const landingDir = path.join(tempDir, 'landing');
+  const appDir = path.join(tempDir, 'app');
+  const dataDir = path.join(tempDir, 'data');
+  await fs.mkdir(landingDir, { recursive: true });
+  await fs.mkdir(appDir, { recursive: true });
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.writeFile(path.join(landingDir, 'index.html'), '<html><body>landing</body></html>');
+  await fs.writeFile(path.join(appDir, 'index.html'), '<html><body>app</body></html>');
+  await fs.writeFile(path.join(appDir, 'asset.js'), 'console.log("ok")');
+
+  const upstream = http.createServer((request, response) => {
+    response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+    response.end(`camera:${request.url}`);
+  });
+  const upstreamBaseUrl = await listen(upstream);
+
+  const config: BravePawsServerConfig = {
+    host: '127.0.0.1',
+    port: 0,
+    publicBaseUrl: null,
+    landingBasePath: '/separation/',
+    appBasePath: '/separation/app/',
+    apiBasePath: '/separation/api/',
+    cameraBasePath: '/separation/camera/',
+    healthPath: '/separation/api/health',
+    landingDistDir: landingDir,
+    appDistDir: appDir,
+    dataDir,
+    dataFilePath: path.join(dataDir, 'sessions.json'),
+    cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
+    authToken: null,
+  };
+
+  const server = createBravePawsServer(config);
+  const baseUrl = await listen(server);
+
+  try {
+    await run({ baseUrl, config });
+  } finally {
+    await close(server);
+    await close(upstream);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+test('health endpoint reports session metadata', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/health`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as { status: string; sessionCount: number };
+    assert.equal(body.status, 'ok');
+    assert.equal(body.sessionCount, 0);
+  });
+});
+
+test('sync push and pull round-trip sessions to disk', async () => {
+  await withFixtureServer(async ({ baseUrl, config }) => {
+    const sessions = [{
+      id: 'session-1',
+      date: '2026-05-03T11:00:00.000Z',
+      steps: [{ id: 'step-1', durationSeconds: 30, status: 'completed' }],
+      totalDurationSeconds: 30,
+      status: 'completed',
+    }];
+
+    const pushResponse = await fetch(`${baseUrl}/separation/api/sync/push`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessions }),
+    });
+    assert.equal(pushResponse.status, 200);
+
+    const pullResponse = await fetch(`${baseUrl}/separation/api/sync/pull`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
+    const payload = await pullResponse.json() as { sessions: Array<{ id: string }> };
+    assert.equal(payload.sessions.length, 1);
+    assert.equal(payload.sessions[0]?.id, 'session-1');
+
+    const stored = JSON.parse(await fs.readFile(config.dataFilePath, 'utf8')) as { sessions: Array<{ id: string }> };
+    assert.equal(stored.sessions[0]?.id, 'session-1');
+  });
+});
+
+test('session CRUD endpoints expose individual sessions', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const session = {
+      id: 'session-2',
+      date: '2026-05-03T11:30:00.000Z',
+      steps: [{ id: 'step-1', durationSeconds: 45, status: 'pending' }],
+      totalDurationSeconds: 0,
+      status: 'pending',
+    };
+
+    const createResponse = await fetch(`${baseUrl}/separation/api/sessions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(session),
+    });
+    assert.equal(createResponse.status, 201);
+
+    const getResponse = await fetch(`${baseUrl}/separation/api/sessions/session-2`);
+    assert.equal(getResponse.status, 200);
+    const fetched = await getResponse.json() as { id: string };
+    assert.equal(fetched.id, 'session-2');
+  });
+});
+
+test('camera proxy forwards requests to the configured upstream', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/camera/live.stream/index.m3u8`);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'camera:/live.stream/index.m3u8');
+  });
+});
+
+test('serves landing and app static files from the configured paths', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const landingResponse = await fetch(`${baseUrl}/separation/`);
+    assert.equal(landingResponse.status, 200);
+    assert.match(await landingResponse.text(), /landing/);
+
+    const appResponse = await fetch(`${baseUrl}/separation/app/`);
+    assert.equal(appResponse.status, 200);
+    assert.match(await appResponse.text(), /app/);
+  });
+});

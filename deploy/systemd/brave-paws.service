@@ -1,0 +1,19 @@
+[Unit]
+Description=Brave Paws local Tailnet server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/repos/separation-tracker
+Environment=BRAVE_PAWS_HOST=127.0.0.1
+Environment=BRAVE_PAWS_PORT=4310
+Environment=BRAVE_PAWS_PUBLIC_BASE_URL=https://quantum.tail080401.ts.net
+Environment=BRAVE_PAWS_DATA_DIR=/mnt/q/home/family/Brave Paws/data
+Environment=BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL=http://127.0.0.1:18888/
+ExecStart=/usr/bin/env npm run server:start --prefix /mnt/q/repos/separation-tracker
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

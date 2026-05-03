@@ -2,15 +2,14 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - feature/*
+    tags-ignore:
+      - '**'
   pull_request:
     branches:
       - main
 
 jobs:
-  app-checks:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,17 +35,3 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run E2E tests
         run: npm run test:e2e
-
-  camera-helper-health:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Run helper health check in CI-safe mock mode
-        run: npm run camera-helper:health
-        env:
-          CAMERA_HELPER_MOCK: '1'

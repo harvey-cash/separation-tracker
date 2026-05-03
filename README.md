@@ -1,75 +1,56 @@
-# Brave Paws Workspace
+# Brave Paws Monorepo
 
-This repository contains three first-class web and desktop surfaces:
+Brave Paws is a local-first separation-anxiety training app for Harvey.
 
-1. `Brave Paws Landing` in `apps/brave-paws-landing`, the public entrypoint for `harvey.cash/separation/`.
-2. `Brave Paws App` in `apps/brave-paws-app`, the React web app for planning, running, and reviewing separation-anxiety training sessions, including aborted step and session tracking.
-3. `Brave Paws Streamer` in `apps/brave-paws-streamer`, the Windows camera-streaming companion used to pair a live dog-camera feed with the app.
+The repo now has three primary surfaces:
 
-Production hosting targets:
+1. `Brave Paws Landing` in `apps/brave-paws-landing`
+2. `Brave Paws App` in `apps/brave-paws-app`
+3. `Brave Paws Server` in `apps/brave-paws-server`
 
-- `https://harvey.cash/separation/` for the Brave Paws landing page
-- `https://harvey.cash/separation/app/` for Brave Paws App
-- `https://harvey.cash/separation/streamer/` for the hosted Brave Paws Streamer UI
+## v0.2 direction
 
-The repo is organized as an npm workspaces monorepo. Each surface keeps its own source, tests, build config, and package manifest inside its project directory. The root package only orchestrates shared install, CI, release, and convenience commands.
+Brave Paws Streamer has been retired for v0.2.
 
-## Layout
+The intended architecture is now:
 
-```text
-separation-tracker/
-├── apps/
-│   ├── brave-paws-app/
-│   │   ├── README.md
-│   │   ├── package.json
-│   │   ├── index.html
-│   │   ├── vite.config.ts
-│   │   ├── tsconfig.json
-│   │   ├── playwright.config.ts
-│   │   ├── INFO.md
-│   │   ├── .env.example
-│   │   ├── src/
-│   │   ├── tests/
-│   │   └── e2e/
-│   ├── brave-paws-landing/
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   ├── styles.css
-│   │   └── vite.config.js
-│   └── brave-paws-streamer/
-│       ├── README.md
-│       ├── package.json
-│       ├── tests/
-│       ├── windows-camera-helper/
-│       └── windows-camera-helper-ui/
-├── .github/workflows/
-├── package.json
-├── package-lock.json
-└── RELEASE.md
-```
+- landing page at `/separation/`
+- app at `/separation/app/`
+- QUANTUM-hosted API at `/separation/api/`
+- same-origin picam proxy at `/separation/camera/`
+- Tailnet-first hosting on `quantum.tail080401.ts.net`
 
-## Workspace Commands
+## Workspace commands
 
-Run these from the repo root:
+From the repo root:
 
 | Command | Description |
-|---|---|
-| `npm install` | Install workspace dependencies for all workspaces. |
-| `npm run dev` | Start the Brave Paws App dev server. |
-| `npm run landing:dev` | Start the landing page dev server. |
-| `npm test` | Run the Brave Paws App unit tests. |
-| `npm run lint` | Type-check the Brave Paws App workspace. |
-| `npm run build` | Build the landing page and Brave Paws App web artifacts. |
-| `npm run test:e2e` | Run the Brave Paws App Playwright suite. |
-| `npm run camera-helper:gui` | Start Brave Paws Streamer locally. |
-| `npm run camera-helper:health` | Run the Brave Paws Streamer health check. |
-| `npm run camera-helper:bundle` | Build `apps/brave-paws-streamer/dist/brave-paws-streamer.zip`. |
+| --- | --- |
+| `npm run dev` | Start the Brave Paws app dev server. |
+| `npm run build` | Build landing, app, and server workspaces. |
+| `npm test` | Run app and server unit tests. |
+| `npm run lint` | Type-check app and server workspaces. |
+| `npm run test:e2e` | Run app Playwright tests. |
+| `npm run server:start` | Start the compiled QUANTUM server locally. |
 
-## Project Docs
+## Workspace layout
 
-- Web app setup and feature details: [apps/brave-paws-app/README.md](apps/brave-paws-app/README.md)
-- Landing page source: [apps/brave-paws-landing/index.html](apps/brave-paws-landing/index.html)
-- Web app training-method background: [apps/brave-paws-app/INFO.md](apps/brave-paws-app/INFO.md)
-- Streamer overview and development commands: [apps/brave-paws-streamer/README.md](apps/brave-paws-streamer/README.md)
-- Streamer end-user notes and runtime details: [apps/brave-paws-streamer/windows-camera-helper/README.md](apps/brave-paws-streamer/windows-camera-helper/README.md)
-- Release and distribution guide: [RELEASE.md](RELEASE.md)
+```text
+apps/
+├── brave-paws-app/
+├── brave-paws-landing/
+└── brave-paws-server/
+```
+
+## Docs
+
+- Local Tailnet deployment: [docs/quantum-local-tailnet.md](docs/quantum-local-tailnet.md)
+- App workspace notes: [apps/brave-paws-app/README.md](apps/brave-paws-app/README.md)
+- Server workspace notes: [apps/brave-paws-server/README.md](apps/brave-paws-server/README.md)
+
+## Notes
+
+- Browser-local persistence remains first-class.
+- QUANTUM sync is the default v0.2 remote provider.
+- Google Drive remains available as a legacy provider during migration.
+- Public CD remains `main`-only; feature branches get CI without triggering deploy.
