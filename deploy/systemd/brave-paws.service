@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/repos/separation-tracker
+WorkingDirectory=/mnt/q/repos/separation-tracker
 Environment=BRAVE_PAWS_HOST=127.0.0.1
 Environment=BRAVE_PAWS_PORT=4310
 Environment=BRAVE_PAWS_PUBLIC_BASE_URL=https://quantum.tail080401.ts.net
