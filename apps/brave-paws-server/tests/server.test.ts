@@ -7,6 +7,7 @@ import path from 'node:path';
 
 import { createBravePawsServer } from '../src/server.ts';
 import { type BravePawsServerConfig } from '../src/config.ts';
+import { getSessionsCsvFilePath } from '../src/storage.ts';
 
 async function listen(server: http.Server, host = '127.0.0.1') {
   await new Promise<void>((resolve) => server.listen(0, host, resolve));
@@ -105,6 +106,11 @@ test('sync push and pull round-trip sessions to disk', async () => {
 
     const stored = JSON.parse(await fs.readFile(config.dataFilePath, 'utf8')) as { sessions: Array<{ id: string }> };
     assert.equal(stored.sessions[0]?.id, 'session-1');
+
+    const csvFilePath = getSessionsCsvFilePath(config.dataFilePath);
+    const csv = await fs.readFile(csvFilePath, 'utf8');
+    assert.match(csv, /Session Status/);
+    assert.match(csv, /2026-05-03/);
   });
 });
 
@@ -137,6 +143,38 @@ test('camera proxy forwards requests to the configured upstream', async () => {
     const response = await fetch(`${baseUrl}/separation/camera/live.stream/index.m3u8`);
     assert.equal(response.status, 200);
     assert.equal(await response.text(), 'camera:/live.stream/index.m3u8');
+  });
+});
+
+test('camera proxy normalizes directory-style stream paths without a trailing slash', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/camera/live.stream`);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'camera:/live.stream/');
+  });
+});
+
+test('imports newer CSV drops into the canonical session store on read', async () => {
+  await withFixtureServer(async ({ baseUrl, config }) => {
+    const csvFilePath = getSessionsCsvFilePath(config.dataFilePath);
+    await fs.mkdir(path.dirname(csvFilePath), { recursive: true });
+    await fs.writeFile(csvFilePath, [
+      'Date,Session Status,Total Duration (s),Max Step Duration (s),Completed Steps,Aborted Steps,Total Steps,Anxiety Score,Notes,Exercised Level,Anyone Home,Step 1 Duration (s),Step 1 Status',
+      '2026-05-02 08:00:00,completed,30,30,1,0,1,Calm,"CSV import",2,,30,completed',
+    ].join('\n'));
+
+    const response = await fetch(`${baseUrl}/separation/api/sync/pull`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
+    assert.equal(response.status, 200);
+
+    const payload = await response.json() as { sessions: Array<{ notes?: string }> };
+    assert.equal(payload.sessions.length, 1);
+    assert.equal(payload.sessions[0]?.notes, 'CSV import');
+
+    const stored = JSON.parse(await fs.readFile(config.dataFilePath, 'utf8')) as { sessions: Array<{ notes?: string }> };
+    assert.equal(stored.sessions[0]?.notes, 'CSV import');
   });
 });
 

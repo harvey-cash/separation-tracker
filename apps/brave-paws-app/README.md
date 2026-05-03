@@ -6,7 +6,7 @@
 
 Brave Paws is a local-first React + TypeScript app for planning, running, and reviewing gradual-desensitisation sessions for canine separation anxiety.
 
-Session data is still stored locally in the browser for day-to-day use. v0.2 adds provider-based sync so Harvey can use the QUANTUM backend as the default inspectable storage path while keeping Google Drive as a legacy option.
+Session data is still stored locally in the browser for day-to-day use. v0.2 hydrates from the QUANTUM backend on startup and automatically pushes session changes back to QUANTUM so Harvey gets an inspectable canonical history without extra taps.
 
 ## Key Commands
 
@@ -33,7 +33,6 @@ Copy `.env.example` to `.env.local` and set values as needed.
 | `VITE_BRAVE_PAWS_APP_URL` | No | Canonical app URL for deep links and stream QR links. |
 | `VITE_BRAVE_PAWS_API_BASE_URL` | No | API base URL, typically `/separation/api/`. |
 | `VITE_BRAVE_PAWS_DEFAULT_CAMERA_URL` | No | Default same-origin picam stream URL shown by the QUANTUM shortcut. |
-| `VITE_GOOGLE_CLIENT_ID` | No | OAuth client ID for the legacy Google Drive provider. |
 
 ## Related Docs
 

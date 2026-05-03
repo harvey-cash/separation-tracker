@@ -209,13 +209,12 @@ export function CameraLinkInput({
   };
 
   const useSuggestedCamera = () => {
-    const normalized = normalizeCameraUrlValue(suggestedCameraUrl);
-    if (!normalized) {
+    if (!isCameraUrlValid(suggestedCameraUrl)) {
       return;
     }
 
-    setManualUrl(normalized);
-    onCameraUrlChange(normalized);
+    setManualUrl(suggestedCameraUrl);
+    onCameraUrlChange(suggestedCameraUrl);
     onDone?.();
   };
 

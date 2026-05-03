@@ -24,10 +24,10 @@ It serves three things from one localhost process:
 | `BRAVE_PAWS_HOST` | `127.0.0.1` | Bind host for the local server |
 | `BRAVE_PAWS_PORT` | `4310` | Bind port for the local server |
 | `BRAVE_PAWS_PUBLIC_BASE_URL` | unset | Canonical external base URL for docs / logs |
-| `BRAVE_PAWS_DATA_DIR` | `var/brave-paws` in the repo | Session storage directory |
+| `BRAVE_PAWS_DATA_DIR` | `var/brave-paws` in the repo | Session storage directory (live QUANTUM deploy uses `/mnt/q/fermi/brave-paws/data`) |
 | `BRAVE_PAWS_AUTH_TOKEN` | unset | Optional token expected in `x-brave-paws-token` for write requests |
 | `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` | Upstream picam / MediaMTX root that gets proxied under `/separation/camera/` |
 
 ## Storage
 
-Session data is stored as pretty JSON in `sessions.json` so it stays easy to inspect and back up.
+Session data is stored as pretty JSON in `sessions.json` and mirrored to `brave_paws_sessions.csv` in the same directory so it stays easy to inspect, back up, and seed from a manual CSV drop.

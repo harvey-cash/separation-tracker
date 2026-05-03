@@ -50,7 +50,6 @@ apps/
 
 ## Notes
 
-- Browser-local persistence remains first-class.
-- QUANTUM sync is the default v0.2 remote provider.
-- Google Drive remains available as a legacy provider during migration.
+- Browser-local persistence remains first-class, with automatic QUANTUM hydration/push around it.
+- Canonical synced data now lives under `Q:/fermi/brave-paws/data` on QUANTUM.
 - Public CD remains `main`-only; feature branches get CI without triggering deploy.

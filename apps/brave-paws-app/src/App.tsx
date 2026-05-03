@@ -34,7 +34,7 @@ const DEFAULT_STEPS: Step[] = [
 ];
 
 export default function App() {
-  const { sessions, addSession, updateSession, deleteSession, replaceSessions } = useSessions();
+  const { sessions, addSession, updateSession, deleteSession, replaceSessions, upsertSessions } = useSessions();
   const [restoredActiveSessionState] = useState<ActiveSessionState | null>(() => loadActiveSessionState());
   const [currentView, setCurrentView] = useState<View>(restoredActiveSessionState ? 'active' : 'dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
@@ -147,9 +147,7 @@ export default function App() {
           }}
           storageSync={
             <StorageSync
-              providers={storageSync.providerList}
-              selectedProviderId={storageSync.selectedProviderId}
-              onSelectProvider={storageSync.setSelectedProviderId}
+              provider={storageSync.provider}
             />
           }
         />
@@ -211,7 +209,7 @@ export default function App() {
             onExportCSV={() => exportToCSV(sessions)}
             onImportCSV={(csvContent) => {
               const importedSessions = parseCSV(csvContent);
-              importedSessions.forEach(session => addSession(session));
+              upsertSessions(importedSessions);
             }}
             onViewSession={(session) => {
               setActiveSession(session);

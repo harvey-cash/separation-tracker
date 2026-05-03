@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import { generateCSVContent, parseCSV } from './csv.js';
 import type { Session } from './types.js';
 
 export type SessionStoreData = {
@@ -13,11 +14,29 @@ const EMPTY_STORE: SessionStoreData = {
   sessions: [],
 };
 
+const SESSIONS_CSV_FILENAME = 'brave_paws_sessions.csv';
+
 async function ensureParentDirectory(filePath: string) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 }
 
-export async function readSessionStore(filePath: string): Promise<SessionStoreData> {
+function getCsvFilePath(filePath: string): string {
+  return path.join(path.dirname(filePath), SESSIONS_CSV_FILENAME);
+}
+
+async function readFileStat(filePath: string) {
+  try {
+    return await fs.stat(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+async function readJsonStore(filePath: string): Promise<SessionStoreData> {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
     const parsed = JSON.parse(raw) as Partial<SessionStoreData>;
@@ -34,6 +53,42 @@ export async function readSessionStore(filePath: string): Promise<SessionStoreDa
   }
 }
 
+async function writeCsvFile(filePath: string, sessions: Session[]) {
+  const csvFilePath = getCsvFilePath(filePath);
+  await ensureParentDirectory(csvFilePath);
+  await fs.writeFile(csvFilePath, `${generateCSVContent(sessions)}\n`, 'utf8');
+}
+
+async function importCsvIfNewer(filePath: string, currentStore: SessionStoreData): Promise<SessionStoreData> {
+  const csvFilePath = getCsvFilePath(filePath);
+  const [jsonStat, csvStat] = await Promise.all([
+    readFileStat(filePath),
+    readFileStat(csvFilePath),
+  ]);
+
+  if (!csvStat) {
+    return currentStore;
+  }
+
+  const shouldImport = !jsonStat || csvStat.mtimeMs > jsonStat.mtimeMs;
+  if (!shouldImport) {
+    return currentStore;
+  }
+
+  const csvContent = await fs.readFile(csvFilePath, 'utf8');
+  const importedSessions = parseCSV(csvContent);
+  if (!importedSessions.length && currentStore.sessions.length > 0) {
+    return currentStore;
+  }
+
+  return writeSessionStore(filePath, importedSessions);
+}
+
+export async function readSessionStore(filePath: string): Promise<SessionStoreData> {
+  const jsonStore = await readJsonStore(filePath);
+  return importCsvIfNewer(filePath, jsonStore);
+}
+
 export async function writeSessionStore(filePath: string, sessions: Session[]): Promise<SessionStoreData> {
   await ensureParentDirectory(filePath);
 
@@ -42,6 +97,7 @@ export async function writeSessionStore(filePath: string, sessions: Session[]): 
     sessions,
   };
 
+  await writeCsvFile(filePath, sessions);
   await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   return payload;
 }
@@ -57,4 +113,8 @@ export async function upsertSession(filePath: string, session: Session): Promise
   }
 
   return writeSessionStore(filePath, current.sessions);
+}
+
+export function getSessionsCsvFilePath(filePath: string): string {
+  return getCsvFilePath(filePath);
 }

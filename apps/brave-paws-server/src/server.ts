@@ -4,7 +4,7 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 
 import { resolveConfig, type BravePawsServerConfig } from './config.js';
-import { readSessionStore, upsertSession, writeSessionStore } from './storage.js';
+import { getSessionsCsvFilePath, readSessionStore, upsertSession, writeSessionStore } from './storage.js';
 import type { Session } from './types.js';
 
 const JSON_HEADERS = {
@@ -177,6 +177,7 @@ async function handleApiRequest(
       apiBasePath: config.apiBasePath,
       cameraBasePath: config.cameraBasePath,
       dataFilePath: config.dataFilePath,
+      csvFilePath: getSessionsCsvFilePath(config.dataFilePath),
       sessionCount: store.sessions.length,
       updatedAt: store.updatedAt,
     });
@@ -289,6 +290,19 @@ export function createBravePawsServer(config = resolveConfig()) {
 
       if (pathname === config.cameraBasePath || pathname === config.cameraBasePath.slice(0, -1)) {
         response.writeHead(302, { location: `${config.cameraBasePath}live.stream/` });
+        response.end();
+        return;
+      }
+
+      if (
+        pathname.startsWith(config.cameraBasePath)
+        && !pathname.endsWith('/')
+        && (
+          path.posix.basename(pathname) === 'live.stream'
+          || !path.posix.basename(pathname).includes('.')
+        )
+      ) {
+        response.writeHead(302, { location: `${pathname}/${url.search}` });
         response.end();
         return;
       }

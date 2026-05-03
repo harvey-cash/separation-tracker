@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Session } from '../types';
-import { shouldUseRemoteData } from '../utils/googleDrive';
 import { getApiBaseUrl } from '../config';
+import { mergeSessionsById, serializeSessionsForComparison } from '../utils/sessionSync';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
@@ -16,8 +16,15 @@ type PullResponse = {
   updatedAt: string | null;
 };
 
+type SyncMetadata = {
+  lastSyncedSnapshot: string;
+  lastRemoteUpdatedAt: string | null;
+};
+
 const SUCCESS_MESSAGE_DURATION_MS = 3000;
+const AUTO_PUSH_DEBOUNCE_MS = 900;
 const LAST_SYNC_KEY = 'brave_paws_quantum_last_sync_ms';
+const SYNC_METADATA_KEY = 'brave_paws_quantum_sync_meta';
 
 function loadLastSync(): number {
   if (typeof localStorage === 'undefined') {
@@ -36,6 +43,44 @@ function saveLastSync(timestampMs: number) {
   localStorage.setItem(LAST_SYNC_KEY, String(timestampMs));
 }
 
+function loadSyncMetadata(): SyncMetadata {
+  if (typeof localStorage === 'undefined') {
+    return {
+      lastSyncedSnapshot: '',
+      lastRemoteUpdatedAt: null,
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(SYNC_METADATA_KEY);
+    if (!raw) {
+      return {
+        lastSyncedSnapshot: '',
+        lastRemoteUpdatedAt: null,
+      };
+    }
+
+    const parsed = JSON.parse(raw) as Partial<SyncMetadata>;
+    return {
+      lastSyncedSnapshot: typeof parsed.lastSyncedSnapshot === 'string' ? parsed.lastSyncedSnapshot : '',
+      lastRemoteUpdatedAt: typeof parsed.lastRemoteUpdatedAt === 'string' ? parsed.lastRemoteUpdatedAt : null,
+    };
+  } catch {
+    return {
+      lastSyncedSnapshot: '',
+      lastRemoteUpdatedAt: null,
+    };
+  }
+}
+
+function saveSyncMetadata(metadata: SyncMetadata) {
+  if (typeof localStorage === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem(SYNC_METADATA_KEY, JSON.stringify(metadata));
+}
+
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const detail = await response.text();
@@ -51,44 +96,47 @@ export function useQuantumSync(
 ) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [conflictData, setConflictData] = useState<QuantumConflictData | null>(null);
   const [isAvailable, setIsAvailable] = useState(true);
   const apiBaseUrl = getApiBaseUrl();
 
+  const sessionsRef = useRef(sessions);
+  const syncStatusTimeoutRef = useRef<number | null>(null);
+  const autoPushTimeoutRef = useRef<number | null>(null);
+  const initialHydrationDoneRef = useRef(false);
+  const hydrationInFlightRef = useRef(false);
+  const pushInFlightRef = useRef(false);
+  const pendingHydrationSnapshotRef = useRef<string | null>(null);
+  const pendingHydrationNeedsPushRef = useRef(false);
+
+  sessionsRef.current = sessions;
+
   useEffect(() => {
-    let cancelled = false;
+    return () => {
+      if (syncStatusTimeoutRef.current !== null) {
+        globalThis.clearTimeout(syncStatusTimeoutRef.current);
+      }
 
-    const checkHealth = async () => {
-      try {
-        const response = await fetch(`${apiBaseUrl}health`);
-        if (!response.ok) {
-          throw new Error(`QUANTUM API unavailable (${response.status})`);
-        }
-
-        if (!cancelled) {
-          setIsAvailable(true);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setIsAvailable(false);
-          setSyncError(error instanceof Error ? error.message : 'QUANTUM API unavailable');
-        }
+      if (autoPushTimeoutRef.current !== null) {
+        globalThis.clearTimeout(autoPushTimeoutRef.current);
       }
     };
+  }, []);
 
-    void checkHealth();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBaseUrl]);
-
-  const finishSuccess = useCallback(() => {
+  const finishSuccess = useCallback((syncedSessions: Session[], remoteUpdatedAt: string | null) => {
     saveLastSync(Date.now());
+    saveSyncMetadata({
+      lastSyncedSnapshot: serializeSessionsForComparison(syncedSessions),
+      lastRemoteUpdatedAt: remoteUpdatedAt,
+    });
+
+    if (syncStatusTimeoutRef.current !== null) {
+      globalThis.clearTimeout(syncStatusTimeoutRef.current);
+    }
+
     setIsAvailable(true);
     setSyncError(null);
     setSyncStatus('success');
-    globalThis.setTimeout(() => setSyncStatus('idle'), SUCCESS_MESSAGE_DURATION_MS);
+    syncStatusTimeoutRef.current = globalThis.setTimeout(() => setSyncStatus('idle'), SUCCESS_MESSAGE_DURATION_MS);
   }, []);
 
   const pushSessions = useCallback(async (nextSessions: Session[]) => {
@@ -115,76 +163,184 @@ export function useQuantumSync(
     return parseJsonResponse<PullResponse>(response);
   }, [apiBaseUrl]);
 
-  const syncNow = useCallback(async () => {
+  const pushNow = useCallback(async () => {
+    if (pushInFlightRef.current) {
+      return;
+    }
+
+    pushInFlightRef.current = true;
     setSyncStatus('syncing');
     setSyncError(null);
 
     try {
-      const remote = await pullSessions();
-      const remoteModifiedMs = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-      const lastSyncMs = loadLastSync();
-
-      if (
-        remote.sessions.length > 0
-        && shouldUseRemoteData({
-          lastSyncMs,
-          remoteModifiedMs,
-          localSessions: sessions,
-          remoteSessions: remote.sessions,
-        })
-      ) {
-        setConflictData({
-          remoteSessions: remote.sessions,
-          remoteUpdatedAt: remote.updatedAt,
-        });
-        setSyncStatus('idle');
-        return;
-      }
-
-      await pushSessions(sessions);
-      finishSuccess();
+      const nextSessions = sessionsRef.current;
+      const response = await pushSessions(nextSessions);
+      finishSuccess(nextSessions, response.updatedAt);
     } catch (error) {
       setSyncStatus('error');
       setSyncError(error instanceof Error ? error.message : 'QUANTUM sync failed');
       setIsAvailable(false);
+    } finally {
+      pushInFlightRef.current = false;
     }
-  }, [finishSuccess, pullSessions, pushSessions, sessions]);
+  }, [finishSuccess, pushSessions]);
 
-  const acceptRemote = useCallback(() => {
-    if (!conflictData) {
+  const scheduleAutoPush = useCallback((delayMs = AUTO_PUSH_DEBOUNCE_MS) => {
+    if (autoPushTimeoutRef.current !== null) {
+      globalThis.clearTimeout(autoPushTimeoutRef.current);
+    }
+
+    autoPushTimeoutRef.current = globalThis.setTimeout(() => {
+      autoPushTimeoutRef.current = null;
+      void pushNow();
+    }, delayMs);
+  }, [pushNow]);
+
+  const hydrateFromRemote = useCallback(async (reason: 'startup' | 'resume' | 'manual' = 'startup') => {
+    if (hydrationInFlightRef.current) {
       return;
     }
 
-    onReplaceSessions(conflictData.remoteSessions);
-    setConflictData(null);
-    finishSuccess();
-  }, [conflictData, finishSuccess, onReplaceSessions]);
+    hydrationInFlightRef.current = true;
 
-  const keepLocal = useCallback(async () => {
-    if (!conflictData) {
-      return;
+    if (reason !== 'resume') {
+      setSyncStatus('syncing');
     }
-
-    setSyncStatus('syncing');
     setSyncError(null);
 
     try {
-      await pushSessions(sessions);
-      setConflictData(null);
-      finishSuccess();
+      const remote = await pullSessions();
+      const localSessions = sessionsRef.current;
+      const localSnapshot = serializeSessionsForComparison(localSessions);
+      const remoteSnapshot = serializeSessionsForComparison(remote.sessions);
+      const syncMetadata = loadSyncMetadata();
+
+      let nextSessions = localSessions;
+      let needsPush = false;
+
+      if (remote.sessions.length === 0) {
+        needsPush = localSessions.length > 0;
+      } else if (localSessions.length === 0) {
+        nextSessions = remote.sessions;
+      } else if (
+        syncMetadata.lastSyncedSnapshot
+        && syncMetadata.lastSyncedSnapshot === localSnapshot
+        && remoteSnapshot !== localSnapshot
+      ) {
+        nextSessions = remote.sessions;
+      } else {
+        nextSessions = mergeSessionsById(remote.sessions, localSessions, { prefer: 'secondary' });
+        needsPush = serializeSessionsForComparison(nextSessions) !== remoteSnapshot;
+      }
+
+      const nextSnapshot = serializeSessionsForComparison(nextSessions);
+      const sessionsChanged = nextSnapshot !== localSnapshot;
+
+      setIsAvailable(true);
+
+      if (sessionsChanged) {
+        pendingHydrationSnapshotRef.current = nextSnapshot;
+        pendingHydrationNeedsPushRef.current = needsPush;
+        onReplaceSessions(nextSessions);
+
+        if (!needsPush) {
+          finishSuccess(nextSessions, remote.updatedAt);
+        }
+      } else if (needsPush) {
+        scheduleAutoPush(100);
+      } else {
+        finishSuccess(localSessions, remote.updatedAt);
+      }
     } catch (error) {
       setSyncStatus('error');
       setSyncError(error instanceof Error ? error.message : 'QUANTUM sync failed');
+      setIsAvailable(false);
+    } finally {
+      initialHydrationDoneRef.current = true;
+      hydrationInFlightRef.current = false;
     }
-  }, [conflictData, finishSuccess, pushSessions, sessions]);
+  }, [finishSuccess, onReplaceSessions, pullSessions, scheduleAutoPush]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkHealth = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}health`);
+        if (!response.ok) {
+          throw new Error(`QUANTUM API unavailable (${response.status})`);
+        }
+
+        if (!cancelled) {
+          setIsAvailable(true);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setIsAvailable(false);
+          setSyncError(error instanceof Error ? error.message : 'QUANTUM API unavailable');
+        }
+      }
+    };
+
+    void checkHealth();
+    void hydrateFromRemote('startup');
+
+    const handleResume = () => {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+
+      void hydrateFromRemote('resume');
+    };
+
+    window.addEventListener('focus', handleResume);
+    window.addEventListener('online', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleResume);
+      window.removeEventListener('online', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
+    };
+  }, [apiBaseUrl, hydrateFromRemote]);
+
+  useEffect(() => {
+    const currentSnapshot = serializeSessionsForComparison(sessions);
+    const pendingHydrationSnapshot = pendingHydrationSnapshotRef.current;
+
+    if (pendingHydrationSnapshot && pendingHydrationSnapshot === currentSnapshot) {
+      pendingHydrationSnapshotRef.current = null;
+
+      if (pendingHydrationNeedsPushRef.current) {
+        pendingHydrationNeedsPushRef.current = false;
+        scheduleAutoPush(100);
+      }
+
+      return;
+    }
+
+    if (!initialHydrationDoneRef.current) {
+      return;
+    }
+
+    scheduleAutoPush();
+  }, [scheduleAutoPush, sessions]);
 
   return {
     isAvailable,
     syncStatus,
     syncError,
-    conflictData,
-    syncNow,
-    acceptRemote,
-    keepLocal,
+    conflictData: null,
+    syncNow: () => {
+      if (loadLastSync() === 0) {
+        void hydrateFromRemote('manual');
+        return;
+      }
+
+      void pushNow();
+    },
+    acceptRemote: () => {},
+    keepLocal: () => {},
   };
 }
