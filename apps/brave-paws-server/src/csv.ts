@@ -22,11 +22,42 @@ function escapeCSVValue(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+function padDatePart(input: number): string {
+  return String(input).padStart(2, '0');
+}
+
 function formatCsvDate(value: string): string {
   const date = new Date(value);
-  const pad = (input: number) => String(input).padStart(2, '0');
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:${padDatePart(date.getSeconds())}`;
+}
 
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+function parseCsvDate(value: string): Date | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const isoCandidate = new Date(normalized);
+  if (!Number.isNaN(isoCandidate.getTime()) && (normalized.includes('T') || normalized.endsWith('Z'))) {
+    return isoCandidate;
+  }
+
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) {
+    return Number.isNaN(isoCandidate.getTime()) ? null : isoCandidate;
+  }
+
+  const [, year, month, day, hours, minutes, seconds] = match;
+  const parsed = new Date(
+    Number.parseInt(year, 10),
+    Number.parseInt(month, 10) - 1,
+    Number.parseInt(day, 10),
+    Number.parseInt(hours, 10),
+    Number.parseInt(minutes, 10),
+    Number.parseInt(seconds, 10),
+  );
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function parseCSVLine(line: string): string[] {
@@ -130,8 +161,8 @@ export function parseCSV(content: string): Session[] {
       continue;
     }
 
-    const date = new Date(getValue(columns, 'Date'));
-    if (Number.isNaN(date.getTime())) {
+    const date = parseCsvDate(getValue(columns, 'Date'));
+    if (!date) {
       continue;
     }
 

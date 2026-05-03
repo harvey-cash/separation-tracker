@@ -6,8 +6,6 @@ import path from 'node:path';
 import { resolveConfig, type BravePawsServerConfig } from './config.js';
 import {
   appendClientDiagnostic,
-  getClientDiagnosticsFilePath,
-  getSessionsCsvFilePath,
   readSessionStore,
   upsertSession,
   writeSessionStore,
@@ -434,9 +432,6 @@ async function handleApiRequest(
       apiBasePath: config.apiBasePath,
       cameraBasePath: config.cameraBasePath,
       clientDiagnosticsPath: config.clientDiagnosticsPath,
-      dataFilePath: config.dataFilePath,
-      csvFilePath: getSessionsCsvFilePath(config.dataFilePath),
-      clientDiagnosticsFilePath: getClientDiagnosticsFilePath(config.dataFilePath),
       sessionCount: store.sessions.length,
       updatedAt: store.updatedAt,
     });
@@ -491,12 +486,16 @@ async function handleApiRequest(
   }
 
   if (request.method === 'POST' && pathname === clientDiagnosticsPath) {
+    if (!isWriteAuthorized(request, config)) {
+      sendJson(response, 401, { error: 'Unauthorized' });
+      return;
+    }
+
     const payload = await readJsonBody(request);
     const record = sanitizeClientDiagnosticPayload(payload, request);
-    const diagnosticsFilePath = await appendClientDiagnostic(config.dataFilePath, record);
+    await appendClientDiagnostic(config.dataFilePath, record);
     sendJson(response, 202, {
       status: 'accepted',
-      diagnosticsFilePath,
     });
     return;
   }

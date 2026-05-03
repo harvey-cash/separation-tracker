@@ -24,6 +24,44 @@ function escapeCSVValue(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+function padDatePart(input: number): string {
+  return String(input).padStart(2, '0');
+}
+
+function formatCsvDate(value: string): string {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:${padDatePart(date.getSeconds())}`;
+}
+
+function parseCsvDate(value: string): Date | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const isoCandidate = new Date(normalized);
+  if (!Number.isNaN(isoCandidate.getTime()) && (normalized.includes('T') || normalized.endsWith('Z'))) {
+    return isoCandidate;
+  }
+
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) {
+    return Number.isNaN(isoCandidate.getTime()) ? null : isoCandidate;
+  }
+
+  const [, year, month, day, hours, minutes, seconds] = match;
+  const parsed = new Date(
+    Number.parseInt(year, 10),
+    Number.parseInt(month, 10) - 1,
+    Number.parseInt(day, 10),
+    Number.parseInt(hours, 10),
+    Number.parseInt(minutes, 10),
+    Number.parseInt(seconds, 10),
+  );
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function parseCSVLine(line: string): string[] {
   const regex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,]*))/g;
   const values: string[] = [];
@@ -87,7 +125,7 @@ export function generateCSVContent(sessions: Session[]): string {
     });
 
     return [
-      format(new Date(session.date), 'yyyy-MM-dd HH:mm:ss'),
+      formatCsvDate(session.date),
       session.status,
       session.totalDurationSeconds,
       maxDuration,
@@ -137,8 +175,8 @@ export function parseCSV(csvContent: string): Session[] {
     if (columns.length < 7) continue;
 
     const dateStr = getValue(columns, 'Date');
-    const date = new Date(dateStr);
-    if (Number.isNaN(date.getTime())) continue;
+    const date = parseCsvDate(dateStr);
+    if (!date) continue;
 
     const totalDurationSeconds = parseInt(getValue(columns, 'Total Duration (s)'), 10) || 0;
     const completedSteps = parseInt(getValue(columns, 'Completed Steps'), 10) || 0;

@@ -78,8 +78,8 @@ async function importCsvIfNewer(filePath: string, currentStore: SessionStoreData
 
   const csvContent = await fs.readFile(csvFilePath, 'utf8');
   const importedSessions = parseCSV(csvContent);
-  if (!importedSessions.length && currentStore.sessions.length > 0) {
-    return currentStore;
+  if (!importedSessions.length) {
+    return writeSessionStore(filePath, currentStore.sessions);
   }
 
   return writeSessionStore(filePath, importedSessions);
