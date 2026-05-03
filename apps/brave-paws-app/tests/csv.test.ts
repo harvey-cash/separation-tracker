@@ -193,6 +193,14 @@ test('parseCSV infers aborted steps from aborted count when step status columns 
   assert.deepEqual(restored.steps.map((step) => step.status), ['completed', 'aborted', 'pending']);
 });
 
+test('parseCSV generates stable imported ids for repeatable CSV hydration', () => {
+  const csv = generateCSVContent([SESSION]);
+  const [first] = parseCSV(csv);
+  const [second] = parseCSV(csv);
+
+  assert.equal(first.id, second.id);
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Returns columns from the first data row of a CSV string. */

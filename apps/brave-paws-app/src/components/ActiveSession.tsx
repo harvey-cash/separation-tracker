@@ -6,6 +6,7 @@ import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
 import { CameraLinkInput } from './CameraLinkInput';
 import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTimer } from '../utils/timer';
 import { ActiveSessionState } from '../utils/activeSessionStorage';
+import { reportClientDiagnostic } from '../utils/clientDiagnostics';
 
 const PREVIEW_LOAD_TIMEOUT_MS = 12000;
 
@@ -59,6 +60,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a stream URL or use the QUANTUM picam shortcut to start the live preview.');
   const [isPreviewConnected, setIsPreviewConnected] = useState(() => isCameraUrlValid(cameraUrl));
   const [isPreviewMinimized, setIsPreviewMinimized] = useState(false);
+  const lastLoggedPreviewStatusRef = useRef<string | null>(null);
   const sessionRef = useRef(session);
   const sessionClockRef = useRef(sessionClock);
   const currentStepIndexRef = useRef(currentStepIndex);
@@ -285,7 +287,34 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     };
   }, [activePreviewUrl, previewReloadToken]);
 
+  useEffect(() => {
+    if (!activePreviewUrl || previewStatus !== 'degraded') {
+      if (previewStatus === 'live' || previewStatus === 'loading' || previewStatus === 'idle') {
+        lastLoggedPreviewStatusRef.current = null;
+      }
+      return;
+    }
+
+    const fingerprint = `camera-preview:${previewStatus}:${activePreviewUrl}`;
+    if (lastLoggedPreviewStatusRef.current === fingerprint) {
+      return;
+    }
+
+    lastLoggedPreviewStatusRef.current = fingerprint;
+    reportClientDiagnostic({
+      category: 'camera_preview_issue',
+      severity: 'warn',
+      message: previewStatusMessage,
+      fingerprint,
+      details: {
+        previewStatus,
+        previewUrl: activePreviewUrl,
+      },
+    });
+  }, [activePreviewUrl, previewStatus, previewStatusMessage]);
+
   const handlePreviewLoad = useCallback(() => {
+    lastLoggedPreviewStatusRef.current = null;
     setPreviewStatus('live');
     setPreviewStatusMessage('Remote preview connected.');
   }, []);

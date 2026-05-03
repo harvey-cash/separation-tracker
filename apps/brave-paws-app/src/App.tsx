@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSessions } from './store';
 import { Session, Step } from './types';
 import { Dashboard } from './components/Dashboard';
@@ -13,6 +13,7 @@ import { StorageSync } from './components/StorageSync';
 import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
+import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
 import {
   ActiveSessionState,
   clearActiveSessionState,
@@ -34,7 +35,7 @@ const DEFAULT_STEPS: Step[] = [
 ];
 
 export default function App() {
-  const { sessions, addSession, updateSession, deleteSession, replaceSessions } = useSessions();
+  const { sessions, addSession, updateSession, deleteSession, replaceSessions, upsertSessions } = useSessions();
   const [restoredActiveSessionState] = useState<ActiveSessionState | null>(() => loadActiveSessionState());
   const [currentView, setCurrentView] = useState<View>(restoredActiveSessionState ? 'active' : 'dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
@@ -43,6 +44,8 @@ export default function App() {
   const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
 
   useEffect(() => {
+    installGlobalClientDiagnostics();
+
     const pairedCameraUrl = getCameraUrlFromSearch(window.location.search);
     if (!pairedCameraUrl) {
       return;
@@ -71,9 +74,9 @@ export default function App() {
     clearActiveSessionState();
   }, [activeSessionState]);
 
-  const handleImportSessions = (imported: Session[]) => {
+  const handleImportSessions = useCallback((imported: Session[]) => {
     replaceSessions(imported);
-  };
+  }, [replaceSessions]);
 
   const storageSync = useStorageSync(sessions, handleImportSessions);
 
@@ -147,9 +150,7 @@ export default function App() {
           }}
           storageSync={
             <StorageSync
-              providers={storageSync.providerList}
-              selectedProviderId={storageSync.selectedProviderId}
-              onSelectProvider={storageSync.setSelectedProviderId}
+              provider={storageSync.provider}
             />
           }
         />
@@ -211,7 +212,7 @@ export default function App() {
             onExportCSV={() => exportToCSV(sessions)}
             onImportCSV={(csvContent) => {
               const importedSessions = parseCSV(csvContent);
-              importedSessions.forEach(session => addSession(session));
+              upsertSessions(importedSessions);
             }}
             onViewSession={(session) => {
               setActiveSession(session);

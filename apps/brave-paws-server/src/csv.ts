@@ -1,7 +1,5 @@
-import { Session, SessionStatus, Step, StepStatus } from '../types';
-import { format } from 'date-fns';
-import { buildImportedSessionId } from './sessionIdentity';
-import { getAbortedStepCount, getCompletedStepCount } from './sessionStatus';
+import type { Session, SessionStatus, Step, StepStatus } from './types.js';
+import { buildImportedSessionId } from './sessionIdentity.js';
 
 const STEP_COLUMN_COUNT = 10;
 const HEADERS = [
@@ -16,8 +14,8 @@ const HEADERS = [
   'Notes',
   'Exercised Level',
   'Anyone Home',
-  ...Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => `Step ${i + 1} Duration (s)`),
-  ...Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => `Step ${i + 1} Status`),
+  ...Array.from({ length: STEP_COLUMN_COUNT }, (_, index) => `Step ${index + 1} Duration (s)`),
+  ...Array.from({ length: STEP_COLUMN_COUNT }, (_, index) => `Step ${index + 1} Status`),
 ];
 
 function escapeCSVValue(value: string): string {
@@ -65,7 +63,7 @@ function parseCsvDate(value: string): Date | null {
 function parseCSVLine(line: string): string[] {
   const regex = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,]*))/g;
   const values: string[] = [];
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = regex.exec(line)) !== null) {
     values.push(match[1] !== undefined ? match[1].replace(/""/g, '"') : match[2]);
@@ -82,12 +80,12 @@ function parseStatusValue<TStatus extends StepStatus | SessionStatus>(value: str
   return fallback;
 }
 
-function parseSessionStatus(value: string | undefined, fallback: SessionStatus): SessionStatus {
-  return parseStatusValue(value, fallback);
+function getCompletedStepCount(steps: Step[]): number {
+  return steps.filter((step) => step.status === 'completed').length;
 }
 
-function parseStepStatus(value: string | undefined, fallback: StepStatus): StepStatus {
-  return parseStatusValue(value, fallback);
+function getAbortedStepCount(steps: Step[]): number {
+  return steps.filter((step) => step.status === 'aborted').length;
 }
 
 function getAnxietyScoreLabel(score?: Session['anxietyScore']): string {
@@ -109,20 +107,17 @@ export function generateCSVContent(sessions: Session[]): string {
   const rows = sessions.map((session) => {
     const completedSteps = getCompletedStepCount(session.steps);
     const abortedSteps = getAbortedStepCount(session.steps);
-    const score = getAnxietyScoreLabel(session.anxietyScore);
     const notes = session.notes ? escapeCSVValue(session.notes) : '';
     const exercisedLevel = session.exercisedLevel ?? '';
     const anyoneHome = session.anyoneHome ? escapeCSVValue(session.anyoneHome) : '';
-
     const maxDuration = session.steps.length > 0 ? Math.max(...session.steps.map((step) => step.durationSeconds)) : 0;
 
-    const stepDurations = Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => {
-      return i < session.steps.length ? session.steps[i].durationSeconds : '';
-    });
-
-    const stepStatuses = Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => {
-      return i < session.steps.length ? session.steps[i].status : '';
-    });
+    const stepDurations = Array.from({ length: STEP_COLUMN_COUNT }, (_, index) => (
+      index < session.steps.length ? session.steps[index].durationSeconds : ''
+    ));
+    const stepStatuses = Array.from({ length: STEP_COLUMN_COUNT }, (_, index) => (
+      index < session.steps.length ? session.steps[index].status : ''
+    ));
 
     return [
       formatCsvDate(session.date),
@@ -132,7 +127,7 @@ export function generateCSVContent(sessions: Session[]): string {
       completedSteps,
       abortedSteps,
       session.steps.length,
-      score,
+      getAnxietyScoreLabel(session.anxietyScore),
       notes,
       exercisedLevel,
       anyoneHome,
@@ -144,21 +139,11 @@ export function generateCSVContent(sessions: Session[]): string {
   return [HEADERS.join(','), ...rows].join('\n');
 }
 
-export function exportToCSV(sessions: Session[]) {
-  const csvContent = generateCSVContent(sessions);
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', `csa_sessions_${format(new Date(), 'yyyyMMdd')}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-export function parseCSV(csvContent: string): Session[] {
-  const lines = csvContent.split('\n').filter((line) => line.trim() !== '');
-  if (lines.length <= 1) return [];
+export function parseCSV(content: string): Session[] {
+  const lines = content.split('\n').filter((line) => line.trim() !== '');
+  if (lines.length <= 1) {
+    return [];
+  }
 
   const headers = parseCSVLine(lines[0]);
   const getIndex = (header: string) => headers.indexOf(header);
@@ -170,48 +155,49 @@ export function parseCSV(csvContent: string): Session[] {
   const sessions: Session[] = [];
   const occurrenceByFingerprint = new Map<string, number>();
 
-  for (let i = 1; i < lines.length; i++) {
-    const columns = parseCSVLine(lines[i]);
-    if (columns.length < 7) continue;
+  for (let lineIndex = 1; lineIndex < lines.length; lineIndex += 1) {
+    const columns = parseCSVLine(lines[lineIndex]);
+    if (columns.length < 7) {
+      continue;
+    }
 
-    const dateStr = getValue(columns, 'Date');
-    const date = parseCsvDate(dateStr);
-    if (!date) continue;
+    const date = parseCsvDate(getValue(columns, 'Date'));
+    if (!date) {
+      continue;
+    }
 
-    const totalDurationSeconds = parseInt(getValue(columns, 'Total Duration (s)'), 10) || 0;
-    const completedSteps = parseInt(getValue(columns, 'Completed Steps'), 10) || 0;
-    const abortedSteps = parseInt(getValue(columns, 'Aborted Steps'), 10) || 0;
-    const declaredTotalSteps = parseInt(getValue(columns, 'Total Steps'), 10) || 0;
-
+    const totalDurationSeconds = Number.parseInt(getValue(columns, 'Total Duration (s)'), 10) || 0;
+    const completedSteps = Number.parseInt(getValue(columns, 'Completed Steps'), 10) || 0;
+    const abortedSteps = Number.parseInt(getValue(columns, 'Aborted Steps'), 10) || 0;
+    const declaredTotalSteps = Number.parseInt(getValue(columns, 'Total Steps'), 10) || 0;
     const detectedTotalSteps = detectTotalSteps(columns, getValue);
-
     const totalSteps = declaredTotalSteps || detectedTotalSteps || 1;
 
-    let anxietyScore: 0 | 1 | 2 | undefined = undefined;
-    const scoreStr = getValue(columns, 'Anxiety Score');
-    if (scoreStr === 'Calm') anxietyScore = 0;
-    else if (scoreStr === 'Coping') anxietyScore = 1;
-    else if (scoreStr === 'Panicking') anxietyScore = 2;
+    let anxietyScore: 0 | 1 | 2 | undefined;
+    const score = getValue(columns, 'Anxiety Score');
+    if (score === 'Calm') anxietyScore = 0;
+    else if (score === 'Coping') anxietyScore = 1;
+    else if (score === 'Panicking') anxietyScore = 2;
 
-    let exercisedLevel: 0 | 1 | 2 | 3 | 4 | 5 | undefined = undefined;
-    const parsedExerciseLevel = parseInt(getValue(columns, 'Exercised Level'), 10);
+    let exercisedLevel: 0 | 1 | 2 | 3 | 4 | 5 | undefined;
+    const parsedExerciseLevel = Number.parseInt(getValue(columns, 'Exercised Level'), 10);
     if (!Number.isNaN(parsedExerciseLevel) && parsedExerciseLevel >= 0 && parsedExerciseLevel <= 5) {
       exercisedLevel = parsedExerciseLevel as 0 | 1 | 2 | 3 | 4 | 5;
     }
 
     const steps: Step[] = [];
 
-    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex++) {
+    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex += 1) {
       const durationStr = getValue(columns, `Step ${stepIndex + 1} Duration (s)`);
-      const durationSeconds = parseInt(durationStr, 10);
+      const durationSeconds = Number.parseInt(durationStr, 10);
       const isCompletedStep = stepIndex < completedSteps;
       const isAbortedStep = !isCompletedStep && stepIndex < completedSteps + abortedSteps;
       const inferredStatus: StepStatus = isCompletedStep ? 'completed' : isAbortedStep ? 'aborted' : 'pending';
 
       steps.push({
-        id: crypto.randomUUID(),
+        id: `step-${stepIndex + 1}`,
         durationSeconds: Number.isNaN(durationSeconds) ? 0 : durationSeconds,
-        status: parseStepStatus(getValue(columns, `Step ${stepIndex + 1} Status`), inferredStatus),
+        status: parseStatusValue(getValue(columns, `Step ${stepIndex + 1} Status`), inferredStatus),
       });
     }
 
@@ -223,7 +209,7 @@ export function parseCSV(csvContent: string): Session[] {
       exercisedLevel,
       anyoneHome: getValue(columns, 'Anyone Home'),
       notes: getValue(columns, 'Notes'),
-      status: parseSessionStatus(getValue(columns, 'Session Status'), 'completed'),
+      status: parseStatusValue(getValue(columns, 'Session Status'), 'completed' as SessionStatus),
     };
 
     const fingerprint = JSON.stringify({

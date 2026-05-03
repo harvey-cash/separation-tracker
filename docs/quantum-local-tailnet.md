@@ -35,15 +35,18 @@ Default bind:
 | Variable | Example |
 | --- | --- |
 | `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://quantum.tail080401.ts.net` |
-| `BRAVE_PAWS_DATA_DIR` | `/mnt/q/home/family/Brave Paws/data` |
+| `BRAVE_PAWS_DATA_DIR` | `/mnt/q/fermi/brave-paws/data` |
 | `BRAVE_PAWS_AUTH_TOKEN` | `replace-with-shared-secret-if-needed` |
 | `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` |
 
 ## Session storage
 
-Session data is stored in a human-inspectable JSON file:
+QUANTUM keeps a canonical JSON store plus a mirrored CSV export in the same data folder:
 
 - `${BRAVE_PAWS_DATA_DIR}/sessions.json`
+- `${BRAVE_PAWS_DATA_DIR}/brave_paws_sessions.csv`
+
+If Harvey drops a fresher `brave_paws_sessions.csv` into the data folder, the server ingests it on the next read and rewrites the canonical JSON store.
 
 ## API surface
 
@@ -65,5 +68,5 @@ Session data is stored in a human-inspectable JSON file:
 
 ## Notes
 
-- The camera path is a same-origin proxy in front of picam / MediaMTX, so the app can consume the stream over HTTPS without the retired streamer helper.
-- Local browser persistence still exists in the app; QUANTUM sync adds inspectable server-side storage instead of replacing the local-first UX.
+- The camera path is a same-origin proxy in front of picam / MediaMTX, and directory-style preview URLs such as `/separation/camera/live.stream` are redirected to the working trailing-slash preview page automatically.
+- Local browser persistence still exists in the app; QUANTUM hydrates on open and automatically pushes changes back to the inspectable QUANTUM data folder.
