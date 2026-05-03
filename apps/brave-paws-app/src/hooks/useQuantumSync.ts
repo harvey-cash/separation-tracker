@@ -85,6 +85,8 @@ export function useQuantumSync(
 
   const finishSuccess = useCallback(() => {
     saveLastSync(Date.now());
+    setIsAvailable(true);
+    setSyncError(null);
     setSyncStatus('success');
     globalThis.setTimeout(() => setSyncStatus('idle'), SUCCESS_MESSAGE_DURATION_MS);
   }, []);
