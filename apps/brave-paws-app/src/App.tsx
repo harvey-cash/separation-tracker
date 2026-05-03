@@ -13,6 +13,7 @@ import { StorageSync } from './components/StorageSync';
 import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
+import { PAIRING_TOKEN_QUERY_PARAM, resolveCameraUrlFromPairingToken } from './utils/pairingToken';
 import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
 import {
   ActiveSessionState,
@@ -46,18 +47,37 @@ export default function App() {
   useEffect(() => {
     installGlobalClientDiagnostics();
 
-    const pairedCameraUrl = getCameraUrlFromSearch(window.location.search);
-    if (!pairedCameraUrl) {
-      return;
-    }
+    const clearPairingSearchParams = () => {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete('cameraUrl');
+      currentUrl.searchParams.delete('cameraProfile');
+      currentUrl.searchParams.delete('cameraMode');
+      currentUrl.searchParams.delete(PAIRING_TOKEN_QUERY_PARAM);
+      window.history.replaceState({}, document.title, currentUrl.toString());
+    };
 
-    setCameraUrl((currentUrl) => (currentUrl === pairedCameraUrl ? currentUrl : pairedCameraUrl));
+    const applyPairingFromLocation = async () => {
+      const pairedCameraUrl = getCameraUrlFromSearch(window.location.search);
+      if (pairedCameraUrl) {
+        setCameraUrl((currentUrl) => (currentUrl === pairedCameraUrl ? currentUrl : pairedCameraUrl));
+        clearPairingSearchParams();
+        return;
+      }
 
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.delete('cameraUrl');
-    currentUrl.searchParams.delete('cameraProfile');
-    currentUrl.searchParams.delete('cameraMode');
-    window.history.replaceState({}, document.title, currentUrl.toString());
+      try {
+        const tokenPairedCameraUrl = await resolveCameraUrlFromPairingToken(window.location.search);
+        if (!tokenPairedCameraUrl) {
+          return;
+        }
+
+        setCameraUrl((currentUrl) => (currentUrl === tokenPairedCameraUrl ? currentUrl : tokenPairedCameraUrl));
+        clearPairingSearchParams();
+      } catch (error) {
+        console.error('Failed to resolve pairing token', error);
+      }
+    };
+
+    void applyPairingFromLocation();
   }, []);
 
   // Keep cameraUrl in sync with local storage

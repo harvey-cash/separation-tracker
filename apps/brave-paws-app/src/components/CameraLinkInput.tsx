@@ -329,7 +329,7 @@ export function CameraLinkInput({
             </>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-              Live QR scanning is not available in this browser yet. Use manual entry or the QUANTUM picam shortcut instead.
+              Live QR scanning is not available in this browser yet. Use manual entry or the suggested picam link instead.
             </div>
           )}
 
@@ -367,8 +367,8 @@ export function CameraLinkInput({
           <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-2">
             <Server size={16} className="shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium">Quick start on QUANTUM</p>
-              <p className="mt-1 text-xs sm:text-sm">Use the built-in same-origin picam proxy when you want the easiest v0.2 setup.</p>
+              <p className="font-medium">Quick start on this deployment</p>
+              <p className="mt-1 text-xs sm:text-sm">Use the built-in suggested picam link when this deployment exposes a same-origin proxy.</p>
             </div>
           </div>
 
@@ -384,7 +384,7 @@ export function CameraLinkInput({
                   commitManualUrl();
                 }
               }}
-              placeholder="https://quantum.tail080401.ts.net/separation/camera/live.stream/"
+              placeholder="https://camera.example/live.stream/"
               className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-700 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition-all font-mono text-sm"
             />
             <p className={`${descriptionClass} ${isCameraUrlValid(manualUrl) ? 'text-emerald-700' : 'text-slate-500'}`}>
@@ -399,7 +399,7 @@ export function CameraLinkInput({
               className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
             >
               <Server size={16} />
-              Use QUANTUM picam
+              Use suggested picam
             </button>
             <button
               type="button"

@@ -18,8 +18,8 @@ import {
 
 test('sanitizeCameraUrl trims whitespace and preserves stream paths', () => {
   assert.equal(
-    sanitizeCameraUrl('  https://quantum.tail080401.ts.net/separation/camera/live.stream/  '),
-    'https://quantum.tail080401.ts.net/separation/camera/live.stream',
+    sanitizeCameraUrl('  https://camera.example/separation/camera/live.stream/  '),
+    'https://camera.example/separation/camera/live.stream',
   );
 });
 
@@ -93,7 +93,7 @@ test('getCameraUrlFromSearch sanitizes invalid remote profile values to the defa
 });
 
 test('getCameraUrlValidationMessage explains empty and invalid values', () => {
-  assert.match(getCameraUrlValidationMessage(''), /quantum picam shortcut/i);
+  assert.match(getCameraUrlValidationMessage(''), /suggested picam link/i);
   assert.match(getCameraUrlValidationMessage('invalid'), /stream link/i);
   assert.match(getCameraUrlValidationMessage('https://demo.example/live.stream'), /stream link looks good/i);
 });

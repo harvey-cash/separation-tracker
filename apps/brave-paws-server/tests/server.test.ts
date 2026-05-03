@@ -22,7 +22,38 @@ async function close(server: http.Server) {
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
 
-async function withFixtureServer(run: (context: { baseUrl: string; config: BravePawsServerConfig }) => Promise<void>) {
+async function requestRaw(baseUrl: string, requestPath: string) {
+  const url = new URL(baseUrl);
+
+  return new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
+    const request = http.request(
+      {
+        host: url.hostname,
+        port: url.port,
+        path: requestPath,
+        method: 'GET',
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        response.on('end', () => {
+          resolve({
+            statusCode: response.statusCode || 0,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      },
+    );
+
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+async function withFixtureServer(
+  run: (context: { baseUrl: string; config: BravePawsServerConfig }) => Promise<void>,
+  configOverrides: Partial<BravePawsServerConfig> = {},
+) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-server-'));
   const landingDir = path.join(tempDir, 'landing');
   const appDir = path.join(tempDir, 'app');
@@ -54,8 +85,11 @@ async function withFixtureServer(run: (context: { baseUrl: string; config: Brave
     appDistDir: appDir,
     dataDir,
     dataFilePath: path.join(dataDir, 'sessions.json'),
+    pairingStoreFilePath: path.join(dataDir, 'pairings.json'),
+    pairingEnabled: false,
     cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
     authToken: null,
+    ...configOverrides,
   };
 
   const server = createBravePawsServer(config);
@@ -204,7 +238,7 @@ test('client diagnostics endpoint appends sanitized frontend events to disk', as
         severity: 'error',
         message: 'Sync exploded',
         fingerprint: 'quantum-sync:error',
-        pageUrl: 'https://quantum.tail080401.ts.net:7447/separation/app/',
+        pageUrl: 'https://brave-paws.example/separation/app/',
         details: {
           stage: 'push',
           nested: {
@@ -232,7 +266,7 @@ test('client diagnostics endpoint appends sanitized frontend events to disk', as
     assert.equal(record.severity, 'error');
     assert.equal(record.message, 'Sync exploded');
     assert.equal(record.fingerprint, 'quantum-sync:error');
-    assert.equal(record.pageUrl, 'https://quantum.tail080401.ts.net:7447/separation/app/');
+    assert.equal(record.pageUrl, 'https://brave-paws.example/separation/app/');
     assert.equal(record.details.stage, 'push');
     assert.equal(record.details.nested.reason, 'timeout');
   });
@@ -269,6 +303,8 @@ test('client diagnostics endpoint requires auth when a token is configured', asy
     appDistDir: appDir,
     dataDir,
     dataFilePath: path.join(dataDir, 'sessions.json'),
+    pairingStoreFilePath: path.join(dataDir, 'pairings.json'),
+    pairingEnabled: false,
     cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
     authToken: 'secret-token',
   };
@@ -298,6 +334,161 @@ test('client diagnostics endpoint requires auth when a token is configured', asy
     await close(upstream);
     await fs.rm(tempDir, { recursive: true, force: true });
   }
+});
+
+test('pairing broker is disabled by default for public-safety', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cameraUrl: 'https://private.example/live.stream' }),
+    });
+
+    assert.equal(response.status, 404);
+  });
+});
+
+test('pairing broker requires BRAVE_PAWS_AUTH_TOKEN for HTTP pairing creation', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cameraUrl: 'https://private.example/live.stream' }),
+    });
+
+    assert.equal(response.status, 503);
+    assert.match(await response.text(), /BRAVE_PAWS_AUTH_TOKEN/);
+  }, {
+    pairingEnabled: true,
+  });
+});
+
+test('pairing broker returns 400 for malformed JSON bodies', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-brave-paws-token': 'secret-token',
+      },
+      body: '{"cameraUrl":',
+    });
+
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /Could not create pairing|JSON|Unexpected/i);
+  }, {
+    pairingEnabled: true,
+    authToken: 'secret-token',
+  });
+});
+
+test('pairing broker only returns absolute pairing URLs from BRAVE_PAWS_PUBLIC_BASE_URL', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-brave-paws-token': 'secret-token',
+        host: 'evil.example',
+        'x-forwarded-proto': 'https',
+      },
+      body: JSON.stringify({ cameraUrl: 'https://private.example/live.stream' }),
+    });
+
+    assert.equal(response.status, 201);
+    const payload = await response.json() as { pairingUrl: string | null };
+    assert.equal(payload.pairingUrl, null);
+  }, {
+    pairingEnabled: true,
+    authToken: 'secret-token',
+  });
+});
+
+test('pairing broker creates one-time pairing URLs and consumes them once', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-server-pairings-'));
+  const landingDir = path.join(tempDir, 'landing');
+  const appDir = path.join(tempDir, 'app');
+  const dataDir = path.join(tempDir, 'data');
+  await fs.mkdir(landingDir, { recursive: true });
+  await fs.mkdir(appDir, { recursive: true });
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.writeFile(path.join(landingDir, 'index.html'), '<html><body>landing</body></html>');
+  await fs.writeFile(path.join(appDir, 'index.html'), '<html><body>app</body></html>');
+
+  const upstream = http.createServer((request, response) => {
+    response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+    response.end(`camera:${request.url}`);
+  });
+  const upstreamBaseUrl = await listen(upstream);
+
+  const config: BravePawsServerConfig = {
+    host: '127.0.0.1',
+    port: 0,
+    publicBaseUrl: 'https://brave-paws.example/',
+    landingBasePath: '/separation/',
+    appBasePath: '/separation/app/',
+    apiBasePath: '/separation/api/',
+    cameraBasePath: '/separation/camera/',
+    healthPath: '/separation/api/health',
+    clientDiagnosticsPath: '/separation/api/client-diagnostics',
+    landingDistDir: landingDir,
+    appDistDir: appDir,
+    dataDir,
+    dataFilePath: path.join(dataDir, 'sessions.json'),
+    pairingStoreFilePath: path.join(dataDir, 'pairings.json'),
+    pairingEnabled: true,
+    cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
+    authToken: 'secret-token',
+  };
+
+  const server = createBravePawsServer(config);
+  const baseUrl = await listen(server);
+
+  try {
+    const created = await fetch(`${baseUrl}/separation/api/pairings`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-brave-paws-token': 'secret-token',
+      },
+      body: JSON.stringify({
+        cameraUrl: 'https://private.example/live.stream/',
+        profile: 'remote-low-latency',
+        mode: 'mse,mp4,mjpeg',
+      }),
+    });
+    assert.equal(created.status, 201);
+
+    const createdPayload = await created.json() as { token: string; pairingUrl: string; expiresAt: string | null };
+    assert.match(createdPayload.token, /^[A-Za-z0-9_-]{10,}$/);
+    assert.equal(createdPayload.pairingUrl, `https://brave-paws.example/separation/app/?pairingToken=${createdPayload.token}`);
+    assert.ok(createdPayload.expiresAt);
+
+    const consumeResponse = await fetch(`${baseUrl}/separation/api/pairings/${createdPayload.token}`);
+    assert.equal(consumeResponse.status, 200);
+    const consumePayload = await consumeResponse.json() as { cameraUrl: string; consumedAt: string | null };
+    assert.equal(consumePayload.cameraUrl, 'https://private.example/live.stream');
+    assert.ok(consumePayload.consumedAt);
+
+    const secondConsume = await fetch(`${baseUrl}/separation/api/pairings/${createdPayload.token}`);
+    assert.equal(secondConsume.status, 404);
+  } finally {
+    await close(server);
+    await close(upstream);
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('malformed pairing tokens do not trigger a server error or stack leak', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await requestRaw(baseUrl, '/separation/api/pairings/%ZZ');
+    assert.equal(response.statusCode, 404);
+    assert.match(response.body, /Pairing token not found or expired/);
+    assert.doesNotMatch(response.body, /TypeError|at createBravePawsServer/);
+  }, {
+    pairingEnabled: true,
+    authToken: 'secret-token',
+  });
 });
 
 test('serves landing and app static files from the configured paths', async () => {

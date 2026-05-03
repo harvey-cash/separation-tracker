@@ -5,6 +5,12 @@ import path from 'node:path';
 
 import { resolveConfig, type BravePawsServerConfig } from './config.js';
 import {
+  buildPairingAppUrl,
+  consumePairing,
+  createPairing,
+  PAIRING_TOKEN_QUERY_PARAM,
+} from './pairings.js';
+import {
   appendClientDiagnostic,
   readSessionStore,
   upsertSession,
@@ -112,6 +118,10 @@ function isWriteAuthorized(request: IncomingMessage, config: BravePawsServerConf
 
   const headerToken = request.headers['x-brave-paws-token'];
   return headerToken === config.authToken;
+}
+
+function getRequestOrigin(config: BravePawsServerConfig): string | null {
+  return config.publicBaseUrl;
 }
 
 function getMimeType(filePath: string): string {
@@ -432,6 +442,8 @@ async function handleApiRequest(
       apiBasePath: config.apiBasePath,
       cameraBasePath: config.cameraBasePath,
       clientDiagnosticsPath: config.clientDiagnosticsPath,
+      pairingEnabled: config.pairingEnabled,
+      pairingTokenQueryParam: PAIRING_TOKEN_QUERY_PARAM,
       sessionCount: store.sessions.length,
       updatedAt: store.updatedAt,
     });
@@ -442,6 +454,7 @@ async function handleApiRequest(
   const syncPullPath = `${config.apiBasePath}sync/pull`;
   const syncPushPath = `${config.apiBasePath}sync/push`;
   const clientDiagnosticsPath = config.clientDiagnosticsPath;
+  const pairingCollectionPath = `${config.apiBasePath}pairings`;
 
   if (request.method === 'GET' && pathname === sessionsCollectionPath) {
     const store = await readSessionStore(config.dataFilePath);
@@ -498,6 +511,84 @@ async function handleApiRequest(
       status: 'accepted',
     });
     return;
+  }
+
+  if (pathname === pairingCollectionPath) {
+    if (!config.pairingEnabled) {
+      notFound(response);
+      return;
+    }
+
+    if (request.method === 'POST') {
+      if (!config.authToken) {
+        sendJson(response, 503, {
+          error: 'Pairing creation requires BRAVE_PAWS_AUTH_TOKEN to be configured',
+        });
+        return;
+      }
+
+      if (!isWriteAuthorized(request, config)) {
+        sendJson(response, 401, { error: 'Unauthorized' });
+        return;
+      }
+
+      try {
+        const payload = await readJsonBody<{ cameraUrl?: string; profile?: string; mode?: string; ttlHours?: number }>(request);
+        const record = await createPairing(
+          config.pairingStoreFilePath,
+          {
+            cameraUrl: payload.cameraUrl || '',
+            profile:
+              payload.profile === 'local-quality' || payload.profile === 'remote-low-latency'
+                ? payload.profile
+                : undefined,
+            mode: payload.mode,
+          },
+          { ttlHours: payload.ttlHours },
+        );
+        const requestOrigin = getRequestOrigin(config);
+        const pairingUrl = requestOrigin ? buildPairingAppUrl(requestOrigin, config.appBasePath, record.token) : null;
+
+        sendJson(response, 201, {
+          token: record.token,
+          pairingUrl,
+          expiresAt: record.expiresAt,
+          profile: record.launchConfig.profile,
+          mode: record.launchConfig.mode,
+        });
+      } catch (error) {
+        sendJson(response, 400, {
+          error: error instanceof Error ? error.message : 'Could not create pairing',
+        });
+      }
+      return;
+    }
+  }
+
+  if (pathname.startsWith(`${pairingCollectionPath}/`)) {
+    if (!config.pairingEnabled) {
+      notFound(response);
+      return;
+    }
+
+    if (request.method === 'GET') {
+      const token = pathname.slice(`${pairingCollectionPath}/`.length);
+      const record = await consumePairing(config.pairingStoreFilePath, token);
+
+      if (!record) {
+        notFound(response, 'Pairing token not found or expired');
+        return;
+      }
+
+      sendJson(response, 200, {
+        cameraUrl: record.launchConfig.cameraUrl,
+        profile: record.launchConfig.profile,
+        mode: record.launchConfig.mode,
+        expiresAt: record.expiresAt,
+        consumedAt: record.consumedAt,
+      });
+      return;
+    }
   }
 
   if (pathname.startsWith(`${sessionsCollectionPath}/`)) {
@@ -607,11 +698,13 @@ export function createBravePawsServer(config = resolveConfig()) {
 
       notFound(response);
     } catch (error) {
-      sendText(
-        response,
-        500,
-        error instanceof Error ? error.stack || error.message : 'Unknown server error',
-      );
+      if (error instanceof TypeError) {
+        sendJson(response, 400, { error: 'Invalid request URL' });
+        return;
+      }
+
+      console.error('Brave Paws server request failed', error);
+      sendText(response, 500, 'Internal server error');
     }
   });
 
@@ -632,5 +725,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`API health: http://${config.host}:${config.port}${config.healthPath}`);
     console.log(`Camera proxy: http://${config.host}:${config.port}${config.cameraBasePath}live.stream/`);
     console.log(`Session store: ${config.dataFilePath}`);
+    if (config.pairingEnabled) {
+      console.log(`Pairing broker: http://${config.host}:${config.port}${config.apiBasePath}pairings`);
+      if (!config.authToken) {
+        console.warn('Pairing creation over HTTP is disabled until BRAVE_PAWS_AUTH_TOKEN is configured.');
+      }
+      if (!config.publicBaseUrl) {
+        console.warn('Pairing tokens can still be minted, but absolute pairing URLs require BRAVE_PAWS_PUBLIC_BASE_URL.');
+      }
+    }
   });
 }
