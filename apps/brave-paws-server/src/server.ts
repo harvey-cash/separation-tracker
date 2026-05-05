@@ -7,6 +7,7 @@ import { resolveConfig, type BravePawsServerConfig } from './config.js';
 import {
   createCameraStreamingController,
   getBackendCapabilities,
+  type CameraStreamingCapability,
   type CameraStreamingController,
 } from './cameraControl.js';
 import {
@@ -403,7 +404,7 @@ async function proxyCameraRequest(
       method: request.method,
       headers: {
         accept: request.headers.accept || '*/*',
-        'user-agent': request.headers['user-agent'] || 'BravePawsServer/0.3',
+        'user-agent': request.headers['user-agent'] || 'BravePawsServer/0.2.1',
       },
     });
 
@@ -755,6 +756,7 @@ export function createBravePawsServer(config = resolveConfig()) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const config = resolveConfig();
   const server = createBravePawsServer(config);
+  const startupCameraStreamingController = createCameraStreamingController(config);
 
   server.listen(config.port, config.host, () => {
     const publicHint = config.publicBaseUrl
@@ -767,9 +769,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`Capabilities: http://${config.host}:${config.port}${config.apiBasePath}capabilities`);
     console.log(`Camera proxy: http://${config.host}:${config.port}${config.cameraBasePath}live.stream/`);
     console.log(`Session store: ${config.dataFilePath}`);
-    if (config.cameraControlProvider === 'command') {
-      console.log(`Camera streaming control: ${config.cameraControlLabel}`);
-    }
+    void startupCameraStreamingController.getCapability().then((capability: CameraStreamingCapability) => {
+      if (capability.provider === 'command') {
+        if (capability.supported && capability.canSetEnabled) {
+          console.log(`Camera streaming control: ${capability.label}`);
+          if (capability.detail) {
+            console.warn(capability.detail);
+          }
+          return;
+        }
+
+        console.warn(capability.detail || 'Camera streaming command provider is configured but unavailable.');
+      }
+    }).catch((error: unknown) => {
+      console.warn('Camera streaming control startup check failed.', error);
+    });
     if (config.pairingEnabled) {
       console.log(`Pairing broker: http://${config.host}:${config.port}${config.apiBasePath}pairings`);
       if (!config.authToken) {

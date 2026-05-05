@@ -172,6 +172,64 @@ test('camera streaming capability can be toggled through the command provider', 
   }
 });
 
+test('camera command misconfiguration stays visible through the capability payload', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      provider: string;
+      supported: boolean;
+      canSetEnabled: boolean;
+      detail: string | null;
+    };
+
+    assert.equal(body.provider, 'command');
+    assert.equal(body.supported, false);
+    assert.equal(body.canSetEnabled, false);
+    assert.match(body.detail || '', /missing status, disable commands/i);
+  }, {
+    cameraControlProvider: 'command',
+    cameraControlEnableCommand: 'printf on\\n',
+  });
+});
+
+test('camera command failures return a structured capability payload without leaking command details', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-camera-control-failure-'));
+  const stateFilePath = path.join(tempDir, 'camera-state.txt');
+  await fs.writeFile(stateFilePath, 'off\n');
+
+  try {
+    await withFixtureServer(async ({ baseUrl }) => {
+      const response = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+
+      assert.equal(response.status, 200);
+      const body = await response.json() as {
+        provider: string;
+        supported: boolean;
+        enabled: boolean | null;
+        detail: string | null;
+      };
+
+      assert.equal(body.provider, 'command');
+      assert.equal(body.supported, true);
+      assert.equal(body.enabled, false);
+      assert.equal(body.detail, 'Unable to turn camera streaming on right now.');
+      assert.doesNotMatch(JSON.stringify(body), /secret-path|camera-state\.txt|totally-broken-command/);
+    }, {
+      cameraControlProvider: 'command',
+      cameraControlStatusCommand: `cat ${JSON.stringify(stateFilePath)}`,
+      cameraControlEnableCommand: 'printf "secret-path\n" >&2; totally-broken-command',
+      cameraControlDisableCommand: `printf 'off\n' > ${JSON.stringify(stateFilePath)}`,
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('sync push and pull round-trip sessions to disk', async () => {
   await withFixtureServer(async ({ baseUrl, config }) => {
     const sessions = [{ 
