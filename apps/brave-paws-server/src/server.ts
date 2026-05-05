@@ -5,6 +5,12 @@ import path from 'node:path';
 
 import { resolveConfig, type BravePawsServerConfig } from './config.js';
 import {
+  createCameraStreamingController,
+  getBackendCapabilities,
+  type CameraStreamingCapability,
+  type CameraStreamingController,
+} from './cameraControl.js';
+import {
   buildPairingAppUrl,
   consumePairing,
   createPairing,
@@ -398,7 +404,7 @@ async function proxyCameraRequest(
       method: request.method,
       headers: {
         accept: request.headers.accept || '*/*',
-        'user-agent': request.headers['user-agent'] || 'BravePawsServer/0.2',
+        'user-agent': request.headers['user-agent'] || 'BravePawsServer/0.2.1',
       },
     });
 
@@ -432,7 +438,11 @@ async function handleApiRequest(
   response: ServerResponse,
   pathname: string,
   config: BravePawsServerConfig,
+  cameraStreamingController: CameraStreamingController,
 ) {
+  const capabilitiesPath = `${config.apiBasePath}capabilities`;
+  const cameraStreamingCapabilityPath = `${capabilitiesPath}/camera-streaming`;
+
   if (pathname === config.healthPath) {
     const store = await readSessionStore(config.dataFilePath);
     sendJson(response, 200, {
@@ -442,6 +452,7 @@ async function handleApiRequest(
       apiBasePath: config.apiBasePath,
       cameraBasePath: config.cameraBasePath,
       clientDiagnosticsPath: config.clientDiagnosticsPath,
+      capabilitiesPath,
       pairingEnabled: config.pairingEnabled,
       pairingTokenQueryParam: PAIRING_TOKEN_QUERY_PARAM,
       sessionCount: store.sessions.length,
@@ -455,6 +466,35 @@ async function handleApiRequest(
   const syncPushPath = `${config.apiBasePath}sync/push`;
   const clientDiagnosticsPath = config.clientDiagnosticsPath;
   const pairingCollectionPath = `${config.apiBasePath}pairings`;
+
+  if (request.method === 'GET' && pathname === capabilitiesPath) {
+    const capabilities = await getBackendCapabilities(cameraStreamingController);
+    sendJson(response, 200, capabilities);
+    return;
+  }
+
+  if (pathname === cameraStreamingCapabilityPath) {
+    if (request.method === 'GET') {
+      sendJson(response, 200, await cameraStreamingController.getCapability());
+      return;
+    }
+
+    if (request.method === 'POST') {
+      if (!isWriteAuthorized(request, config)) {
+        sendJson(response, 401, { error: 'Unauthorized' });
+        return;
+      }
+
+      const payload = await readJsonBody<{ enabled?: boolean }>(request);
+      if (typeof payload.enabled !== 'boolean') {
+        sendJson(response, 400, { error: 'enabled boolean is required' });
+        return;
+      }
+
+      sendJson(response, 200, await cameraStreamingController.setEnabled(payload.enabled));
+      return;
+    }
+  }
 
   if (request.method === 'GET' && pathname === sessionsCollectionPath) {
     const store = await readSessionStore(config.dataFilePath);
@@ -627,6 +667,8 @@ async function handleApiRequest(
 }
 
 export function createBravePawsServer(config = resolveConfig()) {
+  const cameraStreamingController = createCameraStreamingController(config);
+
   const server = http.createServer(async (request, response) => {
     try {
       if (!request.url) {
@@ -669,7 +711,7 @@ export function createBravePawsServer(config = resolveConfig()) {
       }
 
       if (pathname.startsWith(config.apiBasePath)) {
-        await handleApiRequest(request, response, pathname, config);
+        await handleApiRequest(request, response, pathname, config, cameraStreamingController);
         return;
       }
 
@@ -714,6 +756,7 @@ export function createBravePawsServer(config = resolveConfig()) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const config = resolveConfig();
   const server = createBravePawsServer(config);
+  const startupCameraStreamingController = createCameraStreamingController(config);
 
   server.listen(config.port, config.host, () => {
     const publicHint = config.publicBaseUrl
@@ -723,8 +766,24 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(`Brave Paws server listening on http://${config.host}:${config.port}`);
     console.log(`Landing page: ${publicHint}`);
     console.log(`API health: http://${config.host}:${config.port}${config.healthPath}`);
+    console.log(`Capabilities: http://${config.host}:${config.port}${config.apiBasePath}capabilities`);
     console.log(`Camera proxy: http://${config.host}:${config.port}${config.cameraBasePath}live.stream/`);
     console.log(`Session store: ${config.dataFilePath}`);
+    void startupCameraStreamingController.getCapability().then((capability: CameraStreamingCapability) => {
+      if (capability.provider === 'command') {
+        if (capability.supported && capability.canSetEnabled) {
+          console.log(`Camera streaming control: ${capability.label}`);
+          if (capability.detail) {
+            console.warn(capability.detail);
+          }
+          return;
+        }
+
+        console.warn(capability.detail || 'Camera streaming command provider is configured but unavailable.');
+      }
+    }).catch((error: unknown) => {
+      console.warn('Camera streaming control startup check failed.', error);
+    });
     if (config.pairingEnabled) {
       console.log(`Pairing broker: http://${config.host}:${config.port}${config.apiBasePath}pairings`);
       if (!config.authToken) {

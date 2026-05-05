@@ -88,6 +88,11 @@ async function withFixtureServer(
     pairingStoreFilePath: path.join(dataDir, 'pairings.json'),
     pairingEnabled: false,
     cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
+    cameraControlProvider: 'none',
+    cameraControlLabel: 'Camera streaming',
+    cameraControlStatusCommand: null,
+    cameraControlEnableCommand: null,
+    cameraControlDisableCommand: null,
     authToken: null,
     ...configOverrides,
   };
@@ -117,9 +122,117 @@ test('health endpoint reports session metadata without leaking server file paths
   });
 });
 
+test('camera capabilities report unsupported control by default', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/capabilities`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as { cameraStreaming: { supported: boolean; canSetEnabled: boolean; enabled: boolean | null } };
+    assert.equal(body.cameraStreaming.supported, false);
+    assert.equal(body.cameraStreaming.canSetEnabled, false);
+    assert.equal(body.cameraStreaming.enabled, null);
+  });
+});
+
+test('camera streaming capability can be toggled through the command provider', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-camera-control-'));
+  const stateFilePath = path.join(tempDir, 'camera-state.txt');
+  await fs.writeFile(stateFilePath, 'off\n');
+
+  try {
+    await withFixtureServer(async ({ baseUrl }) => {
+      const before = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`);
+      assert.equal(before.status, 200);
+      assert.equal((await before.json() as { enabled: boolean | null }).enabled, false);
+
+      const enableResponse = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      assert.equal(enableResponse.status, 200);
+      assert.equal((await enableResponse.json() as { enabled: boolean | null }).enabled, true);
+      assert.equal((await fs.readFile(stateFilePath, 'utf8')).trim(), 'on');
+
+      const disableResponse = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: false }),
+      });
+      assert.equal(disableResponse.status, 200);
+      assert.equal((await disableResponse.json() as { enabled: boolean | null }).enabled, false);
+      assert.equal((await fs.readFile(stateFilePath, 'utf8')).trim(), 'off');
+    }, {
+      cameraControlProvider: 'command',
+      cameraControlStatusCommand: `cat ${JSON.stringify(stateFilePath)}`,
+      cameraControlEnableCommand: `printf 'on\n' > ${JSON.stringify(stateFilePath)}`,
+      cameraControlDisableCommand: `printf 'off\n' > ${JSON.stringify(stateFilePath)}`,
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('camera command misconfiguration stays visible through the capability payload', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      provider: string;
+      supported: boolean;
+      canSetEnabled: boolean;
+      detail: string | null;
+    };
+
+    assert.equal(body.provider, 'command');
+    assert.equal(body.supported, false);
+    assert.equal(body.canSetEnabled, false);
+    assert.match(body.detail || '', /missing status, disable commands/i);
+  }, {
+    cameraControlProvider: 'command',
+    cameraControlEnableCommand: 'printf on\\n',
+  });
+});
+
+test('camera command failures return a structured capability payload without leaking command details', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-camera-control-failure-'));
+  const stateFilePath = path.join(tempDir, 'camera-state.txt');
+  await fs.writeFile(stateFilePath, 'off\n');
+
+  try {
+    await withFixtureServer(async ({ baseUrl }) => {
+      const response = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+
+      assert.equal(response.status, 200);
+      const body = await response.json() as {
+        provider: string;
+        supported: boolean;
+        enabled: boolean | null;
+        detail: string | null;
+      };
+
+      assert.equal(body.provider, 'command');
+      assert.equal(body.supported, true);
+      assert.equal(body.enabled, false);
+      assert.equal(body.detail, 'Unable to turn camera streaming on right now.');
+      assert.doesNotMatch(JSON.stringify(body), /secret-path|camera-state\.txt|totally-broken-command/);
+    }, {
+      cameraControlProvider: 'command',
+      cameraControlStatusCommand: `cat ${JSON.stringify(stateFilePath)}`,
+      cameraControlEnableCommand: 'printf "secret-path\n" >&2; totally-broken-command',
+      cameraControlDisableCommand: `printf 'off\n' > ${JSON.stringify(stateFilePath)}`,
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('sync push and pull round-trip sessions to disk', async () => {
   await withFixtureServer(async ({ baseUrl, config }) => {
-    const sessions = [{
+    const sessions = [{ 
       id: 'session-1',
       date: '2026-05-03T11:00:00.000Z',
       steps: [{ id: 'step-1', durationSeconds: 30, status: 'completed' }],
@@ -272,6 +385,42 @@ test('client diagnostics endpoint appends sanitized frontend events to disk', as
   });
 });
 
+test('camera streaming control requires auth when a token is configured', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-camera-auth-'));
+  const stateFilePath = path.join(tempDir, 'camera-state.txt');
+  await fs.writeFile(stateFilePath, 'off\n');
+
+  try {
+    await withFixtureServer(async ({ baseUrl }) => {
+      const unauthorized = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      });
+      assert.equal(unauthorized.status, 401);
+
+      const authorized = await fetch(`${baseUrl}/separation/api/capabilities/camera-streaming`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-brave-paws-token': 'secret-token',
+        },
+        body: JSON.stringify({ enabled: true }),
+      });
+      assert.equal(authorized.status, 200);
+      assert.equal((await authorized.json() as { enabled: boolean | null }).enabled, true);
+    }, {
+      authToken: 'secret-token',
+      cameraControlProvider: 'command',
+      cameraControlStatusCommand: `cat ${JSON.stringify(stateFilePath)}`,
+      cameraControlEnableCommand: `printf 'on\n' > ${JSON.stringify(stateFilePath)}`,
+      cameraControlDisableCommand: `printf 'off\n' > ${JSON.stringify(stateFilePath)}`,
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('client diagnostics endpoint requires auth when a token is configured', async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-server-auth-'));
   const landingDir = path.join(tempDir, 'landing');
@@ -306,6 +455,11 @@ test('client diagnostics endpoint requires auth when a token is configured', asy
     pairingStoreFilePath: path.join(dataDir, 'pairings.json'),
     pairingEnabled: false,
     cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
+    cameraControlProvider: 'none',
+    cameraControlLabel: 'Camera streaming',
+    cameraControlStatusCommand: null,
+    cameraControlEnableCommand: null,
+    cameraControlDisableCommand: null,
     authToken: 'secret-token',
   };
 

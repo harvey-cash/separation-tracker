@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSessions } from './store';
 import { Session, Step } from './types';
 import { Dashboard } from './components/Dashboard';
@@ -9,7 +9,9 @@ import { GraphView } from './components/GraphView';
 import { HistoryList } from './components/HistoryList';
 import { SessionView } from './components/SessionView';
 import { InfoView } from './components/InfoView';
+import { CameraStreamingControl } from './components/CameraStreamingControl';
 import { StorageSync } from './components/StorageSync';
+import { useCameraStreamingControl } from './hooks/useCameraStreamingControl';
 import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
@@ -43,6 +45,9 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<Session | null>(restoredActiveSessionState?.session ?? null);
   const [activeSessionState, setActiveSessionState] = useState<ActiveSessionState | null>(restoredActiveSessionState);
   const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
+  const cameraStreamingControl = useCameraStreamingControl();
+  const wasTrainingActiveRef = useRef(false);
+  const pendingSessionCameraStateRef = useRef<boolean | null>(restoredActiveSessionState ? true : null);
 
   useEffect(() => {
     installGlobalClientDiagnostics();
@@ -99,6 +104,35 @@ export default function App() {
   }, [replaceSessions]);
 
   const storageSync = useStorageSync(sessions, handleImportSessions);
+
+  useEffect(() => {
+    const isTrainingActive = currentView === 'active' && Boolean(activeSession);
+
+    if (isTrainingActive && !wasTrainingActiveRef.current) {
+      pendingSessionCameraStateRef.current = true;
+    }
+
+    if (!isTrainingActive && wasTrainingActiveRef.current) {
+      pendingSessionCameraStateRef.current = false;
+    }
+
+    wasTrainingActiveRef.current = isTrainingActive;
+  }, [activeSession, currentView]);
+
+  useEffect(() => {
+    const pendingState = pendingSessionCameraStateRef.current;
+    if (pendingState == null || !cameraStreamingControl.capability.canSetEnabled) {
+      return;
+    }
+
+    void cameraStreamingControl.setEnabled(pendingState, { silent: true }).then(() => {
+      if (pendingSessionCameraStateRef.current === pendingState) {
+        pendingSessionCameraStateRef.current = null;
+      }
+    }).catch(() => {
+      // Camera control is best-effort; leave the pending state so a later refresh can retry.
+    });
+  }, [cameraStreamingControl.capability.canSetEnabled, cameraStreamingControl.setEnabled]);
 
   const handleStartNew = () => {
     let initialSteps = DEFAULT_STEPS;
@@ -168,6 +202,7 @@ export default function App() {
             setPreviousView('dashboard');
             setCurrentView('session-view');
           }}
+          cameraStreamingControl={<CameraStreamingControl control={cameraStreamingControl} />}
           storageSync={
             <StorageSync
               provider={storageSync.provider}
