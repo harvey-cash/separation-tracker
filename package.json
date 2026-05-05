@@ -1,7 +1,7 @@
 {
   "name": "separation-tracker",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.2.1",
   "type": "module",
   "workspaces": [
     "apps/brave-paws-landing",
@@ -31,6 +31,7 @@
     "server:build": "npm run build --workspace brave-paws-server",
     "server:lint": "npm run lint --workspace brave-paws-server",
     "server:start": "npm run start --workspace brave-paws-server",
+    "server:create-pairing": "npm run create-pairing --workspace brave-paws-server --",
     "server:test": "npm run test --workspace brave-paws-server",
     "server:clean": "npm run clean --workspace brave-paws-server"
   }

@@ -43,6 +43,8 @@ export type BravePawsServerConfig = {
   appDistDir: string;
   dataDir: string;
   dataFilePath: string;
+  pairingStoreFilePath: string;
+  pairingEnabled: boolean;
   cameraUpstreamBaseUrl: string;
   cameraControlProvider: 'none' | 'command';
   cameraControlLabel: string;
@@ -73,6 +75,8 @@ export function resolveConfig(env = process.env): BravePawsServerConfig {
     appDistDir: path.resolve(env.BRAVE_PAWS_APP_DIST_DIR || path.join(repoRoot, 'apps', 'brave-paws-app', 'dist')),
     dataDir,
     dataFilePath: path.join(dataDir, 'sessions.json'),
+    pairingStoreFilePath: path.resolve(env.BRAVE_PAWS_PAIRING_STORE_FILE || path.join(dataDir, 'pairings.json')),
+    pairingEnabled: env.BRAVE_PAWS_ENABLE_PAIRING === 'true',
     cameraUpstreamBaseUrl: (env.BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL || 'http://127.0.0.1:18888/').replace(/\/?$/, '/'),
     cameraControlProvider: env.BRAVE_PAWS_CAMERA_CONTROL_PROVIDER === 'command' ? 'command' : 'none',
     cameraControlLabel: env.BRAVE_PAWS_CAMERA_CONTROL_LABEL || 'Camera streaming',

@@ -57,7 +57,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   });
   const [previewReloadToken, setPreviewReloadToken] = useState(0);
   const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'live' | 'degraded' | 'disconnected'>('idle');
-  const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a stream URL or use the QUANTUM picam shortcut to start the live preview.');
+  const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a stream URL, open a one-time pairing link, or use the suggested picam link to start the live preview.');
   const [isPreviewConnected, setIsPreviewConnected] = useState(() => isCameraUrlValid(cameraUrl));
   const [isPreviewMinimized, setIsPreviewMinimized] = useState(false);
   const lastLoggedPreviewStatusRef = useRef<string | null>(null);
@@ -255,7 +255,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   useEffect(() => {
     if (!hasValidCameraUrl) {
       setPreviewStatus('idle');
-      setPreviewStatusMessage('Paste a stream URL or use the QUANTUM picam shortcut to start the live preview.');
+      setPreviewStatusMessage('Paste a stream URL, open a one-time pairing link, or use the suggested picam link to start the live preview.');
       return;
     }
 

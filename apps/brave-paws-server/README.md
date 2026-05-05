@@ -1,6 +1,6 @@
 # Brave Paws Server
 
-Brave Paws Server is the local-first QUANTUM backend for Brave Paws v0.3.
+Brave Paws Server is the local-first backend for Brave Paws v0.2.1.
 
 It serves three things from one localhost process:
 
@@ -15,6 +15,7 @@ It serves three things from one localhost process:
 | `npm run dev` | Run the server in watch mode. |
 | `npm run build` | Compile the TypeScript server to `dist/`. |
 | `npm run start` | Start the compiled server. |
+| `npm run create-pairing -- --camera-url https://camera.example/live.stream` | Mint a one-time pairing URL when the pairing broker is enabled. |
 | `npm test` | Run the server test suite. |
 
 ## Environment
@@ -23,10 +24,12 @@ It serves three things from one localhost process:
 | --- | --- | --- |
 | `BRAVE_PAWS_HOST` | `127.0.0.1` | Bind host for the local server |
 | `BRAVE_PAWS_PORT` | `4310` | Bind port for the local server |
-| `BRAVE_PAWS_PUBLIC_BASE_URL` | unset | Canonical external base URL for docs / logs |
+| `BRAVE_PAWS_PUBLIC_BASE_URL` | unset | Canonical external base URL used for logs, pairing URLs, and deployment docs |
 | `BRAVE_PAWS_DATA_DIR` | `var/brave-paws` in the repo | Session storage directory (live QUANTUM deploy uses `/mnt/q/fermi/brave-paws/data`) |
-| `BRAVE_PAWS_AUTH_TOKEN` | unset | Optional token expected in `x-brave-paws-token` for write requests |
-| `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` | Upstream camera / MediaMTX root that gets proxied under `/separation/camera/` |
+| `BRAVE_PAWS_AUTH_TOKEN` | unset | Token expected in `x-brave-paws-token` for write requests; required before the HTTP pairing-creation endpoint will mint links |
+| `BRAVE_PAWS_ENABLE_PAIRING` | `false` | Enables the opaque one-time pairing broker |
+| `BRAVE_PAWS_PAIRING_STORE_FILE` | `<data dir>/pairings.json` | Optional override for pairing-token storage |
+| `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` | Upstream picam / MediaMTX root that gets proxied under `/separation/camera/` |
 | `BRAVE_PAWS_CAMERA_CONTROL_PROVIDER` | `none` | Optional backend capability provider for camera streaming control (`none` or `command`) |
 | `BRAVE_PAWS_CAMERA_CONTROL_LABEL` | `Camera streaming` | Friendly label returned by the capabilities API |
 | `BRAVE_PAWS_CAMERA_STATUS_COMMAND` | unset | Shell command that prints `on` / `off`, `true` / `false`, `1` / `0`, or JSON like `{"enabled":true}` |
@@ -37,9 +40,17 @@ It serves three things from one localhost process:
 
 Session data is stored as pretty JSON in `sessions.json` and mirrored to `brave_paws_sessions.csv` in the same directory so it stays easy to inspect, back up, and seed from a manual CSV drop.
 
+When pairing is enabled, opaque one-time camera pairing records are stored separately in `pairings.json`. Those links are meant to bootstrap a browser once; after the app resolves a token, it caches the resulting camera link locally and the token cannot be reused.
+
+## Pairing safety notes
+
+- `POST /separation/api/pairings` stays disabled until `BRAVE_PAWS_AUTH_TOKEN` is configured, so enabling pairing does not silently create a public write endpoint.
+- Absolute `pairingUrl` values are only returned when `BRAVE_PAWS_PUBLIC_BASE_URL` is configured. Otherwise the server can still mint tokens, but callers must construct the final browser URL themselves.
+- Camera URLs with embedded credentials are rejected so secrets do not land in `pairings.json` or pairing responses.
+
 ## Camera streaming capability API
 
-Brave Paws now exposes a backend capability contract for camera streaming control:
+Brave Paws exposes a backend capability contract for camera streaming control:
 
 - `GET /separation/api/capabilities` → returns the capability map
 - `GET /separation/api/capabilities/camera-streaming` → returns the current camera streaming state
@@ -47,4 +58,4 @@ Brave Paws now exposes a backend capability contract for camera streaming contro
 
 The built-in `command` provider is intentionally generic: the server only knows how to run configured shell commands and interpret the returned enabled/disabled state. That keeps the API backend-agnostic so a future provider can control something other than picam without changing the app contract.
 
-For the live QUANTUM deployment, the generic contract is wired to Harvey's existing picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, which adapts the skill's `privacy_mode=...` output into the simple enabled/disabled signal expected by the API.
+On QUANTUM, that generic contract is wired to Harvey's existing picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, which adapts the skill's `privacy_mode=...` output into the simple enabled/disabled signal expected by the API.
