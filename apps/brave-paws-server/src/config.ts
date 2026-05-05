@@ -44,6 +44,11 @@ export type BravePawsServerConfig = {
   dataDir: string;
   dataFilePath: string;
   cameraUpstreamBaseUrl: string;
+  cameraControlProvider: 'none' | 'command';
+  cameraControlLabel: string;
+  cameraControlStatusCommand: string | null;
+  cameraControlEnableCommand: string | null;
+  cameraControlDisableCommand: string | null;
   authToken: string | null;
 };
 
@@ -69,6 +74,11 @@ export function resolveConfig(env = process.env): BravePawsServerConfig {
     dataDir,
     dataFilePath: path.join(dataDir, 'sessions.json'),
     cameraUpstreamBaseUrl: (env.BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL || 'http://127.0.0.1:18888/').replace(/\/?$/, '/'),
+    cameraControlProvider: env.BRAVE_PAWS_CAMERA_CONTROL_PROVIDER === 'command' ? 'command' : 'none',
+    cameraControlLabel: env.BRAVE_PAWS_CAMERA_CONTROL_LABEL || 'Camera streaming',
+    cameraControlStatusCommand: env.BRAVE_PAWS_CAMERA_STATUS_COMMAND?.trim() || null,
+    cameraControlEnableCommand: env.BRAVE_PAWS_CAMERA_ENABLE_COMMAND?.trim() || null,
+    cameraControlDisableCommand: env.BRAVE_PAWS_CAMERA_DISABLE_COMMAND?.trim() || null,
     authToken: env.BRAVE_PAWS_AUTH_TOKEN || null,
   };
 }

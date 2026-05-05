@@ -12,6 +12,7 @@ type Props = {
   onViewHistory: () => void;
   onViewInfo: () => void;
   onViewSession: (session: Session) => void;
+  cameraStreamingControl?: ReactNode;
   storageSync?: ReactNode;
 };
 
@@ -28,6 +29,7 @@ export function Dashboard({
   onViewHistory,
   onViewInfo,
   onViewSession,
+  cameraStreamingControl,
   storageSync,
 }: Props) {
   const abortedSessions = sessions.filter((s) => s.status === 'aborted');
@@ -91,6 +93,8 @@ export function Dashboard({
         </div>
       </div>
 
+      {cameraStreamingControl}
+
       {recentSessions.length > 0 && (
         <button
           onClick={onViewInfo}
@@ -151,7 +155,7 @@ export function Dashboard({
       {storageSync}
 
       <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Brave Paws v0.2</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Brave Paws v0.3</p>
         <div className="mt-2 flex items-start gap-3">
           <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-500">
             <Server size={18} />
