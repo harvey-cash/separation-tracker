@@ -38,6 +38,10 @@ Default bind:
 | `BRAVE_PAWS_DATA_DIR` | `/mnt/q/fermi/brave-paws/data` |
 | `BRAVE_PAWS_AUTH_TOKEN` | `replace-with-shared-secret-if-needed` |
 | `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` |
+| `BRAVE_PAWS_CAMERA_CONTROL_PROVIDER` | `command` |
+| `BRAVE_PAWS_CAMERA_STATUS_COMMAND` | `/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh status` |
+| `BRAVE_PAWS_CAMERA_ENABLE_COMMAND` | `/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh enable` |
+| `BRAVE_PAWS_CAMERA_DISABLE_COMMAND` | `/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh disable` |
 
 ## Session storage
 
@@ -69,4 +73,5 @@ If Harvey drops a fresher `brave_paws_sessions.csv` into the data folder, the se
 ## Notes
 
 - The camera path is a same-origin proxy in front of picam / MediaMTX, and directory-style preview URLs such as `/separation/camera/live.stream` are redirected to the working trailing-slash preview page automatically.
+- QUANTUM's deployment now wires the generic camera-streaming capability API to the existing OpenClaw picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, so the Brave Paws dashboard toggle and session lifecycle automation drive the same underlying picam enable/disable behavior as the assistant skill.
 - Local browser persistence still exists in the app; QUANTUM hydrates on open and automatically pushes changes back to the inspectable QUANTUM data folder.

@@ -13,6 +13,11 @@ Environment=BRAVE_PAWS_PORT=4310
 Environment=BRAVE_PAWS_PUBLIC_BASE_URL=https://quantum.tail080401.ts.net:7447
 Environment="BRAVE_PAWS_DATA_DIR=/mnt/q/fermi/brave-paws/data"
 Environment=BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL=http://127.0.0.1:18888/
+Environment=BRAVE_PAWS_CAMERA_CONTROL_PROVIDER=command
+Environment="BRAVE_PAWS_CAMERA_CONTROL_LABEL=Picam streaming"
+Environment="BRAVE_PAWS_CAMERA_STATUS_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh status"
+Environment="BRAVE_PAWS_CAMERA_ENABLE_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh enable"
+Environment="BRAVE_PAWS_CAMERA_DISABLE_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh disable"
 ExecStart=/usr/bin/env npm --prefix /mnt/q/repos/separation-tracker run server:start
 Restart=on-failure
 RestartSec=3

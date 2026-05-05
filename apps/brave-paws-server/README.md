@@ -46,3 +46,5 @@ Brave Paws now exposes a backend capability contract for camera streaming contro
 - `POST /separation/api/capabilities/camera-streaming` with `{ "enabled": true | false }` → requests a state change
 
 The built-in `command` provider is intentionally generic: the server only knows how to run configured shell commands and interpret the returned enabled/disabled state. That keeps the API backend-agnostic so a future provider can control something other than picam without changing the app contract.
+
+For the live QUANTUM deployment, the generic contract is wired to Harvey's existing picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, which adapts the skill's `privacy_mode=...` output into the simple enabled/disabled signal expected by the API.
