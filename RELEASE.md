@@ -22,9 +22,10 @@ That local deployment serves:
 
 ## Manual release workflow
 
-The manual GitHub release workflow still packages the landing page and app for `main`-based public releases.
+The manual GitHub release workflow packages the landing page and app for `main`-based public releases, then commits the generated `/separation/` site directly to `harvey-cash.github.io` `master`.
 
 ## Main-only CD
 
 Automated CD remains `main`-only.
 Feature branches get CI validation without triggering deployment.
+Successful `main` releases now commit the generated `/separation/` site directly to `harvey-cash.github.io` `master` instead of opening a second deploy PR.
