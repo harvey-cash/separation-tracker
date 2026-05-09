@@ -8,6 +8,7 @@ import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTi
 import { ActiveSessionState } from '../utils/activeSessionStorage';
 import { reportClientDiagnostic } from '../utils/clientDiagnostics';
 import {
+  fetchSessionRecordingCapability,
   startSessionRecording,
   stopSessionRecording,
   UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
@@ -140,7 +141,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
 
   const applyRecordingCapability = useCallback((capability: SessionRecordingCapability) => {
     setRecordingCapability(capability);
-    setRecordingError(capability.detail ?? null);
+    setRecordingError(null);
 
     if (!capability.recording) {
       return null;
@@ -235,13 +236,27 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     const ensureRecording = async () => {
       setIsRecordingLoading(true);
       try {
-        const capability = await startSessionRecording({
+        const capability = await fetchSessionRecordingCapability();
+        if (isCancelled) {
+          return;
+        }
+
+        applyRecordingCapability(capability);
+        if (!capability.supported || !capability.canStart) {
+          return;
+        }
+
+        if (capability.active && capability.sessionId === initialSession.id) {
+          return;
+        }
+
+        const startedCapability = await startSessionRecording({
           sessionId: initialSession.id,
           sessionDate: initialSession.date,
           sessionStatus: restoredState?.session.status ?? initialSession.status,
         });
         if (!isCancelled) {
-          applyRecordingCapability(capability);
+          applyRecordingCapability(startedCapability);
         }
       } catch (recordingStartError) {
         if (!isCancelled) {
@@ -377,6 +392,29 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const streamUrl = buildCameraStreamUrl(cameraUrl);
   const hasValidCameraUrl = streamUrl.length > 0;
   const activePreviewUrl = hasValidCameraUrl && isPreviewConnected ? streamUrl : '';
+  const recordingStatusLabel = isRecordingLoading
+    ? 'Starting recording'
+    : isRecordingUpdating
+    ? 'Finalising recording'
+    : recordingCapability.active
+    ? 'Recording session'
+    : session.recording?.status === 'completed'
+    ? 'Recording saved'
+    : !recordingCapability.supported
+    ? 'Recording unavailable'
+    : recordingError || session.recording?.status === 'failed'
+    ? 'Recording issue'
+    : recordingCapability.canStart
+    ? 'Recording idle'
+    : 'Recording unavailable';
+  const recordingIndicatorClass = recordingCapability.active
+    ? 'bg-rose-500'
+    : !recordingCapability.supported
+    ? 'bg-slate-200'
+    : recordingError || session.recording?.status === 'failed'
+    ? 'bg-amber-400'
+    : 'bg-slate-300';
+  const recordingDetailMessage = recordingError || session.recording?.detail || recordingCapability.detail;
 
   useEffect(() => {
     if (!hasValidCameraUrl) {
@@ -540,26 +578,12 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span>{previewStatusMessage}</span>
               <div className="flex items-center gap-2 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <span className={`inline-block h-2 w-2 rounded-full ${recordingCapability.active ? 'bg-rose-500' : recordingError ? 'bg-amber-400' : recordingCapability.supported ? 'bg-slate-300' : 'bg-slate-200'}`} />
-                <span>
-                  {isRecordingLoading
-                    ? 'Starting recording'
-                    : isRecordingUpdating
-                    ? 'Finalising recording'
-                    : recordingCapability.active
-                    ? 'Recording session'
-                    : session.recording?.status === 'completed'
-                    ? 'Recording saved'
-                    : recordingError
-                    ? 'Recording issue'
-                    : recordingCapability.supported
-                    ? 'Recording idle'
-                    : 'Recording unavailable'}
-                </span>
+                <span className={`inline-block h-2 w-2 rounded-full ${recordingIndicatorClass}`} />
+                <span>{recordingStatusLabel}</span>
               </div>
             </div>
-            {(recordingCapability.detail || recordingError) && (
-              <p className="text-[11px] text-slate-500 sm:max-w-[28rem]">{recordingError || recordingCapability.detail}</p>
+            {recordingDetailMessage && (
+              <p className="text-[11px] text-slate-500 sm:max-w-[28rem]">{recordingDetailMessage}</p>
             )}
             <div className="flex flex-wrap items-center gap-2">
               <button

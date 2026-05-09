@@ -473,9 +473,24 @@ async function serveRecordingFile(
 ) {
   const prefix = `${config.apiBasePath}recordings/file/`;
   const encodedSegments = pathname.slice(prefix.length).split('/').filter(Boolean);
-  const safeSegments = encodedSegments
-    .map((segment) => decodeURIComponent(segment))
-    .filter((segment) => segment && segment !== '.' && segment !== '..' && !segment.includes('..'));
+  const decodedSegments: string[] = [];
+
+  for (const segment of encodedSegments) {
+    try {
+      decodedSegments.push(decodeURIComponent(segment));
+    } catch {
+      sendJson(response, 400, {
+        error: 'Invalid recording path',
+      });
+      return;
+    }
+  }
+
+  const safeSegments = decodedSegments.filter((segment) => segment && segment !== '.' && segment !== '..' && !segment.includes('..'));
+  if (safeSegments.length !== decodedSegments.length) {
+    notFound(response);
+    return;
+  }
 
   const resolvedPath = path.resolve(config.recordingsDir, ...safeSegments);
   const relativeResolved = path.relative(config.recordingsDir, resolvedPath);
@@ -601,6 +616,11 @@ async function handleApiRequest(
   }
 
   if (request.method === 'GET' && pathname.startsWith(recordingFilePathPrefix)) {
+    if (!isWriteAuthorized(request, config)) {
+      sendJson(response, 401, { error: 'Unauthorized' });
+      return;
+    }
+
     await serveRecordingFile(response, pathname, config);
     return;
   }

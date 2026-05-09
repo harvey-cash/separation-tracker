@@ -9,8 +9,10 @@ test('session recording UI is surfaced during active sessions and in history/det
   const historyList = readFileSync(resolve(process.cwd(), 'src/components/HistoryList.tsx'), 'utf8');
 
   assert.match(activeSession, /Starting recording|Recording session|Recording saved|Recording unavailable/);
+  assert.match(activeSession, /fetchSessionRecordingCapability/);
   assert.match(activeSession, /startSessionRecording/);
   assert.match(activeSession, /stopSessionRecording/);
+  assert.match(activeSession, /!recordingCapability\.supported\s*\?\s*'Recording unavailable'/);
   assert.match(sessionView, /Session Recording/);
   assert.match(sessionView, /Open recording/);
   assert.match(historyList, /Recording/);

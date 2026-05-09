@@ -134,6 +134,33 @@ is_pid_alive() {
   [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
 }
 
+terminate_recording_process() {
+  local pid="$1"
+
+  if [[ -z "$pid" ]] || ! is_pid_alive "$pid"; then
+    return 0
+  fi
+
+  kill -INT "$pid" 2>/dev/null || true
+  for _ in $(seq 1 40); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.5
+  done
+
+  kill -KILL "$pid" 2>/dev/null || true
+  for _ in $(seq 1 10); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  echo "recording process failed to stop: $pid" >&2
+  return 1
+}
+
 status_json() {
   load_state
   if [[ -n "$STATE_PID" ]] && is_pid_alive "$STATE_PID"; then
@@ -262,15 +289,12 @@ stop_recording() {
     exit 1
   fi
 
-  if [[ -n "$STATE_PID" ]] && is_pid_alive "$STATE_PID"; then
-    kill -INT "$STATE_PID" 2>/dev/null || true
-    for _ in $(seq 1 40); do
-      if ! kill -0 "$STATE_PID" 2>/dev/null; then
-        break
-      fi
-      sleep 0.5
-    done
+  if ! terminate_recording_process "$STATE_PID"; then
+    exit 1
   fi
+
+  local stopped_at
+  stopped_at="$(date -Is)"
 
   if [[ "$DISPOSITION" == 'discard' ]]; then
     rm -rf "$STATE_SESSION_DIR"
@@ -288,14 +312,14 @@ stop_recording() {
       active __FALSE__ \
       sessionId "\"$discarded_session_id\"" \
       detail __NULL__ \
-      recording "$(python3 - <<'PY' "$discarded_session_id" "$discarded_started_at" "$discarded_has_audio"
+      recording "$(python3 - <<'PY' "$discarded_session_id" "$discarded_started_at" "$stopped_at" "$discarded_has_audio"
 import json, sys
 print(json.dumps({
   'status': 'discarded',
   'sessionId': sys.argv[1] or None,
   'startedAt': sys.argv[2] or None,
-  'stoppedAt': None,
-  'hasAudio': sys.argv[3].lower() == 'true',
+  'stoppedAt': sys.argv[3] or None,
+  'hasAudio': sys.argv[4].lower() == 'true',
   'detail': None,
 }))
 PY
@@ -320,14 +344,14 @@ PY
       active __FALSE__ \
       sessionId "\"$session_id\"" \
       detail '"Recording ended before media data was written."' \
-      recording "$(python3 - <<'PY' "$session_id" "$started_at" "$has_audio"
+      recording "$(python3 - <<'PY' "$session_id" "$started_at" "$stopped_at" "$has_audio"
 import json, sys
 print(json.dumps({
   'status': 'failed',
   'sessionId': sys.argv[1] or None,
   'startedAt': sys.argv[2] or None,
-  'stoppedAt': None,
-  'hasAudio': sys.argv[3].lower() == 'true',
+  'stoppedAt': sys.argv[3] or None,
+  'hasAudio': sys.argv[4].lower() == 'true',
   'detail': 'Recording ended before media data was written.',
 }))
 PY
@@ -350,17 +374,17 @@ PY
     active __FALSE__ \
     sessionId "\"$session_id\"" \
     detail __NULL__ \
-    recording "$(python3 - <<'PY' "$session_id" "$started_at" "$has_audio" "$mp4_path" "$duration_seconds" "$size_bytes"
+    recording "$(python3 - <<'PY' "$session_id" "$started_at" "$stopped_at" "$has_audio" "$mp4_path" "$duration_seconds" "$size_bytes"
 import json, sys
 print(json.dumps({
   'status': 'completed',
   'sessionId': sys.argv[1] or None,
   'startedAt': sys.argv[2] or None,
-  'stoppedAt': None,
-  'hasAudio': sys.argv[3].lower() == 'true',
-  'remoteFilePath': sys.argv[4],
-  'durationSeconds': int(sys.argv[5]) if sys.argv[5] else None,
-  'sizeBytes': int(sys.argv[6]) if sys.argv[6] else None,
+  'stoppedAt': sys.argv[3] or None,
+  'hasAudio': sys.argv[4].lower() == 'true',
+  'remoteFilePath': sys.argv[5],
+  'durationSeconds': int(sys.argv[6]) if sys.argv[6] else None,
+  'sizeBytes': int(sys.argv[7]) if sys.argv[7] else None,
   'detail': None,
 }))
 PY
