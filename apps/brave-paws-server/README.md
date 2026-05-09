@@ -40,6 +40,11 @@ It serves three things from one localhost process:
 | `BRAVE_PAWS_RECORDING_STATUS_COMMAND` | unset | Shell command that reports recording state as JSON or a simple `idle` / `recording` string |
 | `BRAVE_PAWS_RECORDING_START_COMMAND` | unset | Shell command that starts recording for the session id passed through Brave Paws env vars |
 | `BRAVE_PAWS_RECORDING_STOP_COMMAND` | unset | Shell command that stops/finalizes/discards recording for the session id passed through Brave Paws env vars |
+| `BRAVE_PAWS_RECORDING_VIDEO_HEIGHT` | `540` | Recording output height in pixels; width is derived to preserve aspect ratio |
+| `BRAVE_PAWS_RECORDING_VIDEO_BITRATE` | `800k` | Target H.264 video bitrate used by the picam recording helper |
+| `BRAVE_PAWS_RECORDING_VIDEO_MAXRATE` | `1000k` | H.264 VBV maxrate used by the picam recording helper |
+| `BRAVE_PAWS_RECORDING_VIDEO_BUFSIZE` | `1600k` | H.264 VBV buffer size used by the picam recording helper |
+| `BRAVE_PAWS_RECORDING_AUDIO_BITRATE` | `96k` | AAC audio bitrate used by the picam recording helper |
 
 ## Storage
 
@@ -78,4 +83,4 @@ Brave Paws also exposes a session recording contract that is intentionally separ
 
 The intended deployment model is a passive extra reader near the media source: the live RTSP publisher remains the same, the in-app HLS preview remains the same, and the Icecast audio stream remains the same. Recording should read the source RTSP feed separately and avoid inserting transcoding or buffering into the live user-facing paths.
 
-On QUANTUM, the sample wiring for this contract lives in `deploy/scripts/brave-paws-picam-recording-control.sh`. It SSHes to `picam`, starts a passive localhost RTSP reader there, finalizes the capture, and places the canonical file under the Brave Paws recordings directory on QUANTUM after stop.
+On QUANTUM, the sample wiring for this contract lives in `deploy/scripts/brave-paws-picam-recording-control.sh`. It SSHes to `picam`, starts a passive localhost RTSP reader there, transcodes recordings to a storage-friendly H.264 MP4 profile (default: 540p at 800 kbps video plus AAC audio), finalizes the capture, and places the canonical file under the Brave Paws recordings directory on QUANTUM after stop.
