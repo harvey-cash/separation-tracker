@@ -179,6 +179,11 @@ export function HistoryList({
                   <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${getAnxietyColor(session.anxietyScore)}`}>
                     {getAnxietyLabel(session.anxietyScore)}
                   </span>
+                  {session.recording?.status === 'completed' && (
+                    <span className="px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border border-sky-200 bg-sky-50 text-sky-700">
+                      Recording
+                    </span>
+                  )}
                   {session.notes && (
                     <span className="text-sm text-slate-500 truncate flex-1 italic">"{session.notes}"</span>
                   )}

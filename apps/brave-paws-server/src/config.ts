@@ -43,6 +43,7 @@ export type BravePawsServerConfig = {
   appDistDir: string;
   dataDir: string;
   dataFilePath: string;
+  recordingsDir: string;
   pairingStoreFilePath: string;
   pairingEnabled: boolean;
   cameraUpstreamBaseUrl: string;
@@ -51,6 +52,11 @@ export type BravePawsServerConfig = {
   cameraControlStatusCommand: string | null;
   cameraControlEnableCommand: string | null;
   cameraControlDisableCommand: string | null;
+  recordingProvider: 'none' | 'command';
+  recordingLabel: string;
+  recordingStatusCommand: string | null;
+  recordingStartCommand: string | null;
+  recordingStopCommand: string | null;
   authToken: string | null;
 };
 
@@ -75,6 +81,7 @@ export function resolveConfig(env = process.env): BravePawsServerConfig {
     appDistDir: path.resolve(env.BRAVE_PAWS_APP_DIST_DIR || path.join(repoRoot, 'apps', 'brave-paws-app', 'dist')),
     dataDir,
     dataFilePath: path.join(dataDir, 'sessions.json'),
+    recordingsDir: path.join(dataDir, 'recordings'),
     pairingStoreFilePath: path.resolve(env.BRAVE_PAWS_PAIRING_STORE_FILE || path.join(dataDir, 'pairings.json')),
     pairingEnabled: env.BRAVE_PAWS_ENABLE_PAIRING === 'true',
     cameraUpstreamBaseUrl: (env.BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL || 'http://127.0.0.1:18888/').replace(/\/?$/, '/'),
@@ -83,6 +90,11 @@ export function resolveConfig(env = process.env): BravePawsServerConfig {
     cameraControlStatusCommand: env.BRAVE_PAWS_CAMERA_STATUS_COMMAND?.trim() || null,
     cameraControlEnableCommand: env.BRAVE_PAWS_CAMERA_ENABLE_COMMAND?.trim() || null,
     cameraControlDisableCommand: env.BRAVE_PAWS_CAMERA_DISABLE_COMMAND?.trim() || null,
+    recordingProvider: env.BRAVE_PAWS_RECORDING_PROVIDER === 'command' ? 'command' : 'none',
+    recordingLabel: env.BRAVE_PAWS_RECORDING_LABEL || 'Session recording',
+    recordingStatusCommand: env.BRAVE_PAWS_RECORDING_STATUS_COMMAND?.trim() || null,
+    recordingStartCommand: env.BRAVE_PAWS_RECORDING_START_COMMAND?.trim() || null,
+    recordingStopCommand: env.BRAVE_PAWS_RECORDING_STOP_COMMAND?.trim() || null,
     authToken: env.BRAVE_PAWS_AUTH_TOKEN || null,
   };
 }

@@ -7,6 +7,21 @@ export type Step = {
 };
 
 export type SessionStatus = 'pending' | 'completed' | 'aborted';
+export type SessionRecordingStatus = 'idle' | 'recording' | 'completed' | 'discarded' | 'failed';
+
+export type SessionRecording = {
+  status: SessionRecordingStatus;
+  sessionId: string | null;
+  provider: string;
+  startedAt?: string | null;
+  stoppedAt?: string | null;
+  hasAudio?: boolean;
+  relativeFilePath?: string | null;
+  downloadPath?: string | null;
+  durationSeconds?: number | null;
+  sizeBytes?: number | null;
+  detail?: string | null;
+};
 
 export type Session = {
   id: string;
@@ -18,4 +33,5 @@ export type Session = {
   anyoneHome?: string;
   notes?: string;
   status: SessionStatus;
+  recording?: SessionRecording;
 };

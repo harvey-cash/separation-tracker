@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 
 import {
   fetchBackendCapabilities,
+  fetchSessionRecordingCapability,
   setCameraStreamingEnabled,
+  startSessionRecording,
+  stopSessionRecording,
   UNSUPPORTED_CAMERA_STREAMING_CAPABILITY,
+  UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
 } from '../src/utils/backendCapabilities.ts';
 
 test('fetchBackendCapabilities reads the shared capabilities endpoint', async () => {
@@ -19,6 +23,15 @@ test('fetchBackendCapabilities reads the shared capabilities endpoint', async ()
         provider: 'command',
         detail: null,
       },
+      sessionRecording: {
+        ...UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
+        supported: true,
+        canStart: true,
+        canStop: true,
+        active: false,
+        provider: 'command',
+        detail: null,
+      },
     }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -28,6 +41,9 @@ test('fetchBackendCapabilities reads the shared capabilities endpoint', async ()
   assert.equal(capabilities.cameraStreaming.supported, true);
   assert.equal(capabilities.cameraStreaming.enabled, false);
   assert.equal(capabilities.cameraStreaming.provider, 'command');
+  assert.equal(capabilities.sessionRecording.supported, true);
+  assert.equal(capabilities.sessionRecording.canStart, true);
+  assert.equal(capabilities.sessionRecording.provider, 'command');
 });
 
 test('setCameraStreamingEnabled posts the desired enabled state to the shared capability endpoint', async () => {
@@ -52,4 +68,104 @@ test('setCameraStreamingEnabled posts the desired enabled state to the shared ca
 
   assert.equal(capability.enabled, true);
   assert.equal(capability.supported, true);
+});
+
+test('fetchSessionRecordingCapability reads the dedicated recording capability endpoint', async () => {
+  const capability = await fetchSessionRecordingCapability((async (input: string | URL | Request) => {
+    assert.equal(String(input), 'https://brave-paws.example/separation/api/capabilities/recording');
+    return new Response(JSON.stringify({
+      ...UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
+      supported: true,
+      canStart: true,
+      canStop: true,
+      active: true,
+      sessionId: 'session-123',
+      provider: 'command',
+      recording: {
+        status: 'recording',
+        sessionId: 'session-123',
+        provider: 'command',
+        hasAudio: true,
+      },
+      detail: null,
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch, 'https://brave-paws.example/separation/api/');
+
+  assert.equal(capability.active, true);
+  assert.equal(capability.sessionId, 'session-123');
+  assert.equal(capability.recording?.status, 'recording');
+});
+
+test('startSessionRecording posts the session payload to the recording start endpoint', async () => {
+  const capability = await startSessionRecording(
+    { sessionId: 'session-abc', sessionDate: '2026-05-09T18:00:00.000Z', sessionStatus: 'pending' },
+    (async (input: string | URL | Request, init?: RequestInit) => {
+      assert.equal(String(input), 'https://brave-paws.example/separation/api/recording/start');
+      assert.equal(init?.method, 'POST');
+      assert.equal(init?.body, JSON.stringify({ sessionId: 'session-abc', sessionDate: '2026-05-09T18:00:00.000Z', sessionStatus: 'pending' }));
+
+      return new Response(JSON.stringify({
+        ...UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
+        supported: true,
+        canStart: true,
+        canStop: true,
+        active: true,
+        sessionId: 'session-abc',
+        provider: 'command',
+        recording: {
+          status: 'recording',
+          sessionId: 'session-abc',
+          provider: 'command',
+        },
+        detail: null,
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch,
+    'https://brave-paws.example/separation/api/',
+  );
+
+  assert.equal(capability.active, true);
+  assert.equal(capability.sessionId, 'session-abc');
+});
+
+test('stopSessionRecording posts the stop payload to the recording stop endpoint', async () => {
+  const capability = await stopSessionRecording(
+    { sessionId: 'session-abc', disposition: 'save' },
+    (async (input: string | URL | Request, init?: RequestInit) => {
+      assert.equal(String(input), 'https://brave-paws.example/separation/api/recording/stop');
+      assert.equal(init?.method, 'POST');
+      assert.equal(init?.body, JSON.stringify({ sessionId: 'session-abc', disposition: 'save' }));
+
+      return new Response(JSON.stringify({
+        ...UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
+        supported: true,
+        canStart: true,
+        canStop: true,
+        active: false,
+        sessionId: 'session-abc',
+        provider: 'command',
+        recording: {
+          status: 'completed',
+          sessionId: 'session-abc',
+          provider: 'command',
+          relativeFilePath: '2026/05/09/session-abc.mp4',
+          downloadPath: '/separation/api/recordings/file/2026/05/09/session-abc.mp4',
+        },
+        detail: null,
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch,
+    'https://brave-paws.example/separation/api/',
+  );
+
+  assert.equal(capability.active, false);
+  assert.equal(capability.recording?.status, 'completed');
+  assert.equal(capability.recording?.downloadPath, '/separation/api/recordings/file/2026/05/09/session-abc.mp4');
 });

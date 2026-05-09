@@ -22,7 +22,7 @@ async function close(server: http.Server) {
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
 
-async function requestRaw(baseUrl: string, requestPath: string) {
+async function requestRaw(baseUrl: string, requestPath: string, headers?: http.OutgoingHttpHeaders) {
   const url = new URL(baseUrl);
 
   return new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
@@ -32,6 +32,7 @@ async function requestRaw(baseUrl: string, requestPath: string) {
         port: url.port,
         path: requestPath,
         method: 'GET',
+        headers,
       },
       (response) => {
         const chunks: Buffer[] = [];
@@ -93,7 +94,13 @@ async function withFixtureServer(
     cameraControlStatusCommand: null,
     cameraControlEnableCommand: null,
     cameraControlDisableCommand: null,
+    recordingProvider: 'none',
+    recordingLabel: 'Session recording',
+    recordingStatusCommand: null,
+    recordingStartCommand: null,
+    recordingStopCommand: null,
     authToken: null,
+    recordingsDir: path.join(dataDir, 'recordings'),
     ...configOverrides,
   };
 
@@ -126,11 +133,123 @@ test('camera capabilities report unsupported control by default', async () => {
   await withFixtureServer(async ({ baseUrl }) => {
     const response = await fetch(`${baseUrl}/separation/api/capabilities`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { cameraStreaming: { supported: boolean; canSetEnabled: boolean; enabled: boolean | null } };
+    const body = await response.json() as {
+      cameraStreaming: { supported: boolean; canSetEnabled: boolean; enabled: boolean | null };
+      sessionRecording: { supported: boolean; canStart: boolean; canStop: boolean; active: boolean };
+    };
     assert.equal(body.cameraStreaming.supported, false);
     assert.equal(body.cameraStreaming.canSetEnabled, false);
     assert.equal(body.cameraStreaming.enabled, null);
+    assert.equal(body.sessionRecording.supported, false);
+    assert.equal(body.sessionRecording.canStart, false);
+    assert.equal(body.sessionRecording.canStop, false);
+    assert.equal(body.sessionRecording.active, false);
   });
+});
+
+test('session recording capability can be started and stopped through the command provider', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-recording-control-'));
+  const stateFilePath = path.join(tempDir, 'recording-state.json');
+  const recordingDir = path.join(tempDir, 'recordings');
+
+  try {
+    await withFixtureServer(async ({ baseUrl, config }) => {
+      const before = await fetch(`${baseUrl}/separation/api/capabilities/recording`);
+      assert.equal(before.status, 200);
+      assert.equal((await before.json() as { active: boolean }).active, false);
+
+      const startResponse = await fetch(`${baseUrl}/separation/api/recording/start`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'session-123', sessionDate: '2026-05-09T18:00:00.000Z', sessionStatus: 'pending' }),
+      });
+      assert.equal(startResponse.status, 200);
+      const started = await startResponse.json() as {
+        active: boolean;
+        sessionId: string | null;
+        recording: { status: string; sessionId: string | null } | null;
+      };
+      assert.equal(started.active, true);
+      assert.equal(started.sessionId, 'session-123');
+      assert.equal(started.recording?.status, 'recording');
+
+      const recordingSourcePath = path.join(recordingDir, '2026/05/09/session-123.mp4');
+      await fs.mkdir(path.dirname(recordingSourcePath), { recursive: true });
+      await fs.writeFile(recordingSourcePath, 'fake recording payload');
+
+      const stopResponse = await fetch(`${baseUrl}/separation/api/recording/stop`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: 'session-123', disposition: 'save' }),
+      });
+      assert.equal(stopResponse.status, 200);
+      const stopped = await stopResponse.json() as {
+        active: boolean;
+        sessionId: string | null;
+        recording: {
+          status: string;
+          sessionId: string | null;
+          relativeFilePath: string | null;
+          downloadPath: string | null;
+        } | null;
+      };
+      assert.equal(stopped.active, false);
+      assert.equal(stopped.sessionId, 'session-123');
+      assert.equal(stopped.recording?.status, 'completed');
+      assert.equal(stopped.recording?.relativeFilePath, '2026/05/09/session-123.mp4');
+      assert.equal(stopped.recording?.downloadPath, '/separation/api/recordings/file/2026/05/09/session-123.mp4');
+
+      const servedRecording = await fetch(`${baseUrl}${stopped.recording?.downloadPath}`);
+      assert.equal(servedRecording.status, 200);
+      assert.equal(await servedRecording.text(), 'fake recording payload');
+
+      const storedRecordingPath = path.join(config.recordingsDir, '2026/05/09/session-123.mp4');
+      assert.equal(await fs.readFile(storedRecordingPath, 'utf8'), 'fake recording payload');
+    }, {
+      recordingProvider: 'command',
+      recordingsDir: recordingDir,
+      recordingStatusCommand: `python3 - <<'PY'\nimport json, os\nstate_file = ${JSON.stringify(stateFilePath)}\nif not os.path.exists(state_file):\n    print(json.dumps({"active": False, "sessionId": None, "recording": None}))\nelse:\n    print(open(state_file, 'r', encoding='utf8').read())\nPY`,
+      recordingStartCommand: `python3 - <<'PY'\nimport json, os\nstate_file = ${JSON.stringify(stateFilePath)}\npayload = {"active": True, "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "recording": {"status": "recording", "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "startedAt": "2026-05-09T18:00:00.000Z", "hasAudio": True}}\nos.makedirs(os.path.dirname(state_file), exist_ok=True)\nopen(state_file, 'w', encoding='utf8').write(json.dumps(payload))\nprint(json.dumps(payload))\nPY`,
+      recordingStopCommand: `python3 - <<'PY'\nimport json, os\nstate_file = ${JSON.stringify(stateFilePath)}\npayload = {"active": False, "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "recording": {"status": "completed", "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "startedAt": "2026-05-09T18:00:00.000Z", "stoppedAt": "2026-05-09T18:12:00.000Z", "hasAudio": True, "relativeFilePath": "2026/05/09/session-123.mp4", "durationSeconds": 720, "sizeBytes": 19}}\nos.makedirs(os.path.dirname(state_file), exist_ok=True)\nopen(state_file, 'w', encoding='utf8').write(json.dumps(payload))\nprint(json.dumps(payload))\nPY`,
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('recording download rejects malformed path segments instead of crashing', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await requestRaw(baseUrl, '/separation/api/recordings/file/%E0%A4%A');
+    assert.equal(response.statusCode, 400);
+    assert.match(response.body, /Invalid recording path/);
+  });
+});
+
+test('recording download requires auth when an auth token is configured', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-recording-auth-'));
+  const recordingDir = path.join(tempDir, 'recordings');
+  const relativeRecordingPath = '2026/05/09/secure-session.mp4';
+
+  try {
+    await fs.mkdir(path.join(recordingDir, '2026/05/09'), { recursive: true });
+    await fs.writeFile(path.join(recordingDir, relativeRecordingPath), 'secure recording payload');
+
+    await withFixtureServer(async ({ baseUrl }) => {
+      const unauthenticated = await requestRaw(baseUrl, `/separation/api/recordings/file/${relativeRecordingPath}`);
+      assert.equal(unauthenticated.statusCode, 401);
+
+      const authenticated = await requestRaw(baseUrl, `/separation/api/recordings/file/${relativeRecordingPath}`, {
+        'x-brave-paws-token': 'secret-token',
+      });
+      assert.equal(authenticated.statusCode, 200);
+      assert.equal(authenticated.body, 'secure recording payload');
+    }, {
+      authToken: 'secret-token',
+      recordingsDir: recordingDir,
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('camera streaming capability can be toggled through the command provider', async () => {

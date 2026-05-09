@@ -181,11 +181,9 @@ export default function App() {
   };
 
   const handleCancelSession = () => {
-    if (window.confirm('Are you sure you want to cancel this session? Progress will not be saved.')) {
-      setActiveSession(null);
-      setActiveSessionState(null);
-      setCurrentView('dashboard');
-    }
+    setActiveSession(null);
+    setActiveSessionState(null);
+    setCurrentView('dashboard');
   };
 
   return (

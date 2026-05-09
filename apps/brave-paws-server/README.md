@@ -1,6 +1,6 @@
 # Brave Paws Server
 
-Brave Paws Server is the local-first backend for Brave Paws v0.2.1.
+Brave Paws Server is the local-first backend for Brave Paws v0.2.2.
 
 It serves three things from one localhost process:
 
@@ -35,10 +35,17 @@ It serves three things from one localhost process:
 | `BRAVE_PAWS_CAMERA_STATUS_COMMAND` | unset | Shell command that prints `on` / `off`, `true` / `false`, `1` / `0`, or JSON like `{"enabled":true}` |
 | `BRAVE_PAWS_CAMERA_ENABLE_COMMAND` | unset | Shell command that enables camera streaming when the command provider is active |
 | `BRAVE_PAWS_CAMERA_DISABLE_COMMAND` | unset | Shell command that disables camera streaming when the command provider is active |
+| `BRAVE_PAWS_RECORDING_PROVIDER` | `none` | Optional backend capability provider for session recording (`none` or `command`) |
+| `BRAVE_PAWS_RECORDING_LABEL` | `Session recording` | Friendly label returned by the recording capability API |
+| `BRAVE_PAWS_RECORDING_STATUS_COMMAND` | unset | Shell command that reports recording state as JSON or a simple `idle` / `recording` string |
+| `BRAVE_PAWS_RECORDING_START_COMMAND` | unset | Shell command that starts recording for the session id passed through Brave Paws env vars |
+| `BRAVE_PAWS_RECORDING_STOP_COMMAND` | unset | Shell command that stops/finalizes/discards recording for the session id passed through Brave Paws env vars |
 
 ## Storage
 
 Session data is stored as pretty JSON in `sessions.json` and mirrored to `brave_paws_sessions.csv` in the same directory so it stays easy to inspect, back up, and seed from a manual CSV drop.
+
+When session recording is enabled, finalized media files are expected under `<data dir>/recordings/`, and saved session objects can carry a lightweight `recording` pointer with metadata plus a backend download path.
 
 When pairing is enabled, opaque one-time camera pairing records are stored separately in `pairings.json`. Those links are meant to bootstrap a browser once; after the app resolves a token, it caches the resulting camera link locally and the token cannot be reused.
 
@@ -59,3 +66,16 @@ Brave Paws exposes a backend capability contract for camera streaming control:
 The built-in `command` provider is intentionally generic: the server only knows how to run configured shell commands and interpret the returned enabled/disabled state. That keeps the API backend-agnostic so a future provider can control something other than picam without changing the app contract.
 
 On QUANTUM, that generic contract is wired to Harvey's existing picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, which adapts the skill's `privacy_mode=...` output into the simple enabled/disabled signal expected by the API.
+
+## Session recording API
+
+Brave Paws also exposes a session recording contract that is intentionally separate from both the HLS preview path and the Icecast audio path:
+
+- `GET /separation/api/capabilities/recording` → returns recording capability and current state
+- `POST /separation/api/recording/start` with `{ "sessionId": "...", "sessionDate": "...", "sessionStatus": "..." }` → starts or resumes recording for a session
+- `POST /separation/api/recording/stop` with `{ "sessionId": "...", "disposition": "save" | "discard" }` → finalizes or discards the session recording
+- `GET /separation/api/recordings/file/<relative-path>` → streams a finalized recording file from the canonical recordings directory
+
+The intended deployment model is a passive extra reader near the media source: the live RTSP publisher remains the same, the in-app HLS preview remains the same, and the Icecast audio stream remains the same. Recording should read the source RTSP feed separately and avoid inserting transcoding or buffering into the live user-facing paths.
+
+On QUANTUM, the sample wiring for this contract lives in `deploy/scripts/brave-paws-picam-recording-control.sh`. It SSHes to `picam`, starts a passive localhost RTSP reader there, finalizes the capture, and places the canonical file under the Brave Paws recordings directory on QUANTUM after stop.
