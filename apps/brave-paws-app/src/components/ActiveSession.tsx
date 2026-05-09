@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Session, StepStatus } from '../types';
+import { Session, SessionRecording, StepStatus } from '../types';
 import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff, RotateCcw, Minimize2, Maximize2 } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
@@ -7,6 +7,12 @@ import { CameraLinkInput } from './CameraLinkInput';
 import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTimer } from '../utils/timer';
 import { ActiveSessionState } from '../utils/activeSessionStorage';
 import { reportClientDiagnostic } from '../utils/clientDiagnostics';
+import {
+  startSessionRecording,
+  stopSessionRecording,
+  UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
+  type SessionRecordingCapability,
+} from '../utils/backendCapabilities';
 
 const PREVIEW_LOAD_TIMEOUT_MS = 12000;
 
@@ -60,6 +66,10 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a stream URL, open a one-time pairing link, or use the suggested picam link to start the live preview.');
   const [isPreviewConnected, setIsPreviewConnected] = useState(() => isCameraUrlValid(cameraUrl));
   const [isPreviewMinimized, setIsPreviewMinimized] = useState(false);
+  const [recordingCapability, setRecordingCapability] = useState<SessionRecordingCapability>(UNSUPPORTED_SESSION_RECORDING_CAPABILITY);
+  const [isRecordingLoading, setIsRecordingLoading] = useState(true);
+  const [isRecordingUpdating, setIsRecordingUpdating] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   const lastLoggedPreviewStatusRef = useRef<string | null>(null);
   const sessionRef = useRef(session);
   const sessionClockRef = useRef(sessionClock);
@@ -128,6 +138,41 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       }
   }, [finalizeStep]);
 
+  const applyRecordingCapability = useCallback((capability: SessionRecordingCapability) => {
+    setRecordingCapability(capability);
+    setRecordingError(capability.detail ?? null);
+
+    if (!capability.recording) {
+      return null;
+    }
+
+    const nextRecording = capability.recording;
+    setSession((prev) => {
+      const updatedSession = {
+        ...prev,
+        recording: nextRecording,
+      };
+      sessionRef.current = updatedSession;
+      return updatedSession;
+    });
+
+    return nextRecording;
+  }, []);
+
+  const buildFailedRecording = useCallback((detail: string): SessionRecording => ({
+    status: 'failed',
+    sessionId: sessionRef.current.id,
+    provider: recordingCapability.provider || 'unknown',
+    startedAt: sessionRef.current.recording?.startedAt ?? null,
+    stoppedAt: new Date().toISOString(),
+    hasAudio: false,
+    relativeFilePath: sessionRef.current.recording?.relativeFilePath ?? null,
+    downloadPath: sessionRef.current.recording?.downloadPath ?? null,
+    durationSeconds: sessionRef.current.recording?.durationSeconds ?? null,
+    sizeBytes: sessionRef.current.recording?.sizeBytes ?? null,
+    detail,
+  }), [recordingCapability.provider]);
+
   // Background Stopwatch
   useEffect(() => {
     syncSessionElapsed();
@@ -185,6 +230,50 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   }, [syncSessionElapsed, syncStepRemaining]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const ensureRecording = async () => {
+      setIsRecordingLoading(true);
+      try {
+        const capability = await startSessionRecording({
+          sessionId: initialSession.id,
+          sessionDate: initialSession.date,
+          sessionStatus: restoredState?.session.status ?? initialSession.status,
+        });
+        if (!isCancelled) {
+          applyRecordingCapability(capability);
+        }
+      } catch (recordingStartError) {
+        if (!isCancelled) {
+          const detail = recordingStartError instanceof Error
+            ? recordingStartError.message
+            : 'Session recording unavailable';
+          const failedRecording = buildFailedRecording(detail);
+          setRecordingError(detail);
+          setSession((prev) => {
+            const updatedSession = {
+              ...prev,
+              recording: failedRecording,
+            };
+            sessionRef.current = updatedSession;
+            return updatedSession;
+          });
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsRecordingLoading(false);
+        }
+      }
+    };
+
+    void ensureRecording();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [applyRecordingCapability, buildFailedRecording, initialSession.date, initialSession.id, initialSession.status, restoredState?.session.status]);
+
+  useEffect(() => {
     onStateChange?.({
       session,
       currentStepIndex,
@@ -225,17 +314,61 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     setIsStepRunning(true);
   };
 
-  const handleFinishSession = () => {
+  const handleFinishSession = async () => {
     const now = Date.now();
     const finalSessionClock = isSessionRunning ? pauseTimer(sessionClockRef.current, now) : sessionClockRef.current;
     updateSessionClock(finalSessionClock);
     setSessionElapsed(getElapsedSeconds(finalSessionClock, now));
     setIsSessionRunning(false);
     setIsStepRunning(false);
+
+    let nextRecording = sessionRef.current.recording;
+    if (recordingCapability.canStop) {
+      setIsRecordingUpdating(true);
+      try {
+        const capability = await stopSessionRecording({
+          sessionId: sessionRef.current.id,
+          disposition: 'save',
+        });
+        nextRecording = applyRecordingCapability(capability) ?? nextRecording;
+      } catch (recordingStopError) {
+        const detail = recordingStopError instanceof Error
+          ? recordingStopError.message
+          : 'Unable to stop session recording';
+        nextRecording = buildFailedRecording(detail);
+        setRecordingError(detail);
+      } finally {
+        setIsRecordingUpdating(false);
+      }
+    }
+
     onCompleteSession({
-      ...session,
+      ...sessionRef.current,
       totalDurationSeconds: getElapsedSeconds(finalSessionClock, now),
+      recording: nextRecording,
     });
+  };
+
+  const handleCancel = async () => {
+    if (!window.confirm('Are you sure you want to cancel this session? Progress will not be saved.')) {
+      return;
+    }
+
+    if (recordingCapability.canStop) {
+      setIsRecordingUpdating(true);
+      try {
+        await stopSessionRecording({
+          sessionId: sessionRef.current.id,
+          disposition: 'discard',
+        });
+      } catch {
+        // Best effort only; cancelling the session still takes priority.
+      } finally {
+        setIsRecordingUpdating(false);
+      }
+    }
+
+    onCancel();
   };
 
   const currentStep = session.steps[currentStepIndex];
@@ -361,7 +494,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
           <span className="text-xs text-rose-300 ml-2 hidden sm:inline">Total elapsed time</span>
         </div>
         <button
-          onClick={onCancel}
+          onClick={handleCancel}
           className="p-1.5 hover:bg-rose-800 rounded-md transition-colors text-rose-300 hover:text-white"
         >
           <X size={18} />
@@ -403,8 +536,31 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <span>{previewStatusMessage}</span>
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>{previewStatusMessage}</span>
+              <div className="flex items-center gap-2 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className={`inline-block h-2 w-2 rounded-full ${recordingCapability.active ? 'bg-rose-500' : recordingError ? 'bg-amber-400' : recordingCapability.supported ? 'bg-slate-300' : 'bg-slate-200'}`} />
+                <span>
+                  {isRecordingLoading
+                    ? 'Starting recording'
+                    : isRecordingUpdating
+                    ? 'Finalising recording'
+                    : recordingCapability.active
+                    ? 'Recording session'
+                    : session.recording?.status === 'completed'
+                    ? 'Recording saved'
+                    : recordingError
+                    ? 'Recording issue'
+                    : recordingCapability.supported
+                    ? 'Recording idle'
+                    : 'Recording unavailable'}
+                </span>
+              </div>
+            </div>
+            {(recordingCapability.detail || recordingError) && (
+              <p className="text-[11px] text-slate-500 sm:max-w-[28rem]">{recordingError || recordingCapability.detail}</p>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -555,7 +711,8 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
         {/* Finish Button */}
         <button
           onClick={handleFinishSession}
-          className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white p-5 rounded-3xl shadow-sm transition-colors text-lg font-bold"
+          disabled={isRecordingUpdating}
+          className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white p-5 rounded-3xl shadow-sm transition-colors text-lg font-bold disabled:cursor-not-allowed disabled:opacity-60"
         >
           <CheckCircle2 size={24} />
           Wrap Up Session

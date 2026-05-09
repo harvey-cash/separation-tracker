@@ -18,6 +18,11 @@ Environment="BRAVE_PAWS_CAMERA_CONTROL_LABEL=Picam streaming"
 Environment="BRAVE_PAWS_CAMERA_STATUS_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh status"
 Environment="BRAVE_PAWS_CAMERA_ENABLE_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh enable"
 Environment="BRAVE_PAWS_CAMERA_DISABLE_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh disable"
+Environment=BRAVE_PAWS_RECORDING_PROVIDER=command
+Environment="BRAVE_PAWS_RECORDING_LABEL=Session recording"
+Environment="BRAVE_PAWS_RECORDING_STATUS_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-recording-control.sh status"
+Environment="BRAVE_PAWS_RECORDING_START_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-recording-control.sh start"
+Environment="BRAVE_PAWS_RECORDING_STOP_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-recording-control.sh stop"
 ExecStart=/usr/bin/env npm --prefix /mnt/q/repos/separation-tracker run server:start
 Restart=on-failure
 RestartSec=3

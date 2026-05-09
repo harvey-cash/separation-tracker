@@ -11,6 +11,11 @@ import {
   type CameraStreamingController,
 } from './cameraControl.js';
 import {
+  createSessionRecordingController,
+  type SessionRecordingCapability,
+  type SessionRecordingController,
+} from './recordingControl.js';
+import {
   buildPairingAppUrl,
   consumePairing,
   createPairing,
@@ -139,6 +144,8 @@ function getMimeType(filePath: string): string {
   if (filePath.endsWith('.png')) return 'image/png';
   if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) return 'image/jpeg';
   if (filePath.endsWith('.woff2')) return 'font/woff2';
+  if (filePath.endsWith('.mp4')) return 'video/mp4';
+  if (filePath.endsWith('.mkv')) return 'video/x-matroska';
   return 'application/octet-stream';
 }
 
@@ -404,7 +411,7 @@ async function proxyCameraRequest(
       method: request.method,
       headers: {
         accept: request.headers.accept || '*/*',
-        'user-agent': request.headers['user-agent'] || 'BravePawsServer/0.2.1',
+        'user-agent': request.headers['user-agent'] || 'BravePawsServer/0.2.2',
       },
     });
 
@@ -433,15 +440,69 @@ async function proxyCameraRequest(
   }
 }
 
+function buildRecordingDownloadPath(apiBasePath: string, relativeFilePath: string | null | undefined): string | null {
+  if (!relativeFilePath) {
+    return null;
+  }
+
+  return `${apiBasePath}recordings/file/${relativeFilePath
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')}`;
+}
+
+function attachRecordingDownloadPath(apiBasePath: string, capability: SessionRecordingCapability): SessionRecordingCapability {
+  if (!capability.recording?.relativeFilePath) {
+    return capability;
+  }
+
+  return {
+    ...capability,
+    recording: {
+      ...capability.recording,
+      downloadPath: buildRecordingDownloadPath(apiBasePath, capability.recording.relativeFilePath),
+    },
+  };
+}
+
+async function serveRecordingFile(
+  response: ServerResponse,
+  pathname: string,
+  config: BravePawsServerConfig,
+) {
+  const prefix = `${config.apiBasePath}recordings/file/`;
+  const encodedSegments = pathname.slice(prefix.length).split('/').filter(Boolean);
+  const safeSegments = encodedSegments
+    .map((segment) => decodeURIComponent(segment))
+    .filter((segment) => segment && segment !== '.' && segment !== '..' && !segment.includes('..'));
+
+  const resolvedPath = path.resolve(config.recordingsDir, ...safeSegments);
+  const relativeResolved = path.relative(config.recordingsDir, resolvedPath);
+  if (relativeResolved.startsWith('..') || path.isAbsolute(relativeResolved)) {
+    notFound(response);
+    return;
+  }
+
+  if (!(await fileExists(resolvedPath))) {
+    notFound(response, 'Recording not found');
+    return;
+  }
+
+  await serveStaticFile(response, resolvedPath);
+}
+
 async function handleApiRequest(
   request: IncomingMessage,
   response: ServerResponse,
   pathname: string,
   config: BravePawsServerConfig,
   cameraStreamingController: CameraStreamingController,
+  sessionRecordingController: SessionRecordingController,
 ) {
   const capabilitiesPath = `${config.apiBasePath}capabilities`;
   const cameraStreamingCapabilityPath = `${capabilitiesPath}/camera-streaming`;
+  const sessionRecordingCapabilityPath = `${capabilitiesPath}/recording`;
 
   if (pathname === config.healthPath) {
     const store = await readSessionStore(config.dataFilePath);
@@ -466,10 +527,16 @@ async function handleApiRequest(
   const syncPushPath = `${config.apiBasePath}sync/push`;
   const clientDiagnosticsPath = config.clientDiagnosticsPath;
   const pairingCollectionPath = `${config.apiBasePath}pairings`;
+  const recordingStartPath = `${config.apiBasePath}recording/start`;
+  const recordingStopPath = `${config.apiBasePath}recording/stop`;
+  const recordingFilePathPrefix = `${config.apiBasePath}recordings/file/`;
 
   if (request.method === 'GET' && pathname === capabilitiesPath) {
     const capabilities = await getBackendCapabilities(cameraStreamingController);
-    sendJson(response, 200, capabilities);
+    sendJson(response, 200, {
+      ...capabilities,
+      sessionRecording: attachRecordingDownloadPath(config.apiBasePath, await sessionRecordingController.getCapability()),
+    });
     return;
   }
 
@@ -494,6 +561,48 @@ async function handleApiRequest(
       sendJson(response, 200, await cameraStreamingController.setEnabled(payload.enabled));
       return;
     }
+  }
+
+  if (request.method === 'GET' && pathname === sessionRecordingCapabilityPath) {
+    sendJson(response, 200, attachRecordingDownloadPath(config.apiBasePath, await sessionRecordingController.getCapability()));
+    return;
+  }
+
+  if (request.method === 'POST' && pathname === recordingStartPath) {
+    if (!isWriteAuthorized(request, config)) {
+      sendJson(response, 401, { error: 'Unauthorized' });
+      return;
+    }
+
+    const payload = await readJsonBody<{ sessionId?: string; sessionDate?: string; sessionStatus?: string }>(request);
+    if (!payload.sessionId) {
+      sendJson(response, 400, { error: 'sessionId is required' });
+      return;
+    }
+
+    sendJson(response, 200, attachRecordingDownloadPath(config.apiBasePath, await sessionRecordingController.startRecording(payload)));
+    return;
+  }
+
+  if (request.method === 'POST' && pathname === recordingStopPath) {
+    if (!isWriteAuthorized(request, config)) {
+      sendJson(response, 401, { error: 'Unauthorized' });
+      return;
+    }
+
+    const payload = await readJsonBody<{ sessionId?: string; disposition?: 'save' | 'discard' }>(request);
+    if (!payload.sessionId) {
+      sendJson(response, 400, { error: 'sessionId is required' });
+      return;
+    }
+
+    sendJson(response, 200, attachRecordingDownloadPath(config.apiBasePath, await sessionRecordingController.stopRecording(payload)));
+    return;
+  }
+
+  if (request.method === 'GET' && pathname.startsWith(recordingFilePathPrefix)) {
+    await serveRecordingFile(response, pathname, config);
+    return;
   }
 
   if (request.method === 'GET' && pathname === sessionsCollectionPath) {
@@ -668,6 +777,7 @@ async function handleApiRequest(
 
 export function createBravePawsServer(config = resolveConfig()) {
   const cameraStreamingController = createCameraStreamingController(config);
+  const sessionRecordingController = createSessionRecordingController(config);
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -711,7 +821,7 @@ export function createBravePawsServer(config = resolveConfig()) {
       }
 
       if (pathname.startsWith(config.apiBasePath)) {
-        await handleApiRequest(request, response, pathname, config, cameraStreamingController);
+        await handleApiRequest(request, response, pathname, config, cameraStreamingController, sessionRecordingController);
         return;
       }
 
@@ -757,6 +867,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const config = resolveConfig();
   const server = createBravePawsServer(config);
   const startupCameraStreamingController = createCameraStreamingController(config);
+  const startupSessionRecordingController = createSessionRecordingController(config);
 
   server.listen(config.port, config.host, () => {
     const publicHint = config.publicBaseUrl
@@ -783,6 +894,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       }
     }).catch((error: unknown) => {
       console.warn('Camera streaming control startup check failed.', error);
+    });
+    void startupSessionRecordingController.getCapability().then((capability: SessionRecordingCapability) => {
+      if (capability.provider === 'command') {
+        if (capability.supported && capability.canStart && capability.canStop) {
+          console.log(`Session recording control: ${capability.label}`);
+          if (capability.detail) {
+            console.warn(capability.detail);
+          }
+          return;
+        }
+
+        console.warn(capability.detail || 'Session recording command provider is configured but unavailable.');
+      }
+    }).catch((error: unknown) => {
+      console.warn('Session recording startup check failed.', error);
     });
     if (config.pairingEnabled) {
       console.log(`Pairing broker: http://${config.host}:${config.port}${config.apiBasePath}pairings`);
