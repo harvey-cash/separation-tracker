@@ -180,7 +180,74 @@ test('session recording capability can be started and stopped through the comman
       const stopResponse = await fetch(`${baseUrl}/separation/api/recording/stop`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId: 'session-123', disposition: 'save' }),
+        body: JSON.stringify({
+          sessionId: 'session-123',
+          disposition: 'save',
+          sessionSnapshot: {
+            id: 'session-123',
+            date: '2026-05-09T18:00:00.000Z',
+            totalDurationSeconds: 720,
+            status: 'completed',
+            steps: [
+              { id: 'step-1', durationSeconds: 30, status: 'completed' },
+              { id: 'step-2', durationSeconds: 690, status: 'completed' },
+            ],
+          },
+          timelineEvents: [
+            {
+              sequence: 0,
+              type: 'session_started',
+              occurredAt: '2026-05-09T18:00:00.000Z',
+              sessionElapsedSeconds: 0,
+              sessionRunning: true,
+              currentStepIndex: 0,
+              stepId: 'step-1',
+              stepStatus: 'pending',
+              stepRunning: false,
+              stepElapsedSeconds: 0,
+              stepDurationSeconds: 30,
+            },
+            {
+              sequence: 1,
+              type: 'step_started',
+              occurredAt: '2026-05-09T18:00:00.000Z',
+              sessionElapsedSeconds: 0,
+              sessionRunning: true,
+              currentStepIndex: 0,
+              stepId: 'step-1',
+              stepStatus: 'pending',
+              stepRunning: true,
+              stepElapsedSeconds: 0,
+              stepDurationSeconds: 30,
+            },
+            {
+              sequence: 2,
+              type: 'step_completed',
+              occurredAt: '2026-05-09T18:00:30.000Z',
+              sessionElapsedSeconds: 30,
+              sessionRunning: true,
+              currentStepIndex: 0,
+              stepId: 'step-1',
+              stepStatus: 'completed',
+              stepRunning: false,
+              stepElapsedSeconds: 30,
+              stepDurationSeconds: 30,
+            },
+            {
+              sequence: 3,
+              type: 'session_finished',
+              occurredAt: '2026-05-09T18:12:00.000Z',
+              sessionElapsedSeconds: 720,
+              sessionRunning: false,
+              currentStepIndex: 1,
+              stepId: 'step-2',
+              stepStatus: 'completed',
+              stepRunning: false,
+              stepElapsedSeconds: 690,
+              stepDurationSeconds: 690,
+            },
+          ],
+        }),
       });
       assert.equal(stopResponse.status, 200);
       const stopped = await stopResponse.json() as {
@@ -191,6 +258,10 @@ test('session recording capability can be started and stopped through the comman
           sessionId: string | null;
           relativeFilePath: string | null;
           downloadPath: string | null;
+          metadataRelativeFilePath: string | null;
+          metadataDownloadPath: string | null;
+          chapterCount: number | null;
+          chaptersEmbedded: boolean | null;
         } | null;
       };
       assert.equal(stopped.active, false);
@@ -198,6 +269,10 @@ test('session recording capability can be started and stopped through the comman
       assert.equal(stopped.recording?.status, 'completed');
       assert.equal(stopped.recording?.relativeFilePath, '2026/05/09/session-123.mp4');
       assert.equal(stopped.recording?.downloadPath, '/separation/api/recordings/file/2026/05/09/session-123.mp4');
+      assert.equal(stopped.recording?.metadataRelativeFilePath, '2026/05/09/session-123.brave-paws.json');
+      assert.equal(stopped.recording?.metadataDownloadPath, '/separation/api/recordings/file/2026/05/09/session-123.brave-paws.json');
+      assert.equal(stopped.recording?.chapterCount, 2);
+      assert.equal(stopped.recording?.chaptersEmbedded, false);
 
       const servedRecording = await fetch(`${baseUrl}${stopped.recording?.downloadPath}`);
       assert.equal(servedRecording.status, 200);
@@ -205,6 +280,22 @@ test('session recording capability can be started and stopped through the comman
 
       const storedRecordingPath = path.join(config.recordingsDir, '2026/05/09/session-123.mp4');
       assert.equal(await fs.readFile(storedRecordingPath, 'utf8'), 'fake recording payload');
+
+      const storedMetadataPath = path.join(config.recordingsDir, '2026/05/09/session-123.brave-paws.json');
+      const sidecar = JSON.parse(await fs.readFile(storedMetadataPath, 'utf8')) as {
+        version: number;
+        recordingFile: { metadataRelativePath: string; relativePath: string };
+        recording: { chapterCount: number; chaptersEmbedded: boolean };
+        timeline: { eventCount: number };
+        chapters: Array<{ title: string }>;
+      };
+      assert.equal(sidecar.version, 1);
+      assert.equal(sidecar.recordingFile.relativePath, '2026/05/09/session-123.mp4');
+      assert.equal(sidecar.recordingFile.metadataRelativePath, '2026/05/09/session-123.brave-paws.json');
+      assert.equal(sidecar.recording.chapterCount, 2);
+      assert.equal(sidecar.recording.chaptersEmbedded, false);
+      assert.equal(sidecar.timeline.eventCount, 4);
+      assert.deepEqual(sidecar.chapters.map((chapter) => chapter.title), ['Step 1 · 30s', 'Step 1 · 30s completed']);
     }, {
       recordingProvider: 'command',
       recordingsDir: recordingDir,
@@ -222,6 +313,38 @@ test('recording download rejects malformed path segments instead of crashing', a
     const response = await requestRaw(baseUrl, '/separation/api/recordings/file/%E0%A4%A');
     assert.equal(response.statusCode, 400);
     assert.match(response.body, /Invalid recording path/);
+  });
+});
+
+test('recording stop rejects oversized JSON payloads', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const oversizedTimelineEvent = {
+      sequence: 0,
+      type: 'session_started',
+      occurredAt: '2026-05-09T18:00:00.000Z',
+      sessionElapsedSeconds: 0,
+      sessionRunning: true,
+      currentStepIndex: 0,
+      stepId: 'step-1',
+      stepStatus: 'pending',
+      stepRunning: false,
+      stepElapsedSeconds: 0,
+      stepDurationSeconds: 30,
+      note: 'x'.repeat(600_000),
+    };
+
+    const response = await fetch(`${baseUrl}/separation/api/recording/stop`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'session-123',
+        disposition: 'discard',
+        timelineEvents: [oversizedTimelineEvent],
+      }),
+    });
+
+    assert.equal(response.status, 413);
+    assert.match(await response.text(), /maximum size of 512KB/i);
   });
 });
 

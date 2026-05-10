@@ -1,5 +1,5 @@
 import { getApiBaseUrl } from '../config';
-import type { SessionRecording } from '../types';
+import type { Session, SessionRecording, SessionTimelineEvent } from '../types';
 
 export type CameraStreamingCapability = {
   key: 'cameraStreaming';
@@ -110,7 +110,12 @@ export async function startSessionRecording(
 }
 
 export async function stopSessionRecording(
-  payload: { sessionId: string; disposition?: 'save' | 'discard' },
+  payload: {
+    sessionId: string;
+    disposition?: 'save' | 'discard';
+    sessionSnapshot?: Session;
+    timelineEvents?: SessionTimelineEvent[];
+  },
   fetchImpl: typeof fetch = fetch,
   apiBaseUrl = getApiBaseUrl(),
 ): Promise<SessionRecordingCapability> {

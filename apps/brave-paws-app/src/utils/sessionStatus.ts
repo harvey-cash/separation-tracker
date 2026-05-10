@@ -126,12 +126,18 @@ function normalizeSessionRecording(value: unknown, sessionId: string): SessionRe
     hasAudio: typeof candidate.hasAudio === 'boolean' ? candidate.hasAudio : false,
     relativeFilePath: typeof candidate.relativeFilePath === 'string' ? candidate.relativeFilePath : null,
     downloadPath: typeof candidate.downloadPath === 'string' ? candidate.downloadPath : null,
+    metadataRelativeFilePath: typeof candidate.metadataRelativeFilePath === 'string' ? candidate.metadataRelativeFilePath : null,
+    metadataDownloadPath: typeof candidate.metadataDownloadPath === 'string' ? candidate.metadataDownloadPath : null,
     durationSeconds: typeof candidate.durationSeconds === 'number' && Number.isFinite(candidate.durationSeconds)
       ? Math.max(0, candidate.durationSeconds)
       : null,
     sizeBytes: typeof candidate.sizeBytes === 'number' && Number.isFinite(candidate.sizeBytes)
       ? Math.max(0, candidate.sizeBytes)
       : null,
+    chapterCount: typeof candidate.chapterCount === 'number' && Number.isFinite(candidate.chapterCount)
+      ? Math.max(0, candidate.chapterCount)
+      : null,
+    chaptersEmbedded: typeof candidate.chaptersEmbedded === 'boolean' ? candidate.chaptersEmbedded : null,
     detail: typeof candidate.detail === 'string' ? candidate.detail : null,
   };
 }

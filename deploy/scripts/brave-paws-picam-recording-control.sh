@@ -5,6 +5,11 @@ PICAM_HOST_ALIAS="${PICAM_HOST_ALIAS:-picam}"
 PICAM_RTSP_URL="${PICAM_RTSP_URL:-rtsp://127.0.0.1:8554/live.stream}"
 REMOTE_ROOT="${BRAVE_PAWS_PICAM_RECORDING_ROOT:-/home/harvey/.cache/brave-paws/session-recording}"
 LOCAL_RECORDINGS_DIR="${BRAVE_PAWS_RECORDINGS_DIR:-${BRAVE_PAWS_DATA_DIR:-/mnt/q/fermi/brave-paws/data}/recordings}"
+RECORDING_VIDEO_HEIGHT="${BRAVE_PAWS_RECORDING_VIDEO_HEIGHT:-540}"
+RECORDING_VIDEO_BITRATE="${BRAVE_PAWS_RECORDING_VIDEO_BITRATE:-800k}"
+RECORDING_VIDEO_MAXRATE="${BRAVE_PAWS_RECORDING_VIDEO_MAXRATE:-1000k}"
+RECORDING_VIDEO_BUFSIZE="${BRAVE_PAWS_RECORDING_VIDEO_BUFSIZE:-1600k}"
+RECORDING_AUDIO_BITRATE="${BRAVE_PAWS_RECORDING_AUDIO_BITRATE:-96k}"
 
 usage() {
   cat <<'EOF'
@@ -25,6 +30,11 @@ Optional overrides:
   PICAM_HOST_ALIAS                   SSH host alias (default: picam)
   PICAM_RTSP_URL                     Source RTSP URL on picam (default: rtsp://127.0.0.1:8554/live.stream)
   BRAVE_PAWS_PICAM_RECORDING_ROOT    Remote working directory on picam
+  BRAVE_PAWS_RECORDING_VIDEO_HEIGHT  Output height in px, preserving aspect ratio (default: 540)
+  BRAVE_PAWS_RECORDING_VIDEO_BITRATE Target video bitrate (default: 800k)
+  BRAVE_PAWS_RECORDING_VIDEO_MAXRATE Video VBV maxrate (default: 1000k)
+  BRAVE_PAWS_RECORDING_VIDEO_BUFSIZE Video VBV bufsize (default: 1600k)
+  BRAVE_PAWS_RECORDING_AUDIO_BITRATE AAC audio bitrate (default: 96k)
 EOF
 }
 
@@ -57,6 +67,11 @@ remote_exec() {
     BRAVE_PAWS_RECORDING_SESSION_DATE="${BRAVE_PAWS_RECORDING_SESSION_DATE:-}" \
     BRAVE_PAWS_RECORDING_SESSION_STATUS="${BRAVE_PAWS_RECORDING_SESSION_STATUS:-}" \
     BRAVE_PAWS_RECORDING_DISPOSITION="${BRAVE_PAWS_RECORDING_DISPOSITION:-save}" \
+    BRAVE_PAWS_RECORDING_VIDEO_HEIGHT="$RECORDING_VIDEO_HEIGHT" \
+    BRAVE_PAWS_RECORDING_VIDEO_BITRATE="$RECORDING_VIDEO_BITRATE" \
+    BRAVE_PAWS_RECORDING_VIDEO_MAXRATE="$RECORDING_VIDEO_MAXRATE" \
+    BRAVE_PAWS_RECORDING_VIDEO_BUFSIZE="$RECORDING_VIDEO_BUFSIZE" \
+    BRAVE_PAWS_RECORDING_AUDIO_BITRATE="$RECORDING_AUDIO_BITRATE" \
     'bash -s' -- "$mode" <<'EOF'
 set -euo pipefail
 
@@ -67,6 +82,11 @@ SESSION_DATE="${BRAVE_PAWS_RECORDING_SESSION_DATE:-}"
 SESSION_STATUS="${BRAVE_PAWS_RECORDING_SESSION_STATUS:-}"
 DISPOSITION="${BRAVE_PAWS_RECORDING_DISPOSITION:-save}"
 RTSP_URL="${PICAM_RTSP_URL:?}"
+VIDEO_HEIGHT="${BRAVE_PAWS_RECORDING_VIDEO_HEIGHT:-540}"
+VIDEO_BITRATE="${BRAVE_PAWS_RECORDING_VIDEO_BITRATE:-800k}"
+VIDEO_MAXRATE="${BRAVE_PAWS_RECORDING_VIDEO_MAXRATE:-1000k}"
+VIDEO_BUFSIZE="${BRAVE_PAWS_RECORDING_VIDEO_BUFSIZE:-1600k}"
+AUDIO_BITRATE="${BRAVE_PAWS_RECORDING_AUDIO_BITRATE:-96k}"
 STATE_FILE="$ROOT/state.env"
 SESSIONS_DIR="$ROOT/sessions"
 
@@ -254,8 +274,11 @@ start_recording() {
     has_audio="true"
   fi
 
+  local scale_filter
+  scale_filter="scale=-2:${VIDEO_HEIGHT}:flags=lanczos"
+
   local pid
-  pid="$({ nohup ffmpeg -nostdin -hide_banner -loglevel warning -rtsp_transport tcp -i "$RTSP_URL" -map 0:v:0 -map 0:a? -c:v copy -c:a aac -b:a 96k -movflags +faststart "$mp4_path" >"$log_path" 2>&1 < /dev/null & echo $!; } )"
+  pid="$({ nohup ffmpeg -nostdin -hide_banner -loglevel warning -rtsp_transport tcp -i "$RTSP_URL" -map 0:v:0 -map 0:a? -vf "$scale_filter" -c:v libx264 -preset veryfast -pix_fmt yuv420p -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" -c:a aac -b:a "$AUDIO_BITRATE" -movflags +faststart "$mp4_path" >"$log_path" 2>&1 < /dev/null & echo $!; } )"
   sleep 1
 
   if ! kill -0 "$pid" 2>/dev/null; then
