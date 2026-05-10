@@ -316,6 +316,38 @@ test('recording download rejects malformed path segments instead of crashing', a
   });
 });
 
+test('recording stop rejects oversized JSON payloads', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const oversizedTimelineEvent = {
+      sequence: 0,
+      type: 'session_started',
+      occurredAt: '2026-05-09T18:00:00.000Z',
+      sessionElapsedSeconds: 0,
+      sessionRunning: true,
+      currentStepIndex: 0,
+      stepId: 'step-1',
+      stepStatus: 'pending',
+      stepRunning: false,
+      stepElapsedSeconds: 0,
+      stepDurationSeconds: 30,
+      note: 'x'.repeat(600_000),
+    };
+
+    const response = await fetch(`${baseUrl}/separation/api/recording/stop`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'session-123',
+        disposition: 'discard',
+        timelineEvents: [oversizedTimelineEvent],
+      }),
+    });
+
+    assert.equal(response.status, 413);
+    assert.match(await response.text(), /too large/i);
+  });
+});
+
 test('recording download requires auth when an auth token is configured', async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-recording-auth-'));
   const recordingDir = path.join(tempDir, 'recordings');

@@ -23,11 +23,11 @@ Environment="BRAVE_PAWS_RECORDING_LABEL=Session recording"
 Environment="BRAVE_PAWS_RECORDING_STATUS_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-recording-control.sh status"
 Environment="BRAVE_PAWS_RECORDING_START_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-recording-control.sh start"
 Environment="BRAVE_PAWS_RECORDING_STOP_COMMAND=/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-recording-control.sh stop"
-Environment=BRAVE_PAWS_RECORDING_VIDEO_HEIGHT=540
-Environment=BRAVE_PAWS_RECORDING_VIDEO_BITRATE=800k
-Environment=BRAVE_PAWS_RECORDING_VIDEO_MAXRATE=1000k
-Environment=BRAVE_PAWS_RECORDING_VIDEO_BUFSIZE=1600k
-Environment=BRAVE_PAWS_RECORDING_AUDIO_BITRATE=96k
+Environment="BRAVE_PAWS_RECORDING_VIDEO_HEIGHT=540"
+Environment="BRAVE_PAWS_RECORDING_VIDEO_BITRATE=800k"
+Environment="BRAVE_PAWS_RECORDING_VIDEO_MAXRATE=1000k"
+Environment="BRAVE_PAWS_RECORDING_VIDEO_BUFSIZE=1600k"
+Environment="BRAVE_PAWS_RECORDING_AUDIO_BITRATE=96k"
 ExecStart=/usr/bin/env npm --prefix /mnt/q/repos/separation-tracker run server:start
 Restart=on-failure
 RestartSec=3

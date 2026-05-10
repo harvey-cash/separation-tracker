@@ -9,6 +9,7 @@ import {
   saveActiveSessionState,
 } from '../src/utils/activeSessionStorage.ts';
 import { Session } from '../src/types.ts';
+import { shouldAppendInitialTimelineEvent } from '../src/components/ActiveSession.tsx';
 
 function createStorage() {
   const entries = new Map<string, string>();
@@ -124,4 +125,49 @@ test('clearActiveSessionState removes persisted state', () => {
   clearActiveSessionState(storage);
 
   assert.equal(storage.getItem(ACTIVE_SESSION_STORAGE_KEY), null);
+});
+
+test('shouldAppendInitialTimelineEvent adds a restore resume marker when prior events exist', () => {
+  const restoredState = createActiveSessionState(createSession(), 1_000);
+
+  assert.equal(shouldAppendInitialTimelineEvent(undefined, []), true);
+  assert.equal(shouldAppendInitialTimelineEvent(undefined, [{
+    sequence: 0,
+    type: 'session_started',
+    occurredAt: '2026-05-10T09:00:00.000Z',
+    sessionElapsedSeconds: 0,
+    sessionRunning: true,
+    currentStepIndex: 0,
+    stepId: 'step-1',
+    stepStatus: 'pending',
+    stepRunning: false,
+    stepElapsedSeconds: 0,
+    stepDurationSeconds: 30,
+  }]), false);
+  assert.equal(shouldAppendInitialTimelineEvent(restoredState, [{
+    sequence: 0,
+    type: 'session_started',
+    occurredAt: '2026-05-10T09:00:00.000Z',
+    sessionElapsedSeconds: 0,
+    sessionRunning: true,
+    currentStepIndex: 0,
+    stepId: 'step-1',
+    stepStatus: 'pending',
+    stepRunning: false,
+    stepElapsedSeconds: 0,
+    stepDurationSeconds: 30,
+  }]), true);
+  assert.equal(shouldAppendInitialTimelineEvent(restoredState, [{
+    sequence: 1,
+    type: 'session_resumed',
+    occurredAt: '2026-05-10T09:10:00.000Z',
+    sessionElapsedSeconds: 10,
+    sessionRunning: true,
+    currentStepIndex: 0,
+    stepId: 'step-1',
+    stepStatus: 'pending',
+    stepRunning: false,
+    stepElapsedSeconds: 0,
+    stepDurationSeconds: 30,
+  }]), false);
 });

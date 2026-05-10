@@ -35,6 +35,15 @@ const JSON_HEADERS = {
   'cache-control': 'no-store',
 };
 
+const RECORDING_STOP_REQUEST_MAX_BYTES = 512 * 1024;
+
+class JsonBodyTooLargeError extends Error {
+  constructor(maxBytes: number) {
+    super(`JSON request body exceeds ${maxBytes} bytes`);
+    this.name = 'JsonBodyTooLargeError';
+  }
+}
+
 function sendJson(response: ServerResponse, statusCode: number, payload: unknown) {
   response.writeHead(statusCode, JSON_HEADERS);
   response.end(`${JSON.stringify(payload, null, 2)}\n`);
@@ -112,11 +121,17 @@ function sanitizeClientDiagnosticPayload(payload: unknown, request: IncomingMess
   };
 }
 
-async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
+async function readJsonBody<T>(request: IncomingMessage, options: { maxBytes?: number } = {}): Promise<T> {
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
 
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (options.maxBytes != null && totalBytes > options.maxBytes) {
+      throw new JsonBodyTooLargeError(options.maxBytes);
+    }
+    chunks.push(buffer);
   }
 
   const raw = Buffer.concat(chunks).toString('utf8').trim();
@@ -607,12 +622,28 @@ async function handleApiRequest(
       return;
     }
 
-    const payload = await readJsonBody<{
+    let payload: {
       sessionId?: string;
       disposition?: 'save' | 'discard';
       sessionSnapshot?: Session;
       timelineEvents?: unknown[];
-    }>(request);
+    };
+
+    try {
+      payload = await readJsonBody<{
+        sessionId?: string;
+        disposition?: 'save' | 'discard';
+        sessionSnapshot?: Session;
+        timelineEvents?: unknown[];
+      }>(request, { maxBytes: RECORDING_STOP_REQUEST_MAX_BYTES });
+    } catch (error) {
+      if (error instanceof JsonBodyTooLargeError) {
+        sendJson(response, 413, { error: 'Recording stop payload is too large' });
+        return;
+      }
+      throw error;
+    }
+
     if (!payload.sessionId) {
       sendJson(response, 400, { error: 'sessionId is required' });
       return;

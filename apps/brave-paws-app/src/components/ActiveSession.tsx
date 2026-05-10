@@ -27,6 +27,18 @@ type Props = {
   onCancel: () => void;
 };
 
+export function shouldAppendInitialTimelineEvent(
+  restoredState: ActiveSessionState | undefined,
+  timelineEvents: SessionTimelineEvent[],
+) {
+  if (!restoredState) {
+    return timelineEvents.length === 0;
+  }
+
+  const lastTimelineEvent = timelineEvents[timelineEvents.length - 1];
+  return lastTimelineEvent?.type !== 'session_resumed';
+}
+
 export function ActiveSession({ session: initialSession, initialState, cameraUrl = '', onCameraUrlChange, onStateChange, onCompleteSession, onCancel }: Props) {
   const restoredState = initialState?.session.id === initialSession.id ? initialState : undefined;
   const initialSessionClock = restoredState?.sessionClock ?? {
@@ -143,7 +155,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   }, []);
 
   useEffect(() => {
-    if (timelineEventsRef.current.length > 0) {
+    if (!shouldAppendInitialTimelineEvent(restoredState, timelineEventsRef.current)) {
       return;
     }
 
