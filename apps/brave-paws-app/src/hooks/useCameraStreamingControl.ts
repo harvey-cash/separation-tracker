@@ -26,10 +26,16 @@ export function useCameraStreamingControl(): CameraStreamingControlState {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const capabilityRef = useRef(capability);
+  const refreshInFlightRef = useRef(false);
 
   capabilityRef.current = capability;
 
   const refresh = useCallback(async () => {
+    if (refreshInFlightRef.current) {
+      return capabilityRef.current;
+    }
+
+    refreshInFlightRef.current = true;
     setIsLoading(true);
 
     try {
@@ -47,6 +53,7 @@ export function useCameraStreamingControl(): CameraStreamingControlState {
       setError(message);
       throw refreshError;
     } finally {
+      refreshInFlightRef.current = false;
       setIsLoading(false);
     }
   }, []);

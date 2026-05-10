@@ -19,6 +19,7 @@ test('camera streaming control rechecks backend capabilities on resume-style bro
   const hook = readFileSync(resolve(process.cwd(), 'src/hooks/useCameraStreamingControl.ts'), 'utf8');
 
   assert.match(hook, /setIsLoading\(true\);/);
+  assert.match(hook, /refreshInFlightRef/);
   assert.match(hook, /window\.addEventListener\('focus', handleResume\);/);
   assert.match(hook, /window\.addEventListener\('online', handleResume\);/);
   assert.match(hook, /window\.addEventListener\('pageshow', handleResume\);/);
