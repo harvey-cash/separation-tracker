@@ -28,3 +28,16 @@ test('resolveCameraUrlFromPairingToken exchanges a token for a cached Brave Paws
   assert.match(pairedUrl, /cameraUrl=https%3A%2F%2Fprivate\.example%2Flive\.stream/);
   assert.match(pairedUrl, /cameraProfile=remote-low-latency/);
 });
+
+test('resolveCameraUrlFromPairingToken hides raw HTML failures behind a safe message', async () => {
+  await assert.rejects(
+    resolveCameraUrlFromPairingToken('?pairingToken=abc_DEF-1234567890', {
+      apiBaseUrl: 'https://brave-paws.example/separation/api/',
+      fetchImpl: async () => new Response('<!DOCTYPE html><html><body>GitHub Pages</body></html>', {
+        status: 404,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      }),
+    }),
+    /QUANTUM is not reachable right now\./,
+  );
+});

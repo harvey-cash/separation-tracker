@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from '../config';
 import type { Session, SessionRecording, SessionTimelineEvent } from '../types';
+import { parseBackendJsonResponse } from './backendRequests';
 
 export type CameraStreamingCapability = {
   key: 'cameraStreaming';
@@ -52,21 +53,12 @@ export const UNSUPPORTED_SESSION_RECORDING_CAPABILITY: SessionRecordingCapabilit
   recording: null,
 };
 
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Request failed (${response.status})`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
 export async function fetchBackendCapabilities(
   fetchImpl: typeof fetch = fetch,
   apiBaseUrl = getApiBaseUrl(),
 ): Promise<BackendCapabilities> {
   const response = await fetchImpl(`${apiBaseUrl}capabilities`);
-  return parseJsonResponse<BackendCapabilities>(response);
+  return parseBackendJsonResponse<BackendCapabilities>(response);
 }
 
 export async function setCameraStreamingEnabled(
@@ -82,7 +74,7 @@ export async function setCameraStreamingEnabled(
     body: JSON.stringify({ enabled }),
   });
 
-  return parseJsonResponse<CameraStreamingCapability>(response);
+  return parseBackendJsonResponse<CameraStreamingCapability>(response);
 }
 
 export async function fetchSessionRecordingCapability(
@@ -90,7 +82,7 @@ export async function fetchSessionRecordingCapability(
   apiBaseUrl = getApiBaseUrl(),
 ): Promise<SessionRecordingCapability> {
   const response = await fetchImpl(`${apiBaseUrl}capabilities/recording`);
-  return parseJsonResponse<SessionRecordingCapability>(response);
+  return parseBackendJsonResponse<SessionRecordingCapability>(response);
 }
 
 export async function startSessionRecording(
@@ -106,7 +98,7 @@ export async function startSessionRecording(
     body: JSON.stringify(payload),
   });
 
-  return parseJsonResponse<SessionRecordingCapability>(response);
+  return parseBackendJsonResponse<SessionRecordingCapability>(response);
 }
 
 export async function stopSessionRecording(
@@ -127,5 +119,5 @@ export async function stopSessionRecording(
     body: JSON.stringify(payload),
   });
 
-  return parseJsonResponse<SessionRecordingCapability>(response);
+  return parseBackendJsonResponse<SessionRecordingCapability>(response);
 }

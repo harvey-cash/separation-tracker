@@ -51,3 +51,12 @@ export function getDefaultCameraUrl(origin = getRuntimeOrigin()): string {
 export function getGoogleClientId(): string | undefined {
   return runtimeEnv.VITE_GOOGLE_CLIENT_ID;
 }
+
+export function isLocalDevelopmentOrigin(origin = getRuntimeOrigin()): boolean {
+  try {
+    const hostname = new URL(origin).hostname;
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}

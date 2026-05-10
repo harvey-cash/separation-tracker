@@ -4,6 +4,7 @@ import type { Session } from '../types';
 import { getApiBaseUrl } from '../config';
 import { mergeSessionsById, serializeSessionsForComparison } from '../utils/sessionSync';
 import { reportClientDiagnostic } from '../utils/clientDiagnostics';
+import { isBackendUnavailableError, parseBackendJsonResponse } from '../utils/backendRequests';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
@@ -82,14 +83,7 @@ function saveSyncMetadata(metadata: SyncMetadata) {
   localStorage.setItem(SYNC_METADATA_KEY, JSON.stringify(metadata));
 }
 
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Request failed (${response.status})`);
-  }
-
-  return response.json() as Promise<T>;
-}
+const QUANTUM_UNAVAILABLE_MESSAGE = 'Live sync is unavailable because Brave Paws cannot reach QUANTUM from this network.';
 
 export function useQuantumSync(
   sessions: Session[],
@@ -151,7 +145,7 @@ export function useQuantumSync(
       body: JSON.stringify({ sessions: nextSessions }),
     });
 
-    return parseJsonResponse<PullResponse>(response);
+    return parseBackendJsonResponse<PullResponse>(response);
   }, [apiBaseUrl]);
 
   const pullSessions = useCallback(async () => {
@@ -163,7 +157,7 @@ export function useQuantumSync(
       body: JSON.stringify({}),
     });
 
-    return parseJsonResponse<PullResponse>(response);
+    return parseBackendJsonResponse<PullResponse>(response);
   }, [apiBaseUrl]);
 
   const pushNow = useCallback(async () => {
@@ -180,7 +174,11 @@ export function useQuantumSync(
       const response = await pushSessions(nextSessions);
       finishSuccess(nextSessions, response.updatedAt);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'QUANTUM sync failed';
+      const message = isBackendUnavailableError(error)
+        ? QUANTUM_UNAVAILABLE_MESSAGE
+        : error instanceof Error
+          ? error.message
+          : 'QUANTUM sync failed';
       setSyncStatus('error');
       setSyncError(message);
       setIsAvailable(false);
@@ -267,7 +265,11 @@ export function useQuantumSync(
         finishSuccess(localSessions, remote.updatedAt);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'QUANTUM sync failed';
+      const message = isBackendUnavailableError(error)
+        ? QUANTUM_UNAVAILABLE_MESSAGE
+        : error instanceof Error
+          ? error.message
+          : 'QUANTUM sync failed';
       setSyncStatus('error');
       setSyncError(message);
       setIsAvailable(false);
@@ -295,16 +297,18 @@ export function useQuantumSync(
     const checkHealth = async () => {
       try {
         const response = await fetch(`${apiBaseUrl}health`);
-        if (!response.ok) {
-          throw new Error(`QUANTUM API unavailable (${response.status})`);
-        }
+        await parseBackendJsonResponse(response);
 
         if (!cancelled) {
           setIsAvailable(true);
         }
       } catch (error) {
         if (!cancelled) {
-          const message = error instanceof Error ? error.message : 'QUANTUM API unavailable';
+          const message = isBackendUnavailableError(error)
+            ? QUANTUM_UNAVAILABLE_MESSAGE
+            : error instanceof Error
+              ? error.message
+              : 'QUANTUM API unavailable';
           setIsAvailable(false);
           setSyncError(message);
           reportClientDiagnostic({

@@ -17,6 +17,7 @@ import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
 import { PAIRING_TOKEN_QUERY_PARAM, resolveCameraUrlFromPairingToken } from './utils/pairingToken';
 import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
+import { isLocalDevelopmentOrigin } from './config';
 import {
   ActiveSessionState,
   clearActiveSessionState,
@@ -104,6 +105,7 @@ export default function App() {
   }, [replaceSessions]);
 
   const storageSync = useStorageSync(sessions, handleImportSessions);
+  const isPublicBackendUnavailable = !storageSync.provider.isAvailable && !isLocalDevelopmentOrigin();
 
   useEffect(() => {
     const isTrainingActive = currentView === 'active' && Boolean(activeSession);
@@ -206,6 +208,7 @@ export default function App() {
               provider={storageSync.provider}
             />
           }
+          isBackendUnavailable={isPublicBackendUnavailable}
         />
       )}
 
