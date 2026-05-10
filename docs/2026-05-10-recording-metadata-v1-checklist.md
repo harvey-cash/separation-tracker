@@ -9,4 +9,11 @@
 - [x] Add meaningful automated tests for payload, sidecar, and chapter generation flow.
 - [x] Build/lint/test the affected workspaces.
 - [x] Produce an end-to-end smoke-test recording artifact on Q proving the flow.
-- [ ] Commit sensible checkpoints, push branch, and open/update a PR.
+- [x] Commit sensible checkpoints, push branch, and open/update a PR.
+
+## Outputs
+
+- PR: https://github.com/harvey-cash/separation-tracker/pull/65
+- Smoke recording: `/mnt/q/fermi/brave-paws/smoke-tests/2026-05-10-recording-metadata-v1-rerun/server-data/recordings/2026/05/10/smoke-20260510T093538Z.mp4`
+- Smoke sidecar: `/mnt/q/fermi/brave-paws/smoke-tests/2026-05-10-recording-metadata-v1-rerun/server-data/recordings/2026/05/10/smoke-20260510T093538Z.brave-paws.json`
+- ffprobe chapter dump: `/mnt/q/fermi/brave-paws/smoke-tests/2026-05-10-recording-metadata-v1-rerun/ffprobe-chapters.json`
