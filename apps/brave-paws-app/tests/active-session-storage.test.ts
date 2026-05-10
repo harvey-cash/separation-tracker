@@ -127,7 +127,7 @@ test('clearActiveSessionState removes persisted state', () => {
   assert.equal(storage.getItem(ACTIVE_SESSION_STORAGE_KEY), null);
 });
 
-test('shouldAppendInitialTimelineEvent adds a restore resume marker when prior events exist', () => {
+test('shouldAppendInitialTimelineEvent returns true when restoring sessions with prior events', () => {
   const restoredState = createActiveSessionState(createSession(), 1_000);
 
   assert.equal(shouldAppendInitialTimelineEvent(undefined, []), true);

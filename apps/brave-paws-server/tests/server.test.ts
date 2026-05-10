@@ -344,7 +344,7 @@ test('recording stop rejects oversized JSON payloads', async () => {
     });
 
     assert.equal(response.status, 413);
-    assert.match(await response.text(), /too large/i);
+    assert.match(await response.text(), /maximum size of 512KB/i);
   });
 });
 

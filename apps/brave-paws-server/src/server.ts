@@ -638,7 +638,7 @@ async function handleApiRequest(
       }>(request, { maxBytes: RECORDING_STOP_REQUEST_MAX_BYTES });
     } catch (error) {
       if (error instanceof JsonBodyTooLargeError) {
-        sendJson(response, 413, { error: 'Recording stop payload is too large' });
+        sendJson(response, 413, { error: 'Recording stop payload exceeds maximum size of 512KB' });
         return;
       }
       throw error;
