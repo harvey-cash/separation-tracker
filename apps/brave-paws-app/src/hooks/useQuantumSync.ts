@@ -41,11 +41,15 @@ function loadStringFromStorage(keys: string[]): string | null {
     return null;
   }
 
-  for (const key of keys) {
-    const value = localStorage.getItem(key);
-    if (value) {
-      return value;
+  try {
+    for (const key of keys) {
+      const value = localStorage.getItem(key);
+      if (value) {
+        return value;
+      }
     }
+  } catch {
+    return null;
   }
 
   return null;
@@ -61,8 +65,12 @@ function saveLastSync(timestampMs: number) {
     return;
   }
 
-  localStorage.setItem(LAST_SYNC_KEY, String(timestampMs));
-  localStorage.removeItem(LEGACY_LAST_SYNC_KEY);
+  try {
+    localStorage.setItem(LAST_SYNC_KEY, String(timestampMs));
+    localStorage.removeItem(LEGACY_LAST_SYNC_KEY);
+  } catch {
+    return;
+  }
 }
 
 function createEmptySyncMetadata(): SyncMetadata {
@@ -94,8 +102,12 @@ function saveSyncMetadata(metadata: SyncMetadata) {
     return;
   }
 
-  localStorage.setItem(SYNC_METADATA_KEY, JSON.stringify(metadata));
-  localStorage.removeItem(LEGACY_SYNC_METADATA_KEY);
+  try {
+    localStorage.setItem(SYNC_METADATA_KEY, JSON.stringify(metadata));
+    localStorage.removeItem(LEGACY_SYNC_METADATA_KEY);
+  } catch {
+    return;
+  }
 }
 
 const BACKEND_UNAVAILABLE_MESSAGE = 'Remote sync is unavailable because Brave Paws cannot reach the server from this network.';
@@ -104,10 +116,11 @@ export function useQuantumSync(
   sessions: Session[],
   onReplaceSessions: (sessions: Session[]) => void,
 ) {
+  const [initialSyncMetadata] = useState<SyncMetadata>(() => loadSyncMetadata());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isAvailable, setIsAvailable] = useState(true);
-  const syncMetadataRef = useRef(loadSyncMetadata());
+  const syncMetadataRef = useRef(initialSyncMetadata);
   const [hasPendingChanges, setHasPendingChanges] = useState(
     () => serializeSessionsForComparison(sessions) !== syncMetadataRef.current.lastSyncedSnapshot,
   );
