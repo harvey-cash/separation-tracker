@@ -31,12 +31,7 @@ function buildBackendFailureError(response: Response, bodyText: string): Backend
     });
   }
 
-  if (
-    response.status === 404
-    || response.status === 405
-    || response.status >= 500
-    || isHtmlLikeResponse(response, bodyText)
-  ) {
+  if (response.status >= 500 || isHtmlLikeResponse(response, bodyText)) {
     return new BackendRequestError('QUANTUM is not reachable right now.', {
       kind: 'unreachable',
       status: response.status,
@@ -78,5 +73,20 @@ export async function parseBackendJsonResponse<T>(response: Response): Promise<T
     );
   }
 
-  return response.json() as Promise<T>;
+  const clonedResponse = response.clone();
+
+  try {
+    return await response.json() as T;
+  } catch {
+    const bodyText = await clonedResponse.text().catch(() => '');
+    const htmlLike = isHtmlLikeResponse(response, bodyText);
+
+    throw new BackendRequestError(
+      htmlLike ? 'QUANTUM is not reachable right now.' : 'Unexpected response from QUANTUM.',
+      {
+        kind: htmlLike ? 'unreachable' : 'invalid-response',
+        status: response.status,
+      },
+    );
+  }
 }

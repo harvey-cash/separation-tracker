@@ -80,6 +80,16 @@ test('fetchBackendCapabilities hides raw HTML error bodies when the API is unrea
   );
 });
 
+test('fetchBackendCapabilities keeps JSON 404 responses as feature-unavailable errors', async () => {
+  await assert.rejects(
+    fetchBackendCapabilities((async () => new Response(JSON.stringify({ error: 'pairing disabled' }), {
+      status: 404,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
+    /This feature is unavailable right now\./,
+  );
+});
+
 test('fetchSessionRecordingCapability reads the dedicated recording capability endpoint', async () => {
   const capability = await fetchSessionRecordingCapability((async (input: string | URL | Request) => {
     assert.equal(String(input), 'https://brave-paws.example/separation/api/capabilities/recording');
@@ -150,6 +160,26 @@ test('setCameraStreamingEnabled hides non-JSON gateway errors behind a safe mess
       headers: { 'content-type': 'text/html' },
     })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
     /QUANTUM is not reachable right now\./,
+  );
+});
+
+test('fetchBackendCapabilities hides invalid HTML payloads even when they claim JSON content-type', async () => {
+  await assert.rejects(
+    fetchBackendCapabilities((async () => new Response('<!DOCTYPE html><html><body>gateway error</body></html>', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
+    /QUANTUM is not reachable right now\./,
+  );
+});
+
+test('fetchBackendCapabilities reports invalid non-HTML JSON payloads as unexpected responses', async () => {
+  await assert.rejects(
+    fetchBackendCapabilities((async () => new Response('{not-valid-json', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
+    /Unexpected response from QUANTUM\./,
   );
 });
 
