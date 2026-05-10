@@ -70,6 +70,16 @@ test('setCameraStreamingEnabled posts the desired enabled state to the shared ca
   assert.equal(capability.supported, true);
 });
 
+test('fetchBackendCapabilities hides raw HTML error bodies when the API is unreachable', async () => {
+  await assert.rejects(
+    fetchBackendCapabilities((async () => new Response('<!DOCTYPE html><html><body>nope</body></html>', {
+      status: 404,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
+    /QUANTUM is not reachable right now\./,
+  );
+});
+
 test('fetchSessionRecordingCapability reads the dedicated recording capability endpoint', async () => {
   const capability = await fetchSessionRecordingCapability((async (input: string | URL | Request) => {
     assert.equal(String(input), 'https://brave-paws.example/separation/api/capabilities/recording');
@@ -131,6 +141,16 @@ test('startSessionRecording posts the session payload to the recording start end
 
   assert.equal(capability.active, true);
   assert.equal(capability.sessionId, 'session-abc');
+});
+
+test('setCameraStreamingEnabled hides non-JSON gateway errors behind a safe message', async () => {
+  await assert.rejects(
+    setCameraStreamingEnabled(true, (async () => new Response('<html><head><title>405 Not Allowed</title></head></html>', {
+      status: 405,
+      headers: { 'content-type': 'text/html' },
+    })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
+    /QUANTUM is not reachable right now\./,
+  );
 });
 
 test('stopSessionRecording posts the stop payload to the recording stop endpoint', async () => {

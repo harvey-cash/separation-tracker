@@ -6,6 +6,7 @@ import {
   UNSUPPORTED_CAMERA_STREAMING_CAPABILITY,
   type CameraStreamingCapability,
 } from '../utils/backendCapabilities';
+import { isBackendUnavailableError } from '../utils/backendRequests';
 
 export type CameraStreamingControlState = {
   capability: CameraStreamingCapability;
@@ -16,6 +17,8 @@ export type CameraStreamingControlState = {
   setEnabled: (enabled: boolean, options?: { silent?: boolean }) => Promise<CameraStreamingCapability>;
   toggle: () => Promise<CameraStreamingCapability>;
 };
+
+const CAMERA_UNAVAILABLE_MESSAGE = 'Live camera controls are unavailable because Brave Paws cannot reach QUANTUM from this network.';
 
 export function useCameraStreamingControl(): CameraStreamingControlState {
   const [capability, setCapability] = useState<CameraStreamingCapability>(UNSUPPORTED_CAMERA_STREAMING_CAPABILITY);
@@ -33,7 +36,11 @@ export function useCameraStreamingControl(): CameraStreamingControlState {
       setError(null);
       return next;
     } catch (refreshError) {
-      const message = refreshError instanceof Error ? refreshError.message : 'Camera streaming control unavailable';
+      const message = isBackendUnavailableError(refreshError)
+        ? CAMERA_UNAVAILABLE_MESSAGE
+        : refreshError instanceof Error
+          ? refreshError.message
+          : 'Camera streaming control unavailable';
       setCapability(UNSUPPORTED_CAMERA_STREAMING_CAPABILITY);
       setError(message);
       throw refreshError;
@@ -55,7 +62,11 @@ export function useCameraStreamingControl(): CameraStreamingControlState {
       setError(null);
       return next;
     } catch (updateError) {
-      const message = updateError instanceof Error ? updateError.message : 'Could not update camera streaming';
+      const message = isBackendUnavailableError(updateError)
+        ? CAMERA_UNAVAILABLE_MESSAGE
+        : updateError instanceof Error
+          ? updateError.message
+          : 'Could not update camera streaming';
       if (!options?.silent) {
         setError(message);
       }

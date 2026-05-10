@@ -42,11 +42,11 @@ export function StorageSync({ provider }: Props) {
         {!provider.isAvailable && (
           <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
-            <span>QUANTUM is not reachable right now.</span>
+            <span>Live sync is unavailable on this public page because Brave Paws cannot reach its private QUANTUM server from this network.</span>
           </div>
         )}
 
-        {provider.error && (
+        {provider.error && provider.isAvailable && (
           <div className="flex items-start gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
             <span>{provider.error}</span>

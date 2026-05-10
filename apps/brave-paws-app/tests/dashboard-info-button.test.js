@@ -9,6 +9,10 @@ test('Dashboard includes info entry points, camera control, recording, and the v
   assert.match(dashboard, /recentSessions\.length === 0[\s\S]*New to separation anxiety training\?/);
   assert.match(dashboard, /recentSessions\.length > 0[\s\S]*About separation anxiety training/);
   assert.match(dashboard, /cameraStreamingControl/);
+  assert.match(dashboard, /Private access required/);
+  assert.match(dashboard, /cannot reach that server from the current network/);
+  assert.match(dashboard, /disabled=\{isBackendUnavailable\}/);
+  assert.match(dashboard, /Unavailable without QUANTUM access/);
   assert.match(dashboard, /Brave Paws v0\.2\.2/);
   assert.match(dashboard, /local QUANTUM Tailnet setup/);
   assert.match(dashboard, /backend camera control/);

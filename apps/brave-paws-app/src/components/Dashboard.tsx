@@ -14,6 +14,7 @@ type Props = {
   onViewSession: (session: Session) => void;
   cameraStreamingControl?: ReactNode;
   storageSync?: ReactNode;
+  isBackendUnavailable?: boolean;
 };
 
 export function getRecentSessions(sessions: Session[]) {
@@ -31,6 +32,7 @@ export function Dashboard({
   onViewSession,
   cameraStreamingControl,
   storageSync,
+  isBackendUnavailable = false,
 }: Props) {
   const abortedSessions = sessions.filter((s) => s.status === 'aborted');
   const recentSessions = getRecentSessions(sessions);
@@ -60,15 +62,29 @@ export function Dashboard({
         </button>
       )}
 
+      {isBackendUnavailable && (
+        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Private access required</p>
+          <p className="mt-2 text-sm text-amber-900">
+            Brave Paws needs a live connection to its private QUANTUM server before training, sync, camera controls, and recordings can work.
+            This public page cannot reach that server from the current network.
+          </p>
+        </section>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
           onClick={onStartNew}
-          className="group flex flex-col items-center justify-center gap-3 bg-rose-500 hover:bg-rose-600 text-white p-8 rounded-3xl shadow-sm hover:shadow-md transition-all"
+          disabled={isBackendUnavailable}
+          className="group flex flex-col items-center justify-center gap-3 bg-rose-500 hover:bg-rose-600 text-white p-8 rounded-3xl shadow-sm hover:shadow-md transition-all disabled:cursor-not-allowed disabled:bg-rose-200 disabled:text-rose-50 disabled:shadow-none"
         >
           <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform">
             <Play size={28} fill="currentColor" />
           </div>
           <span className="text-xl font-semibold">Start Training</span>
+          {isBackendUnavailable && (
+            <span className="text-center text-sm font-medium text-rose-50/90">Unavailable without QUANTUM access</span>
+          )}
         </button>
 
         <div className="grid grid-cols-2 gap-4">

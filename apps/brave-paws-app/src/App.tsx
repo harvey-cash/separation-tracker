@@ -206,6 +206,7 @@ export default function App() {
               provider={storageSync.provider}
             />
           }
+          isBackendUnavailable={!storageSync.provider.isAvailable}
         />
       )}
 
