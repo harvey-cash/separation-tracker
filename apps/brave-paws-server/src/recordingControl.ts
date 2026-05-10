@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import type { BravePawsServerConfig } from './config.js';
-import type { SessionRecording } from './types.js';
+import { finalizeRecordingMetadata } from './recordingMetadata.js';
+import type { Session, SessionRecording, SessionTimelineEvent } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -13,6 +14,8 @@ type RecordingCommandPayload = {
   sessionDate?: string;
   sessionStatus?: string;
   disposition?: 'save' | 'discard';
+  sessionSnapshot?: Session;
+  timelineEvents?: SessionTimelineEvent[];
 };
 
 export type SessionRecordingCapability = {
@@ -111,6 +114,8 @@ function normalizeRecording(value: unknown, provider: string, fallbackSessionId:
     hasAudio: typeof candidate.hasAudio === 'boolean' ? candidate.hasAudio : false,
     relativeFilePath: typeof candidate.relativeFilePath === 'string' ? candidate.relativeFilePath : null,
     downloadPath: typeof candidate.downloadPath === 'string' ? candidate.downloadPath : null,
+    metadataRelativeFilePath: typeof candidate.metadataRelativeFilePath === 'string' ? candidate.metadataRelativeFilePath : null,
+    metadataDownloadPath: typeof candidate.metadataDownloadPath === 'string' ? candidate.metadataDownloadPath : null,
     durationSeconds:
       typeof candidate.durationSeconds === 'number' && Number.isFinite(candidate.durationSeconds)
         ? Math.max(0, candidate.durationSeconds)
@@ -119,6 +124,11 @@ function normalizeRecording(value: unknown, provider: string, fallbackSessionId:
       typeof candidate.sizeBytes === 'number' && Number.isFinite(candidate.sizeBytes)
         ? Math.max(0, candidate.sizeBytes)
         : null,
+    chapterCount:
+      typeof candidate.chapterCount === 'number' && Number.isFinite(candidate.chapterCount)
+        ? Math.max(0, candidate.chapterCount)
+        : null,
+    chaptersEmbedded: typeof candidate.chaptersEmbedded === 'boolean' ? candidate.chaptersEmbedded : null,
     detail: typeof candidate.detail === 'string' ? candidate.detail : null,
   };
 }
@@ -361,7 +371,26 @@ class CommandSessionRecordingController implements SessionRecordingController {
           buildRecordingEnv(this.options.config, payload),
         );
         const capability = parseCapabilityOutput(result.stdout, this.options.label, this.options.provider);
-        return capability;
+        if (!capability.recording || payload.disposition === 'discard') {
+          return capability;
+        }
+
+        try {
+          const finalizedRecording = await finalizeRecordingMetadata({
+            config: this.options.config,
+            recording: capability.recording,
+            sessionSnapshot: payload.sessionSnapshot,
+            timelineEvents: payload.timelineEvents,
+          });
+
+          return {
+            ...capability,
+            recording: finalizedRecording,
+          };
+        } catch (metadataError) {
+          console.warn('Session recording metadata finalization failed.', metadataError);
+          return capability;
+        }
       } catch (error) {
         console.error('Session recording stop command failed', error);
         return this.readCapability(payload, getSafeCommandErrorDetail(error, getCommandFailureDetail('stop')));

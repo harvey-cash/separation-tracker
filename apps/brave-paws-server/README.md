@@ -78,8 +78,15 @@ Brave Paws also exposes a session recording contract that is intentionally separ
 
 - `GET /separation/api/capabilities/recording` → returns recording capability and current state
 - `POST /separation/api/recording/start` with `{ "sessionId": "...", "sessionDate": "...", "sessionStatus": "..." }` → starts or resumes recording for a session
-- `POST /separation/api/recording/stop` with `{ "sessionId": "...", "disposition": "save" | "discard" }` → finalizes or discards the session recording
-- `GET /separation/api/recordings/file/<relative-path>` → streams a finalized recording file from the canonical recordings directory
+- `POST /separation/api/recording/stop` with `{ "sessionId": "...", "disposition": "save" | "discard", "sessionSnapshot": { ... }, "timelineEvents": [ ... ] }` → finalizes or discards the session recording and, on save, captures canonical Brave Paws metadata from the actual runtime timeline
+- `GET /separation/api/recordings/file/<relative-path>` → streams a finalized recording file or adjacent sidecar from the canonical recordings directory
++
++When a recording is saved successfully, Brave Paws now writes a canonical v1 JSON sidecar next to the MP4 using the same basename, for example:
++
++- `2026/05/10/session-123.mp4`
++- `2026/05/10/session-123.brave-paws.json`
++
++The JSON sidecar is the source of truth. It stores the finalized session snapshot, normalized runtime timeline events, and the derived chapter list. The backend then tries to embed those chapters into the MP4 as a VLC-friendly convenience layer. Chapter embedding is best-effort only: the recording file is kept even if FFmpeg chapter injection fails.
 
 The intended deployment model is a passive extra reader near the media source: the live RTSP publisher remains the same, the in-app HLS preview remains the same, and the Icecast audio stream remains the same. Recording should read the source RTSP feed separately and avoid inserting transcoding or buffering into the live user-facing paths.
 

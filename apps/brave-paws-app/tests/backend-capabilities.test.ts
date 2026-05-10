@@ -135,11 +135,67 @@ test('startSessionRecording posts the session payload to the recording start end
 
 test('stopSessionRecording posts the stop payload to the recording stop endpoint', async () => {
   const capability = await stopSessionRecording(
-    { sessionId: 'session-abc', disposition: 'save' },
+    {
+      sessionId: 'session-abc',
+      disposition: 'save',
+      sessionSnapshot: {
+        id: 'session-abc',
+        date: '2026-05-09T18:00:00.000Z',
+        totalDurationSeconds: 75,
+        status: 'completed',
+        steps: [
+          { id: 'step-1', durationSeconds: 30, status: 'completed' },
+          { id: 'step-2', durationSeconds: 45, status: 'completed' },
+        ],
+      },
+      timelineEvents: [
+        {
+          sequence: 0,
+          type: 'session_started',
+          occurredAt: '2026-05-09T18:00:00.000Z',
+          sessionElapsedSeconds: 0,
+          sessionRunning: true,
+          currentStepIndex: 0,
+          stepId: 'step-1',
+          stepStatus: 'pending',
+          stepRunning: false,
+          stepElapsedSeconds: 0,
+          stepDurationSeconds: 30,
+        },
+      ],
+    },
     (async (input: string | URL | Request, init?: RequestInit) => {
       assert.equal(String(input), 'https://brave-paws.example/separation/api/recording/stop');
       assert.equal(init?.method, 'POST');
-      assert.equal(init?.body, JSON.stringify({ sessionId: 'session-abc', disposition: 'save' }));
+      assert.equal(init?.body, JSON.stringify({
+        sessionId: 'session-abc',
+        disposition: 'save',
+        sessionSnapshot: {
+          id: 'session-abc',
+          date: '2026-05-09T18:00:00.000Z',
+          totalDurationSeconds: 75,
+          status: 'completed',
+          steps: [
+            { id: 'step-1', durationSeconds: 30, status: 'completed' },
+            { id: 'step-2', durationSeconds: 45, status: 'completed' },
+          ],
+        },
+        timelineEvents: [
+          {
+            sequence: 0,
+            type: 'session_started',
+            occurredAt: '2026-05-09T18:00:00.000Z',
+            sessionElapsedSeconds: 0,
+            sessionRunning: true,
+            currentStepIndex: 0,
+            stepId: 'step-1',
+            stepStatus: 'pending',
+            stepRunning: false,
+            stepElapsedSeconds: 0,
+            stepDurationSeconds: 30,
+          },
+        ],
+      }));
 
       return new Response(JSON.stringify({
         ...UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
@@ -155,6 +211,10 @@ test('stopSessionRecording posts the stop payload to the recording stop endpoint
           provider: 'command',
           relativeFilePath: '2026/05/09/session-abc.mp4',
           downloadPath: '/separation/api/recordings/file/2026/05/09/session-abc.mp4',
+          metadataRelativeFilePath: '2026/05/09/session-abc.brave-paws.json',
+          metadataDownloadPath: '/separation/api/recordings/file/2026/05/09/session-abc.brave-paws.json',
+          chapterCount: 2,
+          chaptersEmbedded: true,
         },
         detail: null,
       }), {
@@ -168,4 +228,7 @@ test('stopSessionRecording posts the stop payload to the recording stop endpoint
   assert.equal(capability.active, false);
   assert.equal(capability.recording?.status, 'completed');
   assert.equal(capability.recording?.downloadPath, '/separation/api/recordings/file/2026/05/09/session-abc.mp4');
+  assert.equal(capability.recording?.metadataDownloadPath, '/separation/api/recordings/file/2026/05/09/session-abc.brave-paws.json');
+  assert.equal(capability.recording?.chapterCount, 2);
+  assert.equal(capability.recording?.chaptersEmbedded, true);
 });

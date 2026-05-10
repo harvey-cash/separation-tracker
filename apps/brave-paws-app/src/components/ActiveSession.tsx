@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Session, SessionRecording, StepStatus } from '../types';
+import { Session, SessionRecording, SessionTimelineEvent, SessionTimelineEventType, StepStatus } from '../types';
 import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff, RotateCcw, Minimize2, Maximize2 } from 'lucide-react';
 import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
@@ -62,6 +62,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
 
     return getRemainingSeconds(currentStep.durationSeconds, restoredState.stepClock);
   });
+  const [timelineEvents, setTimelineEvents] = useState<SessionTimelineEvent[]>(restoredState?.timelineEvents ?? []);
   const [previewReloadToken, setPreviewReloadToken] = useState(0);
   const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'live' | 'degraded' | 'disconnected'>('idle');
   const [previewStatusMessage, setPreviewStatusMessage] = useState('Paste a stream URL, open a one-time pairing link, or use the suggested picam link to start the live preview.');
@@ -75,14 +76,18 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const sessionRef = useRef(session);
   const sessionClockRef = useRef(sessionClock);
   const currentStepIndexRef = useRef(currentStepIndex);
+  const isSessionRunningRef = useRef(isSessionRunning);
   const isStepRunningRef = useRef(isStepRunning);
   const stepClockRef = useRef(stepClock);
+  const timelineEventsRef = useRef(timelineEvents);
 
   sessionRef.current = session;
   sessionClockRef.current = sessionClock;
   currentStepIndexRef.current = currentStepIndex;
+  isSessionRunningRef.current = isSessionRunning;
   isStepRunningRef.current = isStepRunning;
   stepClockRef.current = stepClock;
+  timelineEventsRef.current = timelineEvents;
 
   const updateSessionClock = useCallback((clock: TimerClock) => {
     sessionClockRef.current = clock;
@@ -98,32 +103,111 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     setSessionElapsed(getElapsedSeconds(sessionClockRef.current, now));
   }, []);
 
+  const appendTimelineEvent = useCallback((
+    type: SessionTimelineEventType,
+    options: {
+      now?: number;
+      sessionRunning?: boolean;
+      currentStepIndex?: number | null;
+      stepRunning?: boolean;
+      stepStatus?: StepStatus | null;
+      sessionOverride?: Session;
+      sessionClock?: TimerClock;
+      stepClock?: TimerClock;
+    } = {},
+  ) => {
+    const now = options.now ?? Date.now();
+    const sessionSnapshot = options.sessionOverride ?? sessionRef.current;
+    const nextStepIndex = options.currentStepIndex ?? currentStepIndexRef.current;
+    const step = nextStepIndex != null ? sessionSnapshot.steps[nextStepIndex] : undefined;
+    const sessionClockSnapshot = options.sessionClock ?? sessionClockRef.current;
+    const stepClockSnapshot = options.stepClock ?? stepClockRef.current;
+    const event: SessionTimelineEvent = {
+      sequence: timelineEventsRef.current.length,
+      type,
+      occurredAt: new Date(now).toISOString(),
+      sessionElapsedSeconds: getElapsedSeconds(sessionClockSnapshot, now),
+      sessionRunning: options.sessionRunning ?? isSessionRunningRef.current,
+      currentStepIndex: nextStepIndex,
+      stepId: step?.id ?? null,
+      stepStatus: options.stepStatus ?? step?.status ?? null,
+      stepRunning: options.stepRunning ?? isStepRunningRef.current,
+      stepElapsedSeconds: step ? getElapsedSeconds(stepClockSnapshot, now) : null,
+      stepDurationSeconds: step?.durationSeconds ?? null,
+    };
+
+    const nextTimelineEvents = [...timelineEventsRef.current, event];
+    timelineEventsRef.current = nextTimelineEvents;
+    setTimelineEvents(nextTimelineEvents);
+    return event;
+  }, []);
+
+  useEffect(() => {
+    if (timelineEventsRef.current.length > 0) {
+      return;
+    }
+
+    const now = Date.now();
+    const isRestored = Boolean(restoredState);
+    appendTimelineEvent(isRestored ? 'session_resumed' : 'session_started', {
+      now,
+      sessionRunning: restoredState?.isSessionRunning ?? true,
+      currentStepIndex: restoredState?.currentStepIndex ?? 0,
+      stepRunning: restoredState?.isStepRunning ?? false,
+      sessionOverride: restoredState?.session ?? initialSession,
+      sessionClock: restoredState?.sessionClock ?? initialSessionClock,
+      stepClock: restoredState?.stepClock ?? initialStepClock,
+    });
+  }, [appendTimelineEvent, initialSession, initialSessionClock, initialStepClock, restoredState]);
+
   const finalizeStep = useCallback((index: number, status: StepStatus, now = Date.now()) => {
-    updateStepClock({ startedAt: null, accumulatedMs: 0 });
+    const pausedStepClock = pauseTimer(stepClockRef.current, now);
+    const nextStepClock = { startedAt: null, accumulatedMs: 0 };
+    const currentSession = sessionRef.current;
+    const newSteps = [...currentSession.steps];
+    newSteps[index] = { ...newSteps[index], status };
+    const updatedSession = { ...currentSession, steps: newSteps };
+
+    sessionRef.current = updatedSession;
+    setSession(updatedSession);
+    updateStepClock(nextStepClock);
     setStepRemaining(0);
     isStepRunningRef.current = false;
     setIsStepRunning(false);
 
-    setSession((prev) => {
-      const newSteps = [...prev.steps];
-      newSteps[index] = { ...newSteps[index], status };
-      const updatedSession = { ...prev, steps: newSteps };
-      sessionRef.current = updatedSession;
-      return updatedSession;
-    });
-    
-    if (index < sessionRef.current.steps.length - 1) {
+    if (index < updatedSession.steps.length - 1) {
+      appendTimelineEvent(status === 'completed' ? 'step_completed' : 'step_aborted', {
+        now,
+        currentStepIndex: index,
+        stepRunning: false,
+        stepStatus: status,
+        stepClock: pausedStepClock,
+        sessionOverride: updatedSession,
+      });
+
       const nextStepIndex = index + 1;
       currentStepIndexRef.current = nextStepIndex;
       setCurrentStepIndex(nextStepIndex);
-      setStepRemaining(sessionRef.current.steps[nextStepIndex].durationSeconds);
-    } else {
-      const pausedSessionClock = pauseTimer(sessionClockRef.current, now);
-      updateSessionClock(pausedSessionClock);
-      setSessionElapsed(getElapsedSeconds(pausedSessionClock, now));
-      setIsSessionRunning(false);
+      setStepRemaining(updatedSession.steps[nextStepIndex]!.durationSeconds);
+      return;
     }
-  }, [updateSessionClock, updateStepClock]);
+
+    const pausedSessionClock = pauseTimer(sessionClockRef.current, now);
+    updateSessionClock(pausedSessionClock);
+    setSessionElapsed(getElapsedSeconds(pausedSessionClock, now));
+    isSessionRunningRef.current = false;
+    setIsSessionRunning(false);
+    appendTimelineEvent(status === 'completed' ? 'step_completed' : 'step_aborted', {
+      now,
+      currentStepIndex: index,
+      sessionRunning: false,
+      stepRunning: false,
+      stepStatus: status,
+      sessionClock: pausedSessionClock,
+      stepClock: pausedStepClock,
+      sessionOverride: updatedSession,
+    });
+  }, [appendTimelineEvent, updateSessionClock, updateStepClock]);
 
   const syncStepRemaining = useCallback((now = Date.now()) => {
     const currentStep = sessionRef.current.steps[currentStepIndexRef.current];
@@ -169,8 +253,12 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     hasAudio: false,
     relativeFilePath: sessionRef.current.recording?.relativeFilePath ?? null,
     downloadPath: sessionRef.current.recording?.downloadPath ?? null,
+    metadataRelativeFilePath: sessionRef.current.recording?.metadataRelativeFilePath ?? null,
+    metadataDownloadPath: sessionRef.current.recording?.metadataDownloadPath ?? null,
     durationSeconds: sessionRef.current.recording?.durationSeconds ?? null,
     sizeBytes: sessionRef.current.recording?.sizeBytes ?? null,
+    chapterCount: sessionRef.current.recording?.chapterCount ?? null,
+    chaptersEmbedded: sessionRef.current.recording?.chaptersEmbedded ?? null,
     detail,
   }), [recordingCapability.provider]);
 
@@ -296,8 +384,9 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       sessionClock,
       isStepRunning,
       stepClock,
+      timelineEvents,
     });
-  }, [currentStepIndex, isSessionRunning, isStepRunning, onStateChange, session, sessionClock, stepClock]);
+  }, [currentStepIndex, isSessionRunning, isStepRunning, onStateChange, session, sessionClock, stepClock, timelineEvents]);
 
   const handleToggleSession = () => {
     const now = Date.now();
@@ -305,12 +394,25 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       const pausedClock = pauseTimer(sessionClockRef.current, now);
       updateSessionClock(pausedClock);
       setSessionElapsed(getElapsedSeconds(pausedClock, now));
+      isSessionRunningRef.current = false;
       setIsSessionRunning(false);
+      appendTimelineEvent('session_paused', {
+        now,
+        sessionRunning: false,
+        sessionClock: pausedClock,
+      });
       return;
     }
 
-    updateSessionClock(startTimer(sessionClockRef.current, now));
+    const resumedClock = startTimer(sessionClockRef.current, now);
+    updateSessionClock(resumedClock);
+    isSessionRunningRef.current = true;
     setIsSessionRunning(true);
+    appendTimelineEvent('session_resumed', {
+      now,
+      sessionRunning: true,
+      sessionClock: resumedClock,
+    });
   };
 
   const handleToggleStep = () => {
@@ -321,21 +423,52 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       setStepRemaining(
         getRemainingSeconds(sessionRef.current.steps[currentStepIndexRef.current]?.durationSeconds || 0, pausedClock, now)
       );
+      isStepRunningRef.current = false;
       setIsStepRunning(false);
+      appendTimelineEvent('step_paused', {
+        now,
+        stepRunning: false,
+        stepClock: pausedClock,
+      });
       return;
     }
 
-    updateStepClock(startTimer(stepClockRef.current, now));
+    const wasPaused = stepClockRef.current.accumulatedMs > 0;
+    const nextClock = startTimer(stepClockRef.current, now);
+    updateStepClock(nextClock);
+    isStepRunningRef.current = true;
     setIsStepRunning(true);
+    appendTimelineEvent(wasPaused ? 'step_resumed' : 'step_started', {
+      now,
+      stepRunning: true,
+      stepClock: nextClock,
+    });
   };
 
   const handleFinishSession = async () => {
     const now = Date.now();
     const finalSessionClock = isSessionRunning ? pauseTimer(sessionClockRef.current, now) : sessionClockRef.current;
+    const finalStepClock = isStepRunning ? pauseTimer(stepClockRef.current, now) : stepClockRef.current;
     updateSessionClock(finalSessionClock);
+    updateStepClock({ startedAt: null, accumulatedMs: 0 });
     setSessionElapsed(getElapsedSeconds(finalSessionClock, now));
+    isSessionRunningRef.current = false;
+    isStepRunningRef.current = false;
     setIsSessionRunning(false);
     setIsStepRunning(false);
+    appendTimelineEvent('session_finished', {
+      now,
+      sessionRunning: false,
+      stepRunning: false,
+      sessionClock: finalSessionClock,
+      stepClock: finalStepClock,
+    });
+
+    const recordingSessionSnapshot: Session = {
+      ...sessionRef.current,
+      totalDurationSeconds: getElapsedSeconds(finalSessionClock, now),
+      status: abortedSteps > 0 ? 'aborted' : 'completed',
+    };
 
     let nextRecording = sessionRef.current.recording;
     if (recordingCapability.canStop) {
@@ -344,6 +477,8 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
         const capability = await stopSessionRecording({
           sessionId: sessionRef.current.id,
           disposition: 'save',
+          sessionSnapshot: recordingSessionSnapshot,
+          timelineEvents: [...timelineEventsRef.current],
         });
         nextRecording = applyRecordingCapability(capability) ?? nextRecording;
       } catch (recordingStopError) {
@@ -358,8 +493,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     }
 
     onCompleteSession({
-      ...sessionRef.current,
-      totalDurationSeconds: getElapsedSeconds(finalSessionClock, now),
+      ...recordingSessionSnapshot,
       recording: nextRecording,
     });
   };
@@ -369,12 +503,35 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       return;
     }
 
+    const now = Date.now();
+    const finalSessionClock = isSessionRunning ? pauseTimer(sessionClockRef.current, now) : sessionClockRef.current;
+    const finalStepClock = isStepRunning ? pauseTimer(stepClockRef.current, now) : stepClockRef.current;
+    updateSessionClock(finalSessionClock);
+    updateStepClock({ startedAt: null, accumulatedMs: 0 });
+    isSessionRunningRef.current = false;
+    isStepRunningRef.current = false;
+    setIsSessionRunning(false);
+    setIsStepRunning(false);
+    appendTimelineEvent('session_cancelled', {
+      now,
+      sessionRunning: false,
+      stepRunning: false,
+      sessionClock: finalSessionClock,
+      stepClock: finalStepClock,
+    });
+
     if (recordingCapability.canStop) {
       setIsRecordingUpdating(true);
       try {
         await stopSessionRecording({
           sessionId: sessionRef.current.id,
           disposition: 'discard',
+          sessionSnapshot: {
+            ...sessionRef.current,
+            totalDurationSeconds: getElapsedSeconds(finalSessionClock, now),
+            status: 'aborted',
+          },
+          timelineEvents: [...timelineEventsRef.current],
         });
       } catch {
         // Best effort only; cancelling the session still takes priority.

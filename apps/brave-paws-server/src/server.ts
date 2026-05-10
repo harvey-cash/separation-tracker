@@ -15,6 +15,7 @@ import {
   type SessionRecordingCapability,
   type SessionRecordingController,
 } from './recordingControl.js';
+import { normalizeTimelineEvents } from './recordingMetadata.js';
 import {
   buildPairingAppUrl,
   consumePairing,
@@ -453,7 +454,7 @@ function buildRecordingDownloadPath(apiBasePath: string, relativeFilePath: strin
 }
 
 function attachRecordingDownloadPath(apiBasePath: string, capability: SessionRecordingCapability): SessionRecordingCapability {
-  if (!capability.recording?.relativeFilePath) {
+  if (!capability.recording) {
     return capability;
   }
 
@@ -462,6 +463,7 @@ function attachRecordingDownloadPath(apiBasePath: string, capability: SessionRec
     recording: {
       ...capability.recording,
       downloadPath: buildRecordingDownloadPath(apiBasePath, capability.recording.relativeFilePath),
+      metadataDownloadPath: buildRecordingDownloadPath(apiBasePath, capability.recording.metadataRelativeFilePath),
     },
   };
 }
@@ -605,13 +607,21 @@ async function handleApiRequest(
       return;
     }
 
-    const payload = await readJsonBody<{ sessionId?: string; disposition?: 'save' | 'discard' }>(request);
+    const payload = await readJsonBody<{
+      sessionId?: string;
+      disposition?: 'save' | 'discard';
+      sessionSnapshot?: Session;
+      timelineEvents?: unknown[];
+    }>(request);
     if (!payload.sessionId) {
       sendJson(response, 400, { error: 'sessionId is required' });
       return;
     }
 
-    sendJson(response, 200, attachRecordingDownloadPath(config.apiBasePath, await sessionRecordingController.stopRecording(payload)));
+    sendJson(response, 200, attachRecordingDownloadPath(config.apiBasePath, await sessionRecordingController.stopRecording({
+      ...payload,
+      timelineEvents: normalizeTimelineEvents(payload.timelineEvents),
+    })));
     return;
   }
 
