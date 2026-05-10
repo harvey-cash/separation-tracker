@@ -385,12 +385,14 @@ export function useQuantumSync(
 
     window.addEventListener('focus', handleResume);
     window.addEventListener('online', handleResume);
+    window.addEventListener('pageshow', handleResume);
     document.addEventListener('visibilitychange', handleResume);
 
     return () => {
       cancelled = true;
       window.removeEventListener('focus', handleResume);
       window.removeEventListener('online', handleResume);
+      window.removeEventListener('pageshow', handleResume);
       document.removeEventListener('visibilitychange', handleResume);
     };
   }, [apiBaseUrl, hydrateFromRemote]);

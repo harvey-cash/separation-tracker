@@ -13,3 +13,16 @@ test('App wires camera streaming control into the dashboard and active session l
   assert.match(app, /pendingSessionCameraStateRef\.current = false/);
   assert.match(app, /setEnabled\(pendingState, \{ silent: true \}\)/);
 });
+
+
+test('camera streaming control rechecks backend capabilities on resume-style browser events', () => {
+  const hook = readFileSync(resolve(process.cwd(), 'src/hooks/useCameraStreamingControl.ts'), 'utf8');
+
+  assert.match(hook, /setIsLoading\(true\);/);
+  assert.match(hook, /refreshInFlightRef/);
+  assert.match(hook, /window\.addEventListener\('focus', handleResume\);/);
+  assert.match(hook, /window\.addEventListener\('online', handleResume\);/);
+  assert.match(hook, /window\.addEventListener\('pageshow', handleResume\);/);
+  assert.match(hook, /document\.addEventListener\('visibilitychange', handleResume\);/);
+  assert.match(hook, /window\.removeEventListener\('pageshow', handleResume\);/);
+});

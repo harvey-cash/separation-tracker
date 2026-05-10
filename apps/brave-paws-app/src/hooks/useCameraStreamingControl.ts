@@ -26,10 +26,18 @@ export function useCameraStreamingControl(): CameraStreamingControlState {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const capabilityRef = useRef(capability);
+  const refreshInFlightRef = useRef(false);
 
   capabilityRef.current = capability;
 
   const refresh = useCallback(async () => {
+    if (refreshInFlightRef.current) {
+      return capabilityRef.current;
+    }
+
+    refreshInFlightRef.current = true;
+    setIsLoading(true);
+
     try {
       const next = (await fetchBackendCapabilities()).cameraStreaming;
       setCapability(next);
@@ -45,6 +53,7 @@ export function useCameraStreamingControl(): CameraStreamingControlState {
       setError(message);
       throw refreshError;
     } finally {
+      refreshInFlightRef.current = false;
       setIsLoading(false);
     }
   }, []);
@@ -85,6 +94,28 @@ export function useCameraStreamingControl(): CameraStreamingControlState {
     void refresh().catch(() => {
       // The dashboard can show a graceful unavailable state.
     });
+
+    const handleResume = () => {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+
+      void refresh().catch(() => {
+        // The dashboard can show a graceful unavailable state.
+      });
+    };
+
+    window.addEventListener('focus', handleResume);
+    window.addEventListener('online', handleResume);
+    window.addEventListener('pageshow', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
+
+    return () => {
+      window.removeEventListener('focus', handleResume);
+      window.removeEventListener('online', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
+    };
   }, [refresh]);
 
   return {

@@ -18,3 +18,14 @@ test('useQuantumSync dereferences onReplaceSessions through a ref instead of eff
   assert.match(hookSource, /onReplaceSessionsRef\.current\(nextSessions\);/);
   assert.doesNotMatch(hookSource, /\[finishSuccess, onReplaceSessions, pullSessions, scheduleAutoPush\]/);
 });
+
+
+test('useQuantumSync rehydrates on pageshow as well as the existing resume signals', () => {
+  const hookSource = readFileSync(resolve(process.cwd(), 'src/hooks/useQuantumSync.ts'), 'utf8');
+
+  assert.match(hookSource, /window\.addEventListener\('focus', handleResume\);/);
+  assert.match(hookSource, /window\.addEventListener\('online', handleResume\);/);
+  assert.match(hookSource, /window\.addEventListener\('pageshow', handleResume\);/);
+  assert.match(hookSource, /document\.addEventListener\('visibilitychange', handleResume\);/);
+  assert.match(hookSource, /window\.removeEventListener\('pageshow', handleResume\);/);
+});
