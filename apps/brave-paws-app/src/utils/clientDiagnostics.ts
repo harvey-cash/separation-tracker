@@ -1,7 +1,7 @@
 import { getApiBaseUrl } from '../config';
 
 export type ClientDiagnosticSeverity = 'info' | 'warn' | 'error';
-export type ClientDiagnosticCategory = 'frontend_error' | 'quantum_sync_error' | 'camera_preview_issue';
+export type ClientDiagnosticCategory = 'frontend_error' | 'storage_sync_error' | 'camera_preview_issue';
 
 export type ClientDiagnosticEvent = {
   category: ClientDiagnosticCategory;

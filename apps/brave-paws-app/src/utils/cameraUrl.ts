@@ -209,7 +209,7 @@ export function getCameraUrlFromSearch(search: string): string {
 
 export function getCameraUrlValidationMessage(value: string): string {
   if (!value.trim()) {
-    return 'Add a stream URL, use the suggested picam link, or scan a Brave Paws stream QR code.';
+    return 'Add a stream URL, use the suggested camera link, or scan a Brave Paws stream QR code.';
   }
 
   return isCameraUrlValid(value)

@@ -38,6 +38,6 @@ test('resolveCameraUrlFromPairingToken hides raw HTML failures behind a safe mes
         headers: { 'content-type': 'text/html; charset=utf-8' },
       }),
     }),
-    /QUANTUM is not reachable right now\./,
+    /The server is not reachable right now\./,
   );
 });

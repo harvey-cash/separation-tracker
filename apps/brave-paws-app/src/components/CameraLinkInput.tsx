@@ -329,7 +329,7 @@ export function CameraLinkInput({
             </>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-              Live QR scanning is not available in this browser yet. Use manual entry or the suggested picam link instead.
+              Live QR scanning is not available in this browser yet. Use manual entry or the suggested camera link instead.
             </div>
           )}
 
@@ -368,7 +368,7 @@ export function CameraLinkInput({
             <Server size={16} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">Quick start on this deployment</p>
-              <p className="mt-1 text-xs sm:text-sm">Use the built-in suggested picam link when this deployment exposes a same-origin proxy.</p>
+              <p className="mt-1 text-xs sm:text-sm">Use the built-in suggested camera link when this deployment exposes a same-origin preview.</p>
             </div>
           </div>
 
@@ -399,7 +399,7 @@ export function CameraLinkInput({
               className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
             >
               <Server size={16} />
-              Use suggested picam
+              Use suggested camera link
             </button>
             <button
               type="button"

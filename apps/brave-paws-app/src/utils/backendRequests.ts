@@ -32,7 +32,7 @@ function buildBackendFailureError(response: Response, bodyText: string): Backend
   }
 
   if (response.status >= 500 || isHtmlLikeResponse(response, bodyText)) {
-    return new BackendRequestError('QUANTUM is not reachable right now.', {
+    return new BackendRequestError('The server is not reachable right now.', {
       kind: 'unreachable',
       status: response.status,
     });
@@ -63,7 +63,7 @@ export async function parseBackendJsonResponse<T>(response: Response): Promise<T
   if (!isJsonContentType(contentType)) {
     const bodyText = await response.text();
     const htmlLike = isHtmlLikeResponse(response, bodyText);
-    const message = htmlLike ? 'QUANTUM is not reachable right now.' : 'Unexpected response from QUANTUM.';
+    const message = htmlLike ? 'The server is not reachable right now.' : 'Unexpected response from the server.';
     const kind: BackendRequestErrorKind = htmlLike ? 'unreachable' : 'invalid-response';
 
     throw new BackendRequestError(
@@ -82,7 +82,7 @@ export async function parseBackendJsonResponse<T>(response: Response): Promise<T
   } catch {
     const bodyText = await clonedResponse.text().catch(() => '');
     const htmlLike = isHtmlLikeResponse(response, bodyText);
-    const message = htmlLike ? 'QUANTUM is not reachable right now.' : 'Unexpected response from QUANTUM.';
+    const message = htmlLike ? 'The server is not reachable right now.' : 'Unexpected response from the server.';
     const kind: BackendRequestErrorKind = htmlLike ? 'unreachable' : 'invalid-response';
 
     throw new BackendRequestError(

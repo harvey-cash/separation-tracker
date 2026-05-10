@@ -12,10 +12,9 @@ export function StorageSync({ provider }: Props) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Storage</p>
-          <h2 className="mt-2 text-xl font-serif font-bold text-slate-800">QUANTUM Sync</h2>
+          <h2 className="mt-2 text-xl font-serif font-bold text-slate-800">Local-first sync</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Brave Paws now uses QUANTUM as the default sync path. History hydrates on app open and session changes
-            are pushed back automatically.
+            Sessions are always saved on this device first, then synced with a connected server whenever one is available.
           </p>
         </div>
         <StatusBadge provider={provider} />
@@ -42,7 +41,11 @@ export function StorageSync({ provider }: Props) {
         {!provider.isAvailable && (
           <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
-            <span>Live sync is unavailable on this public page because Brave Paws cannot reach its private QUANTUM server from this network.</span>
+            <span>
+              {provider.hasPendingChanges
+                ? 'New or edited sessions are saved locally on this device and will sync automatically when the server is reachable again.'
+                : 'Remote sync is unavailable right now, but your sessions are still being stored locally on this device.'}
+            </span>
           </div>
         )}
 
@@ -54,12 +57,12 @@ export function StorageSync({ provider }: Props) {
         )}
 
         <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">On app open</div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">After saves and edits</div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">After CSV imports</div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">Saved locally first</div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">Syncs on reconnect</div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">Refreshes after saves and imports</div>
         </div>
 
-        {provider.onSyncNow && (
+        {provider.onSyncNow && provider.isAvailable ? (
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -71,13 +74,23 @@ export function StorageSync({ provider }: Props) {
               Sync now
             </button>
           </div>
-        )}
+        ) : provider.hasPendingChanges ? (
+          <p className="text-xs font-medium text-amber-700">Waiting for the server so pending sessions can sync.</p>
+        ) : null}
       </div>
     </section>
   );
 }
 
 function StatusBadge({ provider }: { provider: StorageProviderState }) {
+  if (!provider.isAvailable) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+        <AlertCircle size={13} /> {provider.hasPendingChanges ? 'Stored locally' : 'Local only'}
+      </span>
+    );
+  }
+
   if (provider.status === 'success') {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
