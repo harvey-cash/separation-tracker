@@ -37,7 +37,7 @@ export const UNSUPPORTED_CAMERA_STREAMING_CAPABILITY: CameraStreamingCapability 
   supported: false,
   canSetEnabled: false,
   enabled: null,
-  detail: 'This backend does not expose camera streaming control.',
+  detail: 'This server does not expose camera streaming control.',
 };
 
 export const UNSUPPORTED_SESSION_RECORDING_CAPABILITY: SessionRecordingCapability = {
@@ -49,7 +49,7 @@ export const UNSUPPORTED_SESSION_RECORDING_CAPABILITY: SessionRecordingCapabilit
   canStop: false,
   active: false,
   sessionId: null,
-  detail: 'This backend does not expose session recording.',
+  detail: 'This server does not expose session recording.',
   recording: null,
 };
 

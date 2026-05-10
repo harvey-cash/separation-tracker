@@ -18,7 +18,7 @@ export type CameraStreamingControlState = {
   toggle: () => Promise<CameraStreamingCapability>;
 };
 
-const CAMERA_UNAVAILABLE_MESSAGE = 'Live camera controls are unavailable because Brave Paws cannot reach QUANTUM from this network.';
+const CAMERA_UNAVAILABLE_MESSAGE = 'Live camera controls are unavailable because Brave Paws cannot reach the server from this network.';
 
 export function useCameraStreamingControl(): CameraStreamingControlState {
   const [capability, setCapability] = useState<CameraStreamingCapability>(UNSUPPORTED_CAMERA_STREAMING_CAPABILITY);

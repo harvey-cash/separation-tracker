@@ -76,7 +76,7 @@ test('fetchBackendCapabilities hides raw HTML error bodies when the API is unrea
       status: 404,
       headers: { 'content-type': 'text/html; charset=utf-8' },
     })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
-    /QUANTUM is not reachable right now\./,
+    /The server is not reachable right now\./,
   );
 });
 
@@ -159,7 +159,7 @@ test('setCameraStreamingEnabled hides non-JSON gateway errors behind a safe mess
       status: 405,
       headers: { 'content-type': 'text/html' },
     })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
-    /QUANTUM is not reachable right now\./,
+    /The server is not reachable right now\./,
   );
 });
 
@@ -169,7 +169,7 @@ test('fetchBackendCapabilities hides invalid HTML payloads even when they claim 
       status: 200,
       headers: { 'content-type': 'application/json' },
     })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
-    /QUANTUM is not reachable right now\./,
+    /The server is not reachable right now\./,
   );
 });
 
@@ -179,7 +179,7 @@ test('fetchBackendCapabilities reports invalid non-HTML JSON payloads as unexpec
       status: 200,
       headers: { 'content-type': 'application/json' },
     })) as typeof fetch, 'https://brave-paws.example/separation/api/'),
-    /Unexpected response from QUANTUM\./,
+    /Unexpected response from the server\./,
   );
 });
 

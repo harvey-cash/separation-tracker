@@ -94,7 +94,7 @@ test('getCameraUrlFromSearch sanitizes invalid remote profile values to the defa
 });
 
 test('getCameraUrlValidationMessage explains empty and invalid values', () => {
-  assert.match(getCameraUrlValidationMessage(''), /suggested picam link/i);
+  assert.match(getCameraUrlValidationMessage(''), /suggested camera link/i);
   assert.match(getCameraUrlValidationMessage('invalid'), /stream link/i);
   assert.match(getCameraUrlValidationMessage('https://demo.example/live.stream'), /stream link looks good/i);
 });

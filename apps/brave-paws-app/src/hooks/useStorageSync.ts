@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import type { Session } from '../types';
 import { useQuantumSync, type QuantumConflictData, type SyncStatus } from './useQuantumSync';
 
-export type StorageProviderId = 'quantum-api';
+export type StorageProviderId = 'backend-api';
 export type GenericSyncStatus = SyncStatus;
 
 export type StorageConflictData = QuantumConflictData;
@@ -17,6 +17,7 @@ export type StorageProviderState = {
   error: string | null;
   isAvailable: boolean;
   conflictData: StorageConflictData | null;
+  hasPendingChanges: boolean;
   onSyncNow?: () => void;
 };
 
@@ -24,19 +25,20 @@ export function useStorageSync(
   sessions: Session[],
   onReplaceSessions: (sessions: Session[]) => void,
 ) {
-  const quantum = useQuantumSync(sessions, onReplaceSessions);
+  const remoteSync = useQuantumSync(sessions, onReplaceSessions);
 
   const provider = useMemo<StorageProviderState>(() => ({
-    id: 'quantum-api',
-    label: 'QUANTUM sync',
-    summary: 'Loads history from QUANTUM when the app opens and automatically saves session changes back to QUANTUM.',
-    badge: 'Automatic',
-    status: quantum.syncStatus,
-    error: quantum.syncError,
-    isAvailable: quantum.isAvailable,
-    conflictData: quantum.conflictData,
-    onSyncNow: quantum.syncNow,
-  }), [quantum]);
+    id: 'backend-api',
+    label: 'Automatic sync',
+    summary: 'Keeps session history on this device and syncs with a connected server in the background.',
+    badge: remoteSync.isAvailable ? 'Automatic' : 'Local first',
+    status: remoteSync.syncStatus,
+    error: remoteSync.syncError,
+    isAvailable: remoteSync.isAvailable,
+    conflictData: remoteSync.conflictData,
+    hasPendingChanges: remoteSync.hasPendingChanges,
+    onSyncNow: remoteSync.syncNow,
+  }), [remoteSync]);
 
   return {
     provider,

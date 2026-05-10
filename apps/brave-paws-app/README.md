@@ -6,7 +6,7 @@
 
 Brave Paws is a local-first React + TypeScript app for planning, running, and reviewing gradual-desensitisation sessions for canine separation anxiety.
 
-Session data is still stored locally in the browser for day-to-day use. v0.2 hydrates from the QUANTUM backend on startup and automatically pushes session changes back to QUANTUM so Harvey gets an inspectable canonical history without extra taps.
+Session data is still stored locally in the browser for day-to-day use. Brave Paws hydrates from a connected server on startup when one is available and automatically pushes session changes back in the background.
 
 ## Key Commands
 
@@ -32,13 +32,13 @@ Copy `.env.example` to `.env.local` and set values as needed.
 | `VITE_BRAVE_PAWS_PUBLIC_BASE_URL` | No | Canonical landing URL, usually the public or self-hosted `/separation/` route. |
 | `VITE_BRAVE_PAWS_APP_URL` | No | Canonical app URL for pairing links and stream QR links. |
 | `VITE_BRAVE_PAWS_API_BASE_URL` | No | API base URL, typically `/separation/api/`. |
-| `VITE_BRAVE_PAWS_DEFAULT_CAMERA_URL` | No | Optional suggested same-origin picam stream URL shown by the quick-start button. |
+| `VITE_BRAVE_PAWS_DEFAULT_CAMERA_URL` | No | Optional suggested same-origin camera stream URL shown by the quick-start button. |
 
 ## Related Docs
 
 - Training-method background: [INFO.md](INFO.md)
 - Repo overview and workspace commands: [../../README.md](../../README.md)
-- Local Tailnet deployment: [../../docs/quantum-local-tailnet.md](../../docs/quantum-local-tailnet.md)
+- Private-network deployment: [../../docs/quantum-local-tailnet.md](../../docs/quantum-local-tailnet.md)
 
 ## Session Status Tracking
 
