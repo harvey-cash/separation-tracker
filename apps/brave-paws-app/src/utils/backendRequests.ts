@@ -62,12 +62,14 @@ export async function parseBackendJsonResponse<T>(response: Response): Promise<T
 
   if (!isJsonContentType(contentType)) {
     const bodyText = await response.text();
+    const htmlLike = isHtmlLikeResponse(response, bodyText);
+    const message = htmlLike ? 'QUANTUM is not reachable right now.' : 'Unexpected response from QUANTUM.';
+    const kind: BackendRequestErrorKind = htmlLike ? 'unreachable' : 'invalid-response';
+
     throw new BackendRequestError(
-      isHtmlLikeResponse(response, bodyText)
-        ? 'QUANTUM is not reachable right now.'
-        : 'Unexpected response from QUANTUM.',
+      message,
       {
-        kind: isHtmlLikeResponse(response, bodyText) ? 'unreachable' : 'invalid-response',
+        kind,
         status: response.status,
       },
     );
@@ -80,11 +82,13 @@ export async function parseBackendJsonResponse<T>(response: Response): Promise<T
   } catch {
     const bodyText = await clonedResponse.text().catch(() => '');
     const htmlLike = isHtmlLikeResponse(response, bodyText);
+    const message = htmlLike ? 'QUANTUM is not reachable right now.' : 'Unexpected response from QUANTUM.';
+    const kind: BackendRequestErrorKind = htmlLike ? 'unreachable' : 'invalid-response';
 
     throw new BackendRequestError(
-      htmlLike ? 'QUANTUM is not reachable right now.' : 'Unexpected response from QUANTUM.',
+      message,
       {
-        kind: htmlLike ? 'unreachable' : 'invalid-response',
+        kind,
         status: response.status,
       },
     );
