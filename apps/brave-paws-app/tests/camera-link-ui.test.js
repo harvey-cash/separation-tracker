@@ -8,21 +8,22 @@ test('SessionConfig and ActiveSession use the shared camera link input', () => {
   const activeSession = readFileSync(resolve(process.cwd(), 'src/components/ActiveSession.tsx'), 'utf8');
 
   assert.match(sessionConfig, /CameraLinkInput/);
-  assert.match(sessionConfig, /full pairing link/i);
+  assert.match(sessionConfig, /one-time pairing link/i);
   assert.match(activeSession, /CameraLinkInput/);
   assert.match(activeSession, /Disconnect/);
   assert.match(activeSession, /Reconnect/);
   assert.match(activeSession, /Minimise/);
   assert.match(activeSession, /Maximise/);
-  assert.match(activeSession, /Paste a camera URL to start the live preview/);
+  assert.match(activeSession, /one-time pairing link/i);
+  assert.match(activeSession, /suggested picam link/i);
 });
 
-test('shared camera link input supports pairing-link or direct camera URL entry', () => {
+test('shared camera link input supports QR, suggested picam, and direct stream URL entry', () => {
   const cameraLinkInput = readFileSync(resolve(process.cwd(), 'src/components/CameraLinkInput.tsx'), 'utf8');
 
   assert.match(cameraLinkInput, /Scan QR Code/);
-  assert.match(cameraLinkInput, /Brave Paws Streamer/);
-  assert.match(cameraLinkInput, /Camera URL/);
-  assert.match(cameraLinkInput, /https:\/\/demo\.trycloudflare\.com/);
-  assert.match(cameraLinkInput, /Use Camera URL/);
+  assert.match(cameraLinkInput, /Use suggested picam/);
+  assert.match(cameraLinkInput, /Stream URL/);
+  assert.match(cameraLinkInput, /https:\/\/camera\.example\/live\.stream\//);
+  assert.match(cameraLinkInput, /Use Stream URL/);
 });

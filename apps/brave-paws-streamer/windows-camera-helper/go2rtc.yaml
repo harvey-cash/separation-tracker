@@ -1,8 +1,0 @@
-ffmpeg:
-  # Brave Paws remote playback is tuned for lower latency and quicker recovery on tunnel-based remote playback.
-  brave_paws_h264_low_latency: "-codec:v libx264 -pix_fmt yuv420p -preset:v superfast -tune:v zerolatency -g:v 30 -profile:v baseline -level:v 3.1 -b:v 1200k -maxrate:v 1200k -bufsize:v 1200k"
-  brave_paws_aac_low_latency: "-codec:a aac -ar 16000 -ac 1 -b:a 48k"
-
-streams:
-  camera:
-    - "ffmpeg:device?video=HD Webcam&audio=Microphone Array (Intel® Smart Sound Technology for Digital Microphones)#video=brave_paws_h264_low_latency#audio=brave_paws_aac_low_latency#width=960#height=540"

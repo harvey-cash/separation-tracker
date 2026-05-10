@@ -1,4 +1,4 @@
-import type { Session, SessionStatus, Step, StepStatus } from '../types';
+import type { Session, SessionRecording, SessionRecordingStatus, SessionStatus, Step, StepStatus } from '../types';
 
 export function isStepStatus(value: unknown): value is StepStatus {
   return value === 'pending' || value === 'completed' || value === 'aborted';
@@ -6,6 +6,10 @@ export function isStepStatus(value: unknown): value is StepStatus {
 
 export function isSessionStatus(value: unknown): value is SessionStatus {
   return value === 'pending' || value === 'completed' || value === 'aborted';
+}
+
+export function isSessionRecordingStatus(value: unknown): value is SessionRecordingStatus {
+  return value === 'idle' || value === 'recording' || value === 'completed' || value === 'discarded' || value === 'failed';
 }
 
 export function getStepStatusLabel(status: StepStatus): string {
@@ -96,6 +100,48 @@ export function normalizeStep(value: unknown): Step | null {
   };
 }
 
+function normalizeSessionRecording(value: unknown, sessionId: string): SessionRecording | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const status = isSessionRecordingStatus(candidate.status) ? candidate.status : undefined;
+  const provider = typeof candidate.provider === 'string' && candidate.provider.trim() ? candidate.provider : undefined;
+
+  if (!status || !provider) {
+    return undefined;
+  }
+
+  const sessionIdValue = typeof candidate.sessionId === 'string' && candidate.sessionId.trim()
+    ? candidate.sessionId
+    : sessionId;
+
+  return {
+    status,
+    sessionId: sessionIdValue,
+    provider,
+    startedAt: typeof candidate.startedAt === 'string' ? candidate.startedAt : null,
+    stoppedAt: typeof candidate.stoppedAt === 'string' ? candidate.stoppedAt : null,
+    hasAudio: typeof candidate.hasAudio === 'boolean' ? candidate.hasAudio : false,
+    relativeFilePath: typeof candidate.relativeFilePath === 'string' ? candidate.relativeFilePath : null,
+    downloadPath: typeof candidate.downloadPath === 'string' ? candidate.downloadPath : null,
+    metadataRelativeFilePath: typeof candidate.metadataRelativeFilePath === 'string' ? candidate.metadataRelativeFilePath : null,
+    metadataDownloadPath: typeof candidate.metadataDownloadPath === 'string' ? candidate.metadataDownloadPath : null,
+    durationSeconds: typeof candidate.durationSeconds === 'number' && Number.isFinite(candidate.durationSeconds)
+      ? Math.max(0, candidate.durationSeconds)
+      : null,
+    sizeBytes: typeof candidate.sizeBytes === 'number' && Number.isFinite(candidate.sizeBytes)
+      ? Math.max(0, candidate.sizeBytes)
+      : null,
+    chapterCount: typeof candidate.chapterCount === 'number' && Number.isFinite(candidate.chapterCount)
+      ? Math.max(0, candidate.chapterCount)
+      : null,
+    chaptersEmbedded: typeof candidate.chaptersEmbedded === 'boolean' ? candidate.chaptersEmbedded : null,
+    detail: typeof candidate.detail === 'string' ? candidate.detail : null,
+  };
+}
+
 export function normalizeSession(value: unknown): Session | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -112,6 +158,7 @@ export function normalizeSession(value: unknown): Session | null {
     notes?: unknown;
     status?: unknown;
     completed?: unknown;
+    recording?: unknown;
   };
 
   if (typeof candidate.id !== 'string' || typeof candidate.date !== 'string' || !Array.isArray(candidate.steps)) {
@@ -160,6 +207,7 @@ export function normalizeSession(value: unknown): Session | null {
     anyoneHome: typeof candidate.anyoneHome === 'string' ? candidate.anyoneHome : '',
     notes: typeof candidate.notes === 'string' ? candidate.notes : '',
     status,
+    recording: normalizeSessionRecording(candidate.recording, candidate.id),
   };
 }
 

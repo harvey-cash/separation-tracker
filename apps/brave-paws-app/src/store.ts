@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Session } from './types';
+import { mergeSessionsById } from './utils/sessionSync';
 import { normalizeSession, normalizeSessions } from './utils/sessionStatus';
 
 const STORAGE_KEY = 'csa_tracker_sessions';
@@ -49,5 +50,9 @@ export function useSessions() {
     setSessions(normalizeSessions(incoming));
   };
 
-  return { sessions, addSession, updateSession, deleteSession, replaceSessions };
+  const upsertSessions = (incoming: Session[]) => {
+    setSessions((prev) => mergeSessionsById(prev, incoming, { prefer: 'secondary' }));
+  };
+
+  return { sessions, addSession, updateSession, deleteSession, replaceSessions, upsertSessions };
 }

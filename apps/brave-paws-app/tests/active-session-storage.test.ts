@@ -9,6 +9,7 @@ import {
   saveActiveSessionState,
 } from '../src/utils/activeSessionStorage.ts';
 import { Session } from '../src/types.ts';
+import { shouldAppendInitialTimelineEvent } from '../src/components/ActiveSession.tsx';
 
 function createStorage() {
   const entries = new Map<string, string>();
@@ -43,12 +44,27 @@ test('active session state roundtrips through storage', () => {
   const storage = createStorage();
   const state = createActiveSessionState(createSession(), 1_000);
 
+  const timelineEvent = {
+    sequence: 0,
+    type: 'session_started' as const,
+    occurredAt: '2026-05-10T09:00:00.000Z',
+    sessionElapsedSeconds: 0,
+    sessionRunning: true,
+    currentStepIndex: 0,
+    stepId: state.session.steps[0]!.id,
+    stepStatus: 'pending' as const,
+    stepRunning: false,
+    stepElapsedSeconds: 0,
+    stepDurationSeconds: 30,
+  };
+
   saveActiveSessionState(
     {
       ...state,
       currentStepIndex: 1,
       isStepRunning: true,
       stepClock: { startedAt: 5_000, accumulatedMs: 2_000 },
+      timelineEvents: [timelineEvent],
     },
     storage
   );
@@ -58,6 +74,7 @@ test('active session state roundtrips through storage', () => {
     currentStepIndex: 1,
     isStepRunning: true,
     stepClock: { startedAt: 5_000, accumulatedMs: 2_000 },
+    timelineEvents: [timelineEvent],
   });
 });
 
@@ -98,6 +115,7 @@ test('loadActiveSessionState normalizes legacy completion booleans', () => {
   assert.ok(restored);
   assert.equal(restored?.session.status, 'pending');
   assert.deepEqual(restored?.session.steps.map((step) => step.status), ['completed', 'pending']);
+  assert.deepEqual(restored?.timelineEvents, []);
 });
 
 test('clearActiveSessionState removes persisted state', () => {
@@ -107,4 +125,49 @@ test('clearActiveSessionState removes persisted state', () => {
   clearActiveSessionState(storage);
 
   assert.equal(storage.getItem(ACTIVE_SESSION_STORAGE_KEY), null);
+});
+
+test('shouldAppendInitialTimelineEvent returns true when restoring sessions with prior events', () => {
+  const restoredState = createActiveSessionState(createSession(), 1_000);
+
+  assert.equal(shouldAppendInitialTimelineEvent(undefined, []), true);
+  assert.equal(shouldAppendInitialTimelineEvent(undefined, [{
+    sequence: 0,
+    type: 'session_started',
+    occurredAt: '2026-05-10T09:00:00.000Z',
+    sessionElapsedSeconds: 0,
+    sessionRunning: true,
+    currentStepIndex: 0,
+    stepId: 'step-1',
+    stepStatus: 'pending',
+    stepRunning: false,
+    stepElapsedSeconds: 0,
+    stepDurationSeconds: 30,
+  }]), false);
+  assert.equal(shouldAppendInitialTimelineEvent(restoredState, [{
+    sequence: 0,
+    type: 'session_started',
+    occurredAt: '2026-05-10T09:00:00.000Z',
+    sessionElapsedSeconds: 0,
+    sessionRunning: true,
+    currentStepIndex: 0,
+    stepId: 'step-1',
+    stepStatus: 'pending',
+    stepRunning: false,
+    stepElapsedSeconds: 0,
+    stepDurationSeconds: 30,
+  }]), true);
+  assert.equal(shouldAppendInitialTimelineEvent(restoredState, [{
+    sequence: 1,
+    type: 'session_resumed',
+    occurredAt: '2026-05-10T09:10:00.000Z',
+    sessionElapsedSeconds: 10,
+    sessionRunning: true,
+    currentStepIndex: 0,
+    stepId: 'step-1',
+    stepStatus: 'pending',
+    stepRunning: false,
+    stepElapsedSeconds: 0,
+    stepDurationSeconds: 30,
+  }]), false);
 });

@@ -163,6 +163,16 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
   };
 
   const anxietyInfo = getAnxietyLabel(session.anxietyScore);
+  const recordingStatusLabel =
+    session.recording?.status === 'recording'
+      ? 'Recording in progress'
+      : session.recording?.status === 'completed'
+      ? 'Recording saved'
+      : session.recording?.status === 'discarded'
+      ? 'Recording discarded'
+      : session.recording?.status === 'failed'
+      ? 'Recording issue'
+      : 'No recording';
 
   return (
     <div 
@@ -424,6 +434,32 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
           <p className="text-xl font-bold">{anxietyInfo.label}</p>
         </div>
       </div>
+
+      {session.recording && (
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Session Recording</p>
+              <p className="mt-2 text-lg font-bold text-slate-800">{recordingStatusLabel}</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {session.recording.hasAudio ? 'Video + audio archive.' : 'Video archive.'}
+                {session.recording.durationSeconds != null ? ` ${formatDuration(session.recording.durationSeconds)} captured.` : ''}
+                {session.recording.detail ? ` ${session.recording.detail}` : ''}
+              </p>
+            </div>
+            {session.recording.downloadPath && (
+              <a
+                href={session.recording.downloadPath}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-2xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-600 transition-colors hover:bg-rose-100"
+              >
+                Open recording
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8 h-[400px] flex flex-col">
         <h2 className="text-lg font-bold text-slate-800 mb-6">Step Durations</h2>

@@ -4,11 +4,9 @@
 
 # Brave Paws App
 
-Brave Paws is a client-side React + TypeScript app for planning, running, and reviewing gradual-desensitisation sessions for canine separation anxiety, including sessions or individual steps that need to be aborted when a dog goes over threshold.
+Brave Paws is a local-first React + TypeScript app for planning, running, and reviewing gradual-desensitisation sessions for canine separation anxiety.
 
-Session data is stored locally in the browser by default, with optional Google Drive backup if you connect your account.
-
-Production deployments target `https://harvey.cash/separation/app/`.
+Session data is still stored locally in the browser for day-to-day use. v0.2 hydrates from the QUANTUM backend on startup and automatically pushes session changes back to QUANTUM so Harvey gets an inspectable canonical history without extra taps.
 
 ## Key Commands
 
@@ -25,38 +23,22 @@ From this directory:
 
 From the repo root, the equivalent delegated commands are `npm run dev`, `npm test`, `npm run lint`, `npm run build`, and `npm run test:e2e`.
 
-## Structure
-
-```text
-apps/brave-paws-app/
-├── package.json
-├── index.html
-├── vite.config.ts
-├── tsconfig.json
-├── playwright.config.ts
-├── INFO.md
-├── .env.example
-├── src/
-├── tests/
-└── e2e/
-```
-
 ## Environment Variables
 
 Copy `.env.example` to `.env.local` and set values as needed.
 
 | Variable | Required | Description |
 |---|---|---|
-| `APP_URL` | No | Hosting URL used for self-referential links. For production this should be `https://harvey.cash/separation/app/`. |
-| `VITE_GOOGLE_CLIENT_ID` | No | OAuth client ID for Google Drive backup. |
-
-If `VITE_GOOGLE_CLIENT_ID` is unset, the app falls back to the built-in default client ID.
+| `VITE_BRAVE_PAWS_PUBLIC_BASE_URL` | No | Canonical landing URL, usually the public or self-hosted `/separation/` route. |
+| `VITE_BRAVE_PAWS_APP_URL` | No | Canonical app URL for pairing links and stream QR links. |
+| `VITE_BRAVE_PAWS_API_BASE_URL` | No | API base URL, typically `/separation/api/`. |
+| `VITE_BRAVE_PAWS_DEFAULT_CAMERA_URL` | No | Optional suggested same-origin picam stream URL shown by the quick-start button. |
 
 ## Related Docs
 
 - Training-method background: [INFO.md](INFO.md)
 - Repo overview and workspace commands: [../../README.md](../../README.md)
-- Release process: [../../RELEASE.md](../../RELEASE.md)
+- Local Tailnet deployment: [../../docs/quantum-local-tailnet.md](../../docs/quantum-local-tailnet.md)
 
 ## Session Status Tracking
 

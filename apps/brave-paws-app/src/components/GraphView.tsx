@@ -62,20 +62,22 @@ export function GraphView({ sessions, onBack }: Props) {
         ) : (
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={data} margin={{ top: 10, right: 10, left: 8, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis
+                  height={36}
                   dataKey="date"
                   stroke="#94a3b8"
                   tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
-                  tickMargin={16}
+                  tickMargin={12}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
+                  width={40}
                   stroke="#94a3b8"
                   tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
-                  tickMargin={16}
+                  tickMargin={12}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(value) => `${value}m`}

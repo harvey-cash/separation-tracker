@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSessions } from './store';
 import { Session, Step } from './types';
 import { Dashboard } from './components/Dashboard';
@@ -9,10 +9,14 @@ import { GraphView } from './components/GraphView';
 import { HistoryList } from './components/HistoryList';
 import { SessionView } from './components/SessionView';
 import { InfoView } from './components/InfoView';
-import { GoogleDriveSync } from './components/GoogleDriveSync';
-import { useGoogleDrive } from './hooks/useGoogleDrive';
+import { CameraStreamingControl } from './components/CameraStreamingControl';
+import { StorageSync } from './components/StorageSync';
+import { useCameraStreamingControl } from './hooks/useCameraStreamingControl';
+import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
+import { PAIRING_TOKEN_QUERY_PARAM, resolveCameraUrlFromPairingToken } from './utils/pairingToken';
+import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
 import {
   ActiveSessionState,
   clearActiveSessionState,
@@ -34,27 +38,51 @@ const DEFAULT_STEPS: Step[] = [
 ];
 
 export default function App() {
-  const { sessions, addSession, updateSession, deleteSession, replaceSessions } = useSessions();
+  const { sessions, addSession, updateSession, deleteSession, replaceSessions, upsertSessions } = useSessions();
   const [restoredActiveSessionState] = useState<ActiveSessionState | null>(() => loadActiveSessionState());
   const [currentView, setCurrentView] = useState<View>(restoredActiveSessionState ? 'active' : 'dashboard');
   const [previousView, setPreviousView] = useState<View>('dashboard');
   const [activeSession, setActiveSession] = useState<Session | null>(restoredActiveSessionState?.session ?? null);
   const [activeSessionState, setActiveSessionState] = useState<ActiveSessionState | null>(restoredActiveSessionState);
   const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
+  const cameraStreamingControl = useCameraStreamingControl();
+  const wasTrainingActiveRef = useRef(false);
+  const pendingSessionCameraStateRef = useRef<boolean | null>(restoredActiveSessionState ? true : null);
 
   useEffect(() => {
-    const pairedCameraUrl = getCameraUrlFromSearch(window.location.search);
-    if (!pairedCameraUrl) {
-      return;
-    }
+    installGlobalClientDiagnostics();
 
-    setCameraUrl((currentUrl) => (currentUrl === pairedCameraUrl ? currentUrl : pairedCameraUrl));
+    const clearPairingSearchParams = () => {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete('cameraUrl');
+      currentUrl.searchParams.delete('cameraProfile');
+      currentUrl.searchParams.delete('cameraMode');
+      currentUrl.searchParams.delete(PAIRING_TOKEN_QUERY_PARAM);
+      window.history.replaceState({}, document.title, currentUrl.toString());
+    };
 
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.delete('cameraUrl');
-    currentUrl.searchParams.delete('cameraProfile');
-    currentUrl.searchParams.delete('cameraMode');
-    window.history.replaceState({}, document.title, currentUrl.toString());
+    const applyPairingFromLocation = async () => {
+      const pairedCameraUrl = getCameraUrlFromSearch(window.location.search);
+      if (pairedCameraUrl) {
+        setCameraUrl((currentUrl) => (currentUrl === pairedCameraUrl ? currentUrl : pairedCameraUrl));
+        clearPairingSearchParams();
+        return;
+      }
+
+      try {
+        const tokenPairedCameraUrl = await resolveCameraUrlFromPairingToken(window.location.search);
+        if (!tokenPairedCameraUrl) {
+          return;
+        }
+
+        setCameraUrl((currentUrl) => (currentUrl === tokenPairedCameraUrl ? currentUrl : tokenPairedCameraUrl));
+        clearPairingSearchParams();
+      } catch (error) {
+        console.error('Failed to resolve pairing token', error);
+      }
+    };
+
+    void applyPairingFromLocation();
   }, []);
 
   // Keep cameraUrl in sync with local storage
@@ -71,11 +99,40 @@ export default function App() {
     clearActiveSessionState();
   }, [activeSessionState]);
 
-  const handleImportSessions = (imported: Session[]) => {
+  const handleImportSessions = useCallback((imported: Session[]) => {
     replaceSessions(imported);
-  };
+  }, [replaceSessions]);
 
-  const drive = useGoogleDrive(sessions, handleImportSessions);
+  const storageSync = useStorageSync(sessions, handleImportSessions);
+
+  useEffect(() => {
+    const isTrainingActive = currentView === 'active' && Boolean(activeSession);
+
+    if (isTrainingActive && !wasTrainingActiveRef.current) {
+      pendingSessionCameraStateRef.current = true;
+    }
+
+    if (!isTrainingActive && wasTrainingActiveRef.current) {
+      pendingSessionCameraStateRef.current = false;
+    }
+
+    wasTrainingActiveRef.current = isTrainingActive;
+  }, [activeSession, currentView]);
+
+  useEffect(() => {
+    const pendingState = pendingSessionCameraStateRef.current;
+    if (pendingState == null || !cameraStreamingControl.capability.canSetEnabled) {
+      return;
+    }
+
+    void cameraStreamingControl.setEnabled(pendingState, { silent: true }).then(() => {
+      if (pendingSessionCameraStateRef.current === pendingState) {
+        pendingSessionCameraStateRef.current = null;
+      }
+    }).catch(() => {
+      // Camera control is best-effort; leave the pending state so a later refresh can retry.
+    });
+  }, [cameraStreamingControl.capability.canSetEnabled, cameraStreamingControl.setEnabled]);
 
   const handleStartNew = () => {
     let initialSteps = DEFAULT_STEPS;
@@ -124,11 +181,9 @@ export default function App() {
   };
 
   const handleCancelSession = () => {
-    if (window.confirm('Are you sure you want to cancel this session? Progress will not be saved.')) {
-      setActiveSession(null);
-      setActiveSessionState(null);
-      setCurrentView('dashboard');
-    }
+    setActiveSession(null);
+    setActiveSessionState(null);
+    setCurrentView('dashboard');
   };
 
   return (
@@ -145,17 +200,10 @@ export default function App() {
             setPreviousView('dashboard');
             setCurrentView('session-view');
           }}
-          driveSync={
-            <GoogleDriveSync
-              isConnected={drive.isConnected}
-              syncStatus={drive.syncStatus}
-              syncError={drive.syncError}
-              conflictData={drive.conflictData}
-              onConnect={drive.connect}
-              onDisconnect={drive.disconnect}
-              onSyncNow={drive.syncNow}
-              onAcceptRemote={drive.acceptRemote}
-              onKeepLocal={drive.keepLocal}
+          cameraStreamingControl={<CameraStreamingControl control={cameraStreamingControl} />}
+          storageSync={
+            <StorageSync
+              provider={storageSync.provider}
             />
           }
         />
@@ -217,7 +265,7 @@ export default function App() {
             onExportCSV={() => exportToCSV(sessions)}
             onImportCSV={(csvContent) => {
               const importedSessions = parseCSV(csvContent);
-              importedSessions.forEach(session => addSession(session));
+              upsertSessions(importedSessions);
             }}
             onViewSession={(session) => {
               setActiveSession(session);

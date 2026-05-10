@@ -1,0 +1,45 @@
+name: Request PR reviews
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+
+permissions:
+  pull-requests: write
+
+jobs:
+  request-harvey-review:
+    if: github.event.pull_request.user.login != 'harvey-cash'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const reviewer = 'harvey-cash';
+            const pull = context.payload.pull_request;
+            const alreadyRequested = (pull.requested_reviewers || []).some((candidate) => candidate.login === reviewer);
+
+            if (alreadyRequested) {
+              core.info(`Reviewer ${reviewer} already requested.`);
+              return;
+            }
+
+            try {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pull.number,
+                reviewers: [reviewer],
+              });
+              core.info(`Requested review from ${reviewer}.`);
+            } catch (error) {
+              if (error.status === 422) {
+                core.warning(`Could not request ${reviewer}: ${error.message}`);
+                return;
+              }
+
+              throw error;
+            }

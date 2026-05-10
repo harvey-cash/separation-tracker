@@ -1,5 +1,6 @@
 import { Session, SessionStatus, Step, StepStatus } from '../types';
 import { format } from 'date-fns';
+import { buildImportedSessionId } from './sessionIdentity';
 import { getAbortedStepCount, getCompletedStepCount } from './sessionStatus';
 
 const STEP_COLUMN_COUNT = 10;
@@ -21,6 +22,44 @@ const HEADERS = [
 
 function escapeCSVValue(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
+}
+
+function padDatePart(input: number): string {
+  return String(input).padStart(2, '0');
+}
+
+function formatCsvDate(value: string): string {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:${padDatePart(date.getSeconds())}`;
+}
+
+function parseCsvDate(value: string): Date | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const isoCandidate = new Date(normalized);
+  if (!Number.isNaN(isoCandidate.getTime()) && (normalized.includes('T') || normalized.endsWith('Z'))) {
+    return isoCandidate;
+  }
+
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) {
+    return Number.isNaN(isoCandidate.getTime()) ? null : isoCandidate;
+  }
+
+  const [, year, month, day, hours, minutes, seconds] = match;
+  const parsed = new Date(
+    Number.parseInt(year, 10),
+    Number.parseInt(month, 10) - 1,
+    Number.parseInt(day, 10),
+    Number.parseInt(hours, 10),
+    Number.parseInt(minutes, 10),
+    Number.parseInt(seconds, 10),
+  );
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function parseCSVLine(line: string): string[] {
@@ -86,7 +125,7 @@ export function generateCSVContent(sessions: Session[]): string {
     });
 
     return [
-      format(new Date(session.date), 'yyyy-MM-dd HH:mm:ss'),
+      formatCsvDate(session.date),
       session.status,
       session.totalDurationSeconds,
       maxDuration,
@@ -129,14 +168,15 @@ export function parseCSV(csvContent: string): Session[] {
   };
 
   const sessions: Session[] = [];
+  const occurrenceByFingerprint = new Map<string, number>();
 
   for (let i = 1; i < lines.length; i++) {
     const columns = parseCSVLine(lines[i]);
     if (columns.length < 7) continue;
 
     const dateStr = getValue(columns, 'Date');
-    const date = new Date(dateStr);
-    if (Number.isNaN(date.getTime())) continue;
+    const date = parseCsvDate(dateStr);
+    if (!date) continue;
 
     const totalDurationSeconds = parseInt(getValue(columns, 'Total Duration (s)'), 10) || 0;
     const completedSteps = parseInt(getValue(columns, 'Completed Steps'), 10) || 0;
@@ -175,8 +215,7 @@ export function parseCSV(csvContent: string): Session[] {
       });
     }
 
-    sessions.push({
-      id: crypto.randomUUID(),
+    const sessionWithoutId = {
       date: date.toISOString(),
       totalDurationSeconds,
       steps,
@@ -185,6 +224,27 @@ export function parseCSV(csvContent: string): Session[] {
       anyoneHome: getValue(columns, 'Anyone Home'),
       notes: getValue(columns, 'Notes'),
       status: parseSessionStatus(getValue(columns, 'Session Status'), 'completed'),
+    };
+
+    const fingerprint = JSON.stringify({
+      date: sessionWithoutId.date,
+      totalDurationSeconds: sessionWithoutId.totalDurationSeconds,
+      anxietyScore: sessionWithoutId.anxietyScore ?? null,
+      exercisedLevel: sessionWithoutId.exercisedLevel ?? null,
+      anyoneHome: sessionWithoutId.anyoneHome,
+      notes: sessionWithoutId.notes,
+      status: sessionWithoutId.status,
+      steps: sessionWithoutId.steps.map((step) => ({
+        durationSeconds: step.durationSeconds,
+        status: step.status,
+      })),
+    });
+    const occurrence = occurrenceByFingerprint.get(fingerprint) ?? 0;
+    occurrenceByFingerprint.set(fingerprint, occurrence + 1);
+
+    sessions.push({
+      id: buildImportedSessionId(sessionWithoutId, occurrence),
+      ...sessionWithoutId,
     });
   }
 
