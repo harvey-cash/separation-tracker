@@ -408,6 +408,31 @@ function buildCameraPreviewHtml(): string {
 </html>`;
 }
 
+function resolveCameraProxyTarget(
+  pathname: string,
+  requestUrl: string | undefined,
+  config: BravePawsServerConfig,
+): URL | null {
+  const suffix = pathname.slice(config.cameraBasePath.length);
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(suffix) || suffix.startsWith('//')) {
+    return null;
+  }
+
+  const queryIndex = requestUrl?.indexOf('?') ?? -1;
+  const query = queryIndex >= 0 && requestUrl ? requestUrl.slice(queryIndex) : '';
+  const upstreamBase = new URL(config.cameraUpstreamBaseUrl);
+  const targetUrl = new URL(`${suffix}${query}`, upstreamBase);
+
+  const basePathPrefix = upstreamBase.pathname.endsWith('/')
+    ? upstreamBase.pathname
+    : `${upstreamBase.pathname}/`;
+  if (targetUrl.origin !== upstreamBase.origin || !targetUrl.pathname.startsWith(basePathPrefix)) {
+    return null;
+  }
+
+  return targetUrl;
+}
+
 async function proxyCameraRequest(
   request: IncomingMessage,
   response: ServerResponse,
@@ -419,8 +444,13 @@ async function proxyCameraRequest(
     return;
   }
 
-  const suffix = pathname.slice(config.cameraBasePath.length);
-  const targetUrl = new URL(suffix + (request.url?.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), config.cameraUpstreamBaseUrl);
+  const targetUrl = resolveCameraProxyTarget(pathname, request.url, config);
+  if (!targetUrl) {
+    sendJson(response, 400, {
+      error: 'Invalid camera path',
+    });
+    return;
+  }
 
   try {
     const upstreamResponse = await fetch(targetUrl, {

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 import { generateCSVContent, parseCSV } from './csv.js';
 import type { Session } from './types.js';
@@ -16,6 +17,7 @@ const EMPTY_STORE: SessionStoreData = {
 
 const SESSIONS_CSV_FILENAME = 'brave_paws_sessions.csv';
 const CLIENT_DIAGNOSTICS_FILENAME = 'client_diagnostics.jsonl';
+const sessionStoreLocks = new Map<string, Promise<void>>();
 
 async function ensureParentDirectory(filePath: string) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -57,7 +59,34 @@ async function readJsonStore(filePath: string): Promise<SessionStoreData> {
 async function writeCsvFile(filePath: string, sessions: Session[]) {
   const csvFilePath = getCsvFilePath(filePath);
   await ensureParentDirectory(csvFilePath);
-  await fs.writeFile(csvFilePath, `${generateCSVContent(sessions)}\n`, 'utf8');
+  await writeFileAtomically(csvFilePath, `${generateCSVContent(sessions)}\n`);
+}
+
+async function writeFileAtomically(filePath: string, content: string) {
+  const tempFilePath = path.join(path.dirname(filePath), `${path.basename(filePath)}.${process.pid}.${crypto.randomUUID()}.tmp`);
+  await fs.writeFile(tempFilePath, content, 'utf8');
+  await fs.rename(tempFilePath, filePath);
+}
+
+async function withSessionStoreLock<T>(filePath: string, operation: () => Promise<T>): Promise<T> {
+  const previous = sessionStoreLocks.get(filePath) || Promise.resolve();
+  let releaseLock = () => {};
+  const current = new Promise<void>((resolve) => {
+    releaseLock = resolve;
+  });
+  const next = previous.catch(() => undefined).then(() => current);
+  sessionStoreLocks.set(filePath, next);
+
+  await previous.catch(() => undefined);
+
+  try {
+    return await operation();
+  } finally {
+    releaseLock();
+    if (sessionStoreLocks.get(filePath) === next) {
+      sessionStoreLocks.delete(filePath);
+    }
+  }
 }
 
 async function importCsvIfNewer(filePath: string, currentStore: SessionStoreData): Promise<SessionStoreData> {
@@ -79,18 +108,22 @@ async function importCsvIfNewer(filePath: string, currentStore: SessionStoreData
   const csvContent = await fs.readFile(csvFilePath, 'utf8');
   const importedSessions = parseCSV(csvContent);
   if (!importedSessions.length) {
-    return writeSessionStore(filePath, currentStore.sessions);
+    return writeSessionStoreUnlocked(filePath, currentStore.sessions);
   }
 
-  return writeSessionStore(filePath, importedSessions);
+  return writeSessionStoreUnlocked(filePath, importedSessions);
 }
 
-export async function readSessionStore(filePath: string): Promise<SessionStoreData> {
+async function readSessionStoreUnlocked(filePath: string): Promise<SessionStoreData> {
   const jsonStore = await readJsonStore(filePath);
   return importCsvIfNewer(filePath, jsonStore);
 }
 
-export async function writeSessionStore(filePath: string, sessions: Session[]): Promise<SessionStoreData> {
+export async function readSessionStore(filePath: string): Promise<SessionStoreData> {
+  return withSessionStoreLock(filePath, () => readSessionStoreUnlocked(filePath));
+}
+
+async function writeSessionStoreUnlocked(filePath: string, sessions: Session[]): Promise<SessionStoreData> {
   await ensureParentDirectory(filePath);
 
   const payload: SessionStoreData = {
@@ -99,21 +132,27 @@ export async function writeSessionStore(filePath: string, sessions: Session[]): 
   };
 
   await writeCsvFile(filePath, sessions);
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  await writeFileAtomically(filePath, `${JSON.stringify(payload, null, 2)}\n`);
   return payload;
 }
 
+export async function writeSessionStore(filePath: string, sessions: Session[]): Promise<SessionStoreData> {
+  return withSessionStoreLock(filePath, () => writeSessionStoreUnlocked(filePath, sessions));
+}
+
 export async function upsertSession(filePath: string, session: Session): Promise<SessionStoreData> {
-  const current = await readSessionStore(filePath);
-  const existingIndex = current.sessions.findIndex((entry) => entry.id === session.id);
+  return withSessionStoreLock(filePath, async () => {
+    const current = await readSessionStoreUnlocked(filePath);
+    const existingIndex = current.sessions.findIndex((entry) => entry.id === session.id);
 
-  if (existingIndex >= 0) {
-    current.sessions[existingIndex] = session;
-  } else {
-    current.sessions.push(session);
-  }
+    if (existingIndex >= 0) {
+      current.sessions[existingIndex] = session;
+    } else {
+      current.sessions.push(session);
+    }
 
-  return writeSessionStore(filePath, current.sessions);
+    return writeSessionStoreUnlocked(filePath, current.sessions);
+  });
 }
 
 export async function appendClientDiagnostic(filePath: string, payload: unknown): Promise<string> {

@@ -559,6 +559,16 @@ test('camera proxy normalizes directory-style stream paths without a trailing sl
   });
 });
 
+test('camera proxy rejects absolute URLs in the request suffix', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/camera/http://evil.example/live.stream/index.m3u8`);
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      error: 'Invalid camera path',
+    });
+  });
+});
+
 test('imports newer CSV drops into the canonical session store on read', async () => {
   await withFixtureServer(async ({ baseUrl, config }) => {
     const csvFilePath = getSessionsCsvFilePath(config.dataFilePath);

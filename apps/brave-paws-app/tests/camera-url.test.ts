@@ -31,6 +31,7 @@ test('sanitizeCameraUrl allows localhost http for local testing', () => {
 test('sanitizeCameraUrl rejects unsupported protocols and malformed URLs', () => {
   assert.equal(sanitizeCameraUrl('ftp://example.com'), '');
   assert.equal(sanitizeCameraUrl('not a url'), '');
+  assert.equal(sanitizeCameraUrl('https://user:pass@example.com/live.stream'), '');
 });
 
 test('extractCameraUrlFromValue supports Brave Paws deep links', () => {

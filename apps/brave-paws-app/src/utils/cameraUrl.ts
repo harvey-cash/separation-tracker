@@ -137,6 +137,10 @@ export function sanitizeCameraUrl(value: string): string {
 
   try {
     const url = new URL(trimmed);
+    if (url.username || url.password) {
+      return '';
+    }
+
     const isLocalhost =
       url.hostname === 'localhost' ||
       url.hostname === '127.0.0.1' ||

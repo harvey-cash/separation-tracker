@@ -8,9 +8,33 @@ const { version } = JSON.parse(readFileSync(new URL('../../package.json', import
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const normalizeBasePath = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '/separation/app/';
+    }
+
+    const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
+  };
+  const deriveBasePath = () => {
+    if (env.VITE_BRAVE_PAWS_APP_BASE_PATH) {
+      return normalizeBasePath(env.VITE_BRAVE_PAWS_APP_BASE_PATH);
+    }
+
+    if (env.VITE_BRAVE_PAWS_APP_URL) {
+      try {
+        return normalizeBasePath(new URL(env.VITE_BRAVE_PAWS_APP_URL).pathname);
+      } catch {
+        return '/separation/app/';
+      }
+    }
+
+    return '/separation/app/';
+  };
 
   return {
-    base: env.VITE_BRAVE_PAWS_APP_BASE_PATH || '/separation/app/',
+    base: deriveBasePath(),
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
