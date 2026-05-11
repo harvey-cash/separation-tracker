@@ -29,9 +29,10 @@ type Props = {
   onBack: () => void;
   onNavigate: (session: Session) => void;
   onSave: (session: Session) => void;
+  onDelete: (sessionId: string) => void;
 };
 
-export function SessionView({ session, allSessions, onBack, onNavigate, onSave }: Props) {
+export function SessionView({ session, allSessions, onBack, onNavigate, onSave, onDelete }: Props) {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   
@@ -127,6 +128,14 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
     };
     setDraftSteps([...draftSteps, newStep]);
     setNewStepDuration(30);
+  };
+
+  const handleDelete = () => {
+    if (!window.confirm('Delete this session? This cannot be undone.')) {
+      return;
+    }
+
+    onDelete(session.id);
   };
 
   const handleRemoveStep = (id: string) => {
@@ -239,6 +248,21 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave }
 
       {isEditing ? (
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8 space-y-8">
+          <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-red-500">Danger Zone</p>
+                <p className="mt-1 text-sm text-red-700">Delete a session that was started by accident or should not stay in your history.</p>
+              </div>
+              <button
+                onClick={handleDelete}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-100"
+              >
+                <Trash2 size={18} />
+                Delete session
+              </button>
+            </div>
+          </div>
           <div>
             <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Session Status</p>
             <div className="grid grid-cols-3 gap-3">

@@ -290,6 +290,11 @@ export default function App() {
             updateSession(updatedSession);
             setActiveSession(updatedSession);
           }}
+          onDelete={(sessionId) => {
+            deleteSession(sessionId);
+            setActiveSession(null);
+            setCurrentView(previousView);
+          }}
         />
       )}
 
