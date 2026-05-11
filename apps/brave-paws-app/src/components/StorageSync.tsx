@@ -14,10 +14,10 @@ export function StorageSync({ provider, backendConnection }: Props) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Storage</p>
-          <h2 className="mt-2 text-xl font-serif font-bold text-slate-800">QUANTUM Sync</h2>
+          <h2 className="mt-2 text-xl font-serif font-bold text-slate-800">Connected sync</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Brave Paws now uses QUANTUM as the default sync path. History hydrates on app open and session changes
-            are pushed back automatically.
+            Brave Paws keeps history on this device and syncs with a connected backend when one is available.
+            Recent sessions hydrate on app open and changes are pushed back automatically.
           </p>
         </div>
         <StatusBadge provider={provider} />
@@ -47,7 +47,7 @@ export function StorageSync({ provider, backendConnection }: Props) {
             <span>
               {provider.hasPendingChanges
                 ? 'New or edited sessions are saved locally on this device and will sync automatically when the server is reachable again.'
-                : 'QUANTUM is not reachable right now, but your sessions are still being stored locally on this device.'}
+                : 'The backend is not reachable right now, but your sessions are still being stored locally on this device.'}
             </span>
           </div>
         )}

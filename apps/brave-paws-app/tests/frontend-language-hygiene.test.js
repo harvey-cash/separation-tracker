@@ -10,6 +10,7 @@ const filesToCheck = [
   'src/components/CameraLinkInput.tsx',
   'src/components/Dashboard.tsx',
   'src/components/StorageSync.tsx',
+  'src/components/BackendConnectionSettings.tsx',
   'src/hooks/useCameraStreamingControl.ts',
   'src/hooks/useQuantumSync.ts',
   'src/hooks/useStorageSync.ts',

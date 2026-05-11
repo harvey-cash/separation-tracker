@@ -18,7 +18,7 @@ test('backend connection settings guide the static frontend failure path', () =>
   const backendConnection = readFileSync(resolve(process.cwd(), 'src/components/BackendConnectionSettings.tsx'), 'utf8');
 
   assert.match(backendConnection, /Connect to your Brave Paws backend/);
-  assert.match(backendConnection, /static <span className="font-semibold text-slate-700">harvey\.cash<\/span> app/i);
-  assert.match(backendConnection, /QUANTUM Tailnet root URL/i);
+  assert.match(backendConnection, /separately hosted frontend/i);
+  assert.match(backendConnection, /Enter your backend root URL/i);
   assert.match(backendConnection, /Suggested camera link/);
 });

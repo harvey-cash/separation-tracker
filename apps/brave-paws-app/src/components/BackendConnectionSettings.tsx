@@ -47,7 +47,7 @@ export function BackendConnectionSettings({
     const normalized = normalizeBackendRootUrl(draftValue);
     if (!normalized) {
       setStatus('error');
-      setMessage('Enter a full backend root like https://quantum.tail080401.ts.net:7447');
+      setMessage('Enter a full backend root like https://backend.example.com:7447');
       return;
     }
 
@@ -89,8 +89,8 @@ export function BackendConnectionSettings({
         <div>
           <h3 className="text-sm font-bold text-slate-800">Backend connection</h3>
           <p className="mt-1 text-xs text-slate-500">
-            QUANTUM staging can keep the deployment default. For the static <span className="font-semibold text-slate-700">harvey.cash</span> app,
-            save your QUANTUM Tailnet root once and Brave Paws will derive the API and suggested camera link from it.
+            If this deployment can already see its backend, you can keep the default. For a separately hosted frontend,
+            save your backend root once and Brave Paws will derive the API and suggested camera link from it.
           </p>
         </div>
       </div>
@@ -101,7 +101,7 @@ export function BackendConnectionSettings({
           <div>
             <p className="font-semibold">Connect to your Brave Paws backend</p>
             <p className="mt-1 text-xs text-amber-800">
-              This frontend cannot see a same-origin backend right now. Enter your QUANTUM Tailnet root URL to point the static app at your private backend.
+              This frontend cannot see a same-origin backend right now. Enter your backend root URL to point this app at the server you want to use.
             </p>
           </div>
         </div>
@@ -123,7 +123,7 @@ export function BackendConnectionSettings({
               setMessage('');
             }
           }}
-          placeholder="https://quantum.tail080401.ts.net:7447"
+          placeholder="https://backend.example.com:7447"
           className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
         />
         <p className="text-xs text-slate-500">
