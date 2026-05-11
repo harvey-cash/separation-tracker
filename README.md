@@ -47,7 +47,7 @@ apps/
 
 ## Docs
 
-- Local Tailnet deployment: [docs/quantum-local-tailnet.md](docs/quantum-local-tailnet.md)
+- Local Tailnet deployment and QUANTUM staging automation: [docs/quantum-local-tailnet.md](docs/quantum-local-tailnet.md)
 - App workspace notes: [apps/brave-paws-app/README.md](apps/brave-paws-app/README.md)
 - Server workspace notes: [apps/brave-paws-server/README.md](apps/brave-paws-server/README.md)
 
@@ -57,4 +57,4 @@ apps/
 - Canonical synced data can live on the self-hosted server while public bundles stay free of private camera origins.
 - Pairing records reject credential-bearing camera URLs so secrets do not leak into stored broker state or client responses.
 - Public CD remains `main`-only; feature branches get CI without triggering deploy.
-- QUANTUM staging is separate from public CD: `deploy/scripts/install-brave-paws-staging-automation.sh` installs a timer-driven local staging refresh that rebuilds from the local dev repo's latest committed HEAD into `/mnt/q/repos/separation-tracker-staging/` and then restarts `brave-paws.service`.
+- QUANTUM staging is separate from public CD: `deploy/scripts/install-brave-paws-staging-automation.sh` installs a timer-driven local staging refresh that rebuilds from the local dev repo's latest committed HEAD into `/mnt/q/repos/separation-tracker-staging/`, refreshes the canonical service unit, restarts `brave-paws.service`, and verifies health/capabilities.

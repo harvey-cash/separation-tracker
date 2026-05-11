@@ -32,16 +32,21 @@ Default bind:
 
 ## Environment variables
 
-| Variable | Example |
+| Variable | Current QUANTUM staging value |
 | --- | --- |
-| `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://tailnet-host.example.ts.net` |
+| `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://quantum.tail080401.ts.net:7447` |
+| `BRAVE_PAWS_CORS_ALLOWED_ORIGINS` | `https://harvey.cash,https://www.harvey.cash` |
 | `BRAVE_PAWS_DATA_DIR` | `/mnt/q/fermi/brave-paws/data` |
 | `BRAVE_PAWS_AUTH_TOKEN` | `replace-with-long-random-secret-before-enabling-pairing` |
 | `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` |
 | `BRAVE_PAWS_CAMERA_CONTROL_PROVIDER` | `command` |
-| `BRAVE_PAWS_CAMERA_STATUS_COMMAND` | `/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh status` |
-| `BRAVE_PAWS_CAMERA_ENABLE_COMMAND` | `/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh enable` |
-| `BRAVE_PAWS_CAMERA_DISABLE_COMMAND` | `/mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-picam-camera-control.sh disable` |
+| `BRAVE_PAWS_CAMERA_STATUS_COMMAND` | `/mnt/q/repos/separation-tracker-staging/deploy/scripts/brave-paws-picam-camera-control.sh status` |
+| `BRAVE_PAWS_CAMERA_ENABLE_COMMAND` | `/mnt/q/repos/separation-tracker-staging/deploy/scripts/brave-paws-picam-camera-control.sh enable` |
+| `BRAVE_PAWS_CAMERA_DISABLE_COMMAND` | `/mnt/q/repos/separation-tracker-staging/deploy/scripts/brave-paws-picam-camera-control.sh disable` |
+| `BRAVE_PAWS_RECORDING_PROVIDER` | `command` |
+| `BRAVE_PAWS_RECORDING_STATUS_COMMAND` | `/mnt/q/repos/separation-tracker-staging/deploy/scripts/brave-paws-picam-recording-control.sh status` |
+| `BRAVE_PAWS_RECORDING_START_COMMAND` | `/mnt/q/repos/separation-tracker-staging/deploy/scripts/brave-paws-picam-recording-control.sh start` |
+| `BRAVE_PAWS_RECORDING_STOP_COMMAND` | `/mnt/q/repos/separation-tracker-staging/deploy/scripts/brave-paws-picam-recording-control.sh stop` |
 
 ## Session storage
 
@@ -103,10 +108,17 @@ systemctl status brave-paws-staging-refresh.service --no-pager
 journalctl -u brave-paws-staging-refresh.service -n 100 --no-pager
 ```
 
+Expected refresh-service behavior:
+
+- `brave-paws-staging-refresh.service` is a `Type=oneshot` job, so a healthy run normally ends as `inactive (dead)` with `status=0/SUCCESS` after finishing.
+- The refresh script includes a bounded readiness retry loop after restarting `brave-paws.service`, so a brief server startup delay should no longer cause a false failed deploy.
+
 ## Notes
 
 - The camera path is a same-origin proxy in front of picam / MediaMTX, and directory-style preview URLs such as `/separation/camera/live.stream` are redirected to the working trailing-slash preview page automatically.
 - `deploy/systemd/brave-paws.service` is the canonical QUANTUM staging unit, but the live copy should now be refreshed automatically by `brave-paws-staging-refresh.service` instead of hand-editing `/etc/systemd/system/brave-paws.service`.
 - QUANTUM's deployment now wires the generic camera-streaming capability API to the existing OpenClaw picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, so the Brave Paws dashboard toggle and session lifecycle automation drive the same underlying picam enable/disable behavior as the assistant skill.
+- QUANTUM's deployment also wires the generic recording capability API to `deploy/scripts/brave-paws-picam-recording-control.sh`, so the app footer/active-session recording controls reflect the same backend capability contract used in tests.
+- If the hosted `harvey.cash` frontend cannot connect to the Tailnet backend root, check CORS first: the QUANTUM backend must include `BRAVE_PAWS_CORS_ALLOWED_ORIGINS=https://harvey.cash,https://www.harvey.cash` and `/separation/api/capabilities` should report both `cameraStreaming.provider = "command"` and `sessionRecording.provider = "command"`.
 - If you enable pairing, also set `BRAVE_PAWS_AUTH_TOKEN`; otherwise the HTTP pairing-creation endpoint stays disabled on purpose and only the local CLI can mint tokens.
 - Local browser persistence still exists in the app; QUANTUM hydrates on open and automatically pushes changes back to the inspectable QUANTUM data folder.

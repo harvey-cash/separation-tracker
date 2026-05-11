@@ -33,12 +33,21 @@ Copy `.env.example` to `.env.local` and set values as needed.
 | `VITE_BRAVE_PAWS_APP_URL` | No | Canonical app URL for pairing links and stream QR links. |
 | `VITE_BRAVE_PAWS_API_BASE_URL` | No | API base URL, typically `/separation/api/`. |
 | `VITE_BRAVE_PAWS_DEFAULT_CAMERA_URL` | No | Optional suggested same-origin camera stream URL shown by the quick-start button. |
+| `VITE_BRAVE_PAWS_BACKEND_ROOT_URL` | No | Optional deployment-time backend root override. The app derives `/separation/api/` and the suggested camera link from this root when it is set. |
 
 ## Related Docs
 
 - Training-method background: [INFO.md](INFO.md)
 - Repo overview and workspace commands: [../../README.md](../../README.md)
 - Private-network deployment: [../../docs/quantum-local-tailnet.md](../../docs/quantum-local-tailnet.md)
+
+## Runtime backend override
+
+Brave Paws also supports a browser-local backend override flow for separately hosted frontends.
+
+- Users can enter a backend root such as `https://quantum.tail080401.ts.net:7447` in the in-app connection settings.
+- The app then derives the API base and suggested camera link from that root and stores the normalized value in browser storage.
+- Hosted/public frontends still need the target backend to allow their origin over CORS for the health test and subsequent API calls to succeed.
 
 ## Session Status Tracking
 

@@ -1,6 +1,6 @@
 # Brave Paws Server
 
-Brave Paws Server is the local-first backend for Brave Paws v0.2.2.
+Brave Paws Server is the local-first backend for Brave Paws v0.2.
 
 It serves three things from one localhost process:
 
@@ -25,6 +25,7 @@ It serves three things from one localhost process:
 | `BRAVE_PAWS_HOST` | `127.0.0.1` | Bind host for the local server |
 | `BRAVE_PAWS_PORT` | `4310` | Bind port for the local server |
 | `BRAVE_PAWS_PUBLIC_BASE_URL` | unset | Canonical external base URL used for logs, pairing URLs, and deployment docs |
+| `BRAVE_PAWS_CORS_ALLOWED_ORIGINS` | unset | Comma-separated origin allowlist for cross-origin browser access to the API (for example `https://harvey.cash,https://www.harvey.cash`) |
 | `BRAVE_PAWS_DATA_DIR` | `var/brave-paws` in the repo | Session storage directory (live QUANTUM deploy uses `/mnt/q/fermi/brave-paws/data`) |
 | `BRAVE_PAWS_AUTH_TOKEN` | unset | Token expected in `x-brave-paws-token` for write requests; required before the HTTP pairing-creation endpoint will mint links |
 | `BRAVE_PAWS_ENABLE_PAIRING` | `false` | Enables the opaque one-time pairing broker |
@@ -60,6 +61,19 @@ When pairing is enabled, opaque one-time camera pairing records are stored separ
 - Absolute `pairingUrl` values are only returned when `BRAVE_PAWS_PUBLIC_BASE_URL` is configured. Otherwise the server can still mint tokens, but callers must construct the final browser URL themselves.
 - Camera URLs with embedded credentials are rejected so secrets do not land in `pairings.json` or pairing responses.
 
+## API summary
+
+Core endpoints:
+
+- `GET /separation/api/health`
+- `GET /separation/api/sessions`
+- `GET /separation/api/sessions/:id`
+- `POST /separation/api/sessions`
+- `PUT /separation/api/sessions/:id`
+- `POST /separation/api/sync/pull`
+- `POST /separation/api/sync/push`
+- `POST /separation/api/client-diagnostics`
+
 ## Camera streaming capability API
 
 Brave Paws exposes a backend capability contract for camera streaming control:
@@ -70,7 +84,7 @@ Brave Paws exposes a backend capability contract for camera streaming control:
 
 The built-in `command` provider is intentionally generic: the server only knows how to run configured shell commands and interpret the returned enabled/disabled state. That keeps the API backend-agnostic so a future provider can control something other than picam without changing the app contract.
 
-On QUANTUM, that generic contract is wired to Harvey's existing picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, which adapts the skill's `privacy_mode=...` output into the simple enabled/disabled signal expected by the API.
+On QUANTUM, that generic contract is wired to Harvey's existing picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, which adapts the skill's `privacy_mode=...` output into the simple enabled/disabled signal expected by the API. In the live staging deployment, `brave-paws.service` runs from the clean staging worktree, so the installed unit points at `/mnt/q/repos/separation-tracker-staging/deploy/scripts/...` rather than the source checkout.
 
 ## Session recording API
 
@@ -91,3 +105,13 @@ The JSON sidecar is the source of truth. It stores the finalized session snapsho
 The intended deployment model is a passive extra reader near the media source: the live RTSP publisher remains the same, the in-app HLS preview remains the same, and the Icecast audio stream remains the same. Recording should read the source RTSP feed separately and avoid inserting transcoding or buffering into the live user-facing paths.
 
 On QUANTUM, the sample wiring for this contract lives in `deploy/scripts/brave-paws-picam-recording-control.sh`. It SSHes to `picam`, starts a passive localhost RTSP reader there, transcodes recordings to a storage-friendly H.264 MP4 profile (default: 540p at 800 kbps video plus AAC audio), finalizes the capture, and places the canonical file under the Brave Paws recordings directory on QUANTUM after stop.
+
+## QUANTUM staging notes
+
+- Canonical source repo: `/mnt/q/repos/separation-tracker`
+- Dedicated clean staging worktree: `/mnt/q/repos/separation-tracker-staging`
+- Live service: `brave-paws.service`
+- Auto-refresh oneshot: `brave-paws-staging-refresh.service`
+- Auto-refresh timer: `brave-paws-staging-refresh.timer`
+- The staging refresh follows the local dev repo's latest **committed** `HEAD`; dirty uncommitted edits are intentionally skipped.
+- A healthy `brave-paws-staging-refresh.service` run normally ends as `inactive (dead)` with `status=0/SUCCESS` because it is a oneshot verification/deploy job.
