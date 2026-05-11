@@ -57,3 +57,4 @@ apps/
 - Canonical synced data can live on the self-hosted server while public bundles stay free of private camera origins.
 - Pairing records reject credential-bearing camera URLs so secrets do not leak into stored broker state or client responses.
 - Public CD remains `main`-only; feature branches get CI without triggering deploy.
+- QUANTUM staging is separate from public CD: `deploy/scripts/install-brave-paws-staging-automation.sh` installs a timer-driven local staging refresh that rebuilds from the local dev repo's latest committed HEAD into `/mnt/q/repos/separation-tracker-staging/` and then restarts `brave-paws.service`.
