@@ -152,15 +152,26 @@ fi
 python3 - "$HEALTH_URL" "$CAPABILITIES_URL" <<'PY'
 import json
 import sys
+import time
+import urllib.error
 import urllib.request
 
 health_url, capabilities_url = sys.argv[1:3]
+last_error = None
+health = None
 
-with urllib.request.urlopen(health_url, timeout=10) as response:
-    health = json.load(response)
-
-if health.get('status') != 'ok':
-    raise SystemExit(f"health check failed: {health!r}")
+for attempt in range(1, 13):
+    try:
+        with urllib.request.urlopen(health_url, timeout=10) as response:
+            health = json.load(response)
+        if health.get('status') != 'ok':
+            raise RuntimeError(f"health check failed: {health!r}")
+        break
+    except (urllib.error.URLError, TimeoutError, RuntimeError, ConnectionError) as error:
+        last_error = error
+        time.sleep(5)
+else:
+    raise SystemExit(f"staging health check never became ready: {last_error}")
 
 with urllib.request.urlopen(capabilities_url, timeout=10) as response:
     capabilities = json.load(response)
