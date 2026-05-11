@@ -100,3 +100,51 @@ test('reset removes the saved backend root override', () => {
 
   assert.equal(loadStoredBackendRootUrl({ storage }), null);
 });
+
+test('loadStoredBackendRootUrl returns null when storage reads throw', () => {
+  const storage: StorageLike = {
+    getItem: () => {
+      throw new Error('blocked');
+    },
+    setItem: () => {},
+    removeItem: () => {},
+  };
+
+  assert.equal(loadStoredBackendRootUrl({ storage }), null);
+});
+
+test('saveStoredBackendRootUrl returns the normalized value when storage writes throw', () => {
+  const storage: StorageLike = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('quota');
+    },
+    removeItem: () => {},
+  };
+
+  assert.equal(saveStoredBackendRootUrl('https://quantum.tail080401.ts.net:7447', { storage }), 'https://quantum.tail080401.ts.net:7447');
+});
+
+test('saveStoredBackendRootUrl treats remove failures as a no-op for invalid values', () => {
+  const storage: StorageLike = {
+    getItem: () => 'https://quantum.tail080401.ts.net:7447',
+    setItem: () => {},
+    removeItem: () => {
+      throw new Error('blocked');
+    },
+  };
+
+  assert.equal(saveStoredBackendRootUrl('not a url', { storage }), null);
+});
+
+test('clearStoredBackendRootUrl ignores storage remove errors', () => {
+  const storage: StorageLike = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {
+      throw new Error('blocked');
+    },
+  };
+
+  assert.doesNotThrow(() => clearStoredBackendRootUrl(storage));
+});

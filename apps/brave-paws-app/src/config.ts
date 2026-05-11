@@ -79,13 +79,46 @@ function resolveBackendDerivedUrl(backendRootUrl: string, fallbackPath: string):
   return ensureTrailingSlash(new URL(fallbackPath, ensureTrailingSlash(backendRootUrl)).toString());
 }
 
-export function loadStoredBackendRootUrl(options: { origin?: string; storage?: StorageLike | null } = {}): string | null {
-  const storage = options.storage === undefined ? getStorage() : options.storage;
+function safeStorageGet(storage: StorageLike | null, key: string): string | null {
   if (!storage) {
     return null;
   }
 
-  const normalized = normalizeBackendRootUrl(storage.getItem(BACKEND_ROOT_URL_STORAGE_KEY) || '', options.origin);
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(storage: StorageLike | null, key: string, value: string): boolean {
+  if (!storage) {
+    return false;
+  }
+
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeStorageRemove(storage: StorageLike | null, key: string): void {
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Treat blocked storage as a no-op.
+  }
+}
+
+export function loadStoredBackendRootUrl(options: { origin?: string; storage?: StorageLike | null } = {}): string | null {
+  const storage = options.storage === undefined ? getStorage() : options.storage;
+  const normalized = normalizeBackendRootUrl(safeStorageGet(storage, BACKEND_ROOT_URL_STORAGE_KEY) || '', options.origin);
   return normalized || null;
 }
 
@@ -98,16 +131,16 @@ export function saveStoredBackendRootUrl(value: string, options: { origin?: stri
   }
 
   if (normalized) {
-    storage.setItem(BACKEND_ROOT_URL_STORAGE_KEY, normalized);
+    safeStorageSet(storage, BACKEND_ROOT_URL_STORAGE_KEY, normalized);
     return normalized;
   }
 
-  storage.removeItem(BACKEND_ROOT_URL_STORAGE_KEY);
+  safeStorageRemove(storage, BACKEND_ROOT_URL_STORAGE_KEY);
   return null;
 }
 
 export function clearStoredBackendRootUrl(storage: StorageLike | null = getStorage()) {
-  storage?.removeItem(BACKEND_ROOT_URL_STORAGE_KEY);
+  safeStorageRemove(storage, BACKEND_ROOT_URL_STORAGE_KEY);
 }
 
 export function resolveEffectiveBackendRootUrl(options: ResolveUrlOptions = {}): string | null {
