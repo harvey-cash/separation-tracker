@@ -1,20 +1,23 @@
+import { type ReactNode } from 'react';
 import { AlertCircle, Check, Loader2, RefreshCw, Server } from 'lucide-react';
 
 import type { StorageProviderState } from '../hooks/useStorageSync';
 
 type Props = {
   provider: StorageProviderState;
+  backendConnection?: ReactNode;
 };
 
-export function StorageSync({ provider }: Props) {
+export function StorageSync({ provider, backendConnection }: Props) {
   return (
     <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Storage</p>
-          <h2 className="mt-2 text-xl font-serif font-bold text-slate-800">Local-first sync</h2>
+          <h2 className="mt-2 text-xl font-serif font-bold text-slate-800">Connected sync</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Sessions are always saved on this device first, then synced with a connected server whenever one is available.
+            Brave Paws keeps history on this device and syncs with a connected backend when one is available.
+            Recent sessions hydrate on app open and changes are pushed back automatically.
           </p>
         </div>
         <StatusBadge provider={provider} />
@@ -44,7 +47,7 @@ export function StorageSync({ provider }: Props) {
             <span>
               {provider.hasPendingChanges
                 ? 'New or edited sessions are saved locally on this device and will sync automatically when the server is reachable again.'
-                : 'Remote sync is unavailable right now, but your sessions are still being stored locally on this device.'}
+                : 'The backend is not reachable right now, but your sessions are still being stored locally on this device.'}
             </span>
           </div>
         )}
@@ -61,6 +64,8 @@ export function StorageSync({ provider }: Props) {
           <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">Syncs on reconnect</div>
           <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">Refreshes after saves and imports</div>
         </div>
+
+        {backendConnection}
 
         {provider.onSyncNow && provider.isAvailable ? (
           <div className="flex flex-wrap gap-2">

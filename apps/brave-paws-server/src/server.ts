@@ -35,6 +35,8 @@ const JSON_HEADERS = {
   'cache-control': 'no-store',
 };
 
+const CORS_ALLOWED_METHODS = 'GET,POST,PUT,OPTIONS';
+const CORS_ALLOWED_HEADERS = 'content-type,x-brave-paws-token';
 const RECORDING_STOP_REQUEST_MAX_BYTES = 512 * 1024;
 
 class JsonBodyTooLargeError extends Error {
@@ -47,6 +49,71 @@ class JsonBodyTooLargeError extends Error {
 function sendJson(response: ServerResponse, statusCode: number, payload: unknown) {
   response.writeHead(statusCode, JSON_HEADERS);
   response.end(`${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function appendVaryHeader(response: ServerResponse, value: string) {
+  const existing = response.getHeader('vary');
+  const entries = new Set(
+    String(existing || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  );
+  entries.add(value);
+  response.setHeader('vary', Array.from(entries).join(', '));
+}
+
+function getAllowedCorsOrigin(request: IncomingMessage, config: BravePawsServerConfig): string | null {
+  const requestOrigin = request.headers.origin;
+  if (typeof requestOrigin !== 'string' || !requestOrigin) {
+    return null;
+  }
+
+  return config.corsAllowedOrigins.includes(requestOrigin) ? requestOrigin : null;
+}
+
+function applyCorsHeaders(response: ServerResponse, request: IncomingMessage, config: BravePawsServerConfig): boolean {
+  const allowedOrigin = getAllowedCorsOrigin(request, config);
+  if (!allowedOrigin) {
+    return false;
+  }
+
+  response.setHeader('access-control-allow-origin', allowedOrigin);
+  response.setHeader('access-control-allow-methods', CORS_ALLOWED_METHODS);
+  response.setHeader('access-control-allow-headers', CORS_ALLOWED_HEADERS);
+  appendVaryHeader(response, 'Origin');
+  return true;
+}
+
+function handleApiPreflight(request: IncomingMessage, response: ServerResponse, config: BravePawsServerConfig): boolean {
+  if (request.method !== 'OPTIONS') {
+    return false;
+  }
+
+  const requestOrigin = typeof request.headers.origin === 'string' ? request.headers.origin : null;
+  if (!requestOrigin) {
+    response.writeHead(204, {
+      'cache-control': 'no-store',
+      'access-control-allow-methods': CORS_ALLOWED_METHODS,
+      'access-control-allow-headers': CORS_ALLOWED_HEADERS,
+    });
+    response.end();
+    return true;
+  }
+
+  if (!applyCorsHeaders(response, request, config)) {
+    response.writeHead(403, {
+      'cache-control': 'no-store',
+    });
+    response.end();
+    return true;
+  }
+
+  response.writeHead(204, {
+    'cache-control': 'no-store',
+  });
+  response.end();
+  return true;
 }
 
 function sendText(response: ServerResponse, statusCode: number, body: string, contentType = 'text/plain; charset=utf-8') {
@@ -912,6 +979,11 @@ export function createBravePawsServer(config = resolveConfig()) {
       }
 
       if (pathname.startsWith(config.apiBasePath)) {
+        if (handleApiPreflight(request, response, config)) {
+          return;
+        }
+
+        applyCorsHeaders(response, request, config);
         await handleApiRequest(request, response, pathname, config, cameraStreamingController, sessionRecordingController);
         return;
       }

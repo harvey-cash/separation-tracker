@@ -11,10 +11,12 @@ import { SessionView } from './components/SessionView';
 import { InfoView } from './components/InfoView';
 import { CameraStreamingControl } from './components/CameraStreamingControl';
 import { StorageSync } from './components/StorageSync';
+import { BackendConnectionSettings } from './components/BackendConnectionSettings';
 import { useCameraStreamingControl } from './hooks/useCameraStreamingControl';
 import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
+import { loadStoredBackendRootUrl } from './config';
 import { PAIRING_TOKEN_QUERY_PARAM, resolveCameraUrlFromPairingToken } from './utils/pairingToken';
 import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
 import {
@@ -45,6 +47,7 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<Session | null>(restoredActiveSessionState?.session ?? null);
   const [activeSessionState, setActiveSessionState] = useState<ActiveSessionState | null>(restoredActiveSessionState);
   const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
+  const [backendRootUrl, setBackendRootUrl] = useState<string | null>(() => loadStoredBackendRootUrl());
   const cameraStreamingControl = useCameraStreamingControl();
   const wasTrainingActiveRef = useRef(false);
   const pendingSessionCameraStateRef = useRef<boolean | null>(restoredActiveSessionState ? true : null);
@@ -83,7 +86,7 @@ export default function App() {
     };
 
     void applyPairingFromLocation();
-  }, []);
+  }, [backendRootUrl]);
 
   // Keep cameraUrl in sync with local storage
   useEffect(() => {
@@ -204,6 +207,13 @@ export default function App() {
           storageSync={
             <StorageSync
               provider={storageSync.provider}
+              backendConnection={
+                <BackendConnectionSettings
+                  currentBackendRootUrl={backendRootUrl}
+                  isBackendAvailable={storageSync.provider.isAvailable}
+                  onBackendRootUrlChange={setBackendRootUrl}
+                />
+              }
             />
           }
           isBackendUnavailable={!storageSync.provider.isAvailable}
