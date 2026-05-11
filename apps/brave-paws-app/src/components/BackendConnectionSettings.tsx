@@ -115,6 +115,7 @@ export function BackendConnectionSettings({
           id="backend-root-url"
           type="url"
           value={draftValue}
+          disabled={status === 'testing'}
           onChange={(event) => {
             setDraftValue(event.target.value);
             if (status !== 'testing') {
@@ -123,7 +124,7 @@ export function BackendConnectionSettings({
             }
           }}
           placeholder="https://quantum.tail080401.ts.net:7447"
-          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
         />
         <p className="text-xs text-slate-500">
           Current deployment default: <span className="font-mono text-[11px] text-slate-600">{deploymentHint}</span>
@@ -154,7 +155,7 @@ export function BackendConnectionSettings({
         <button
           type="button"
           onClick={handleReset}
-          disabled={status === 'testing' && !currentBackendRootUrl}
+          disabled={status === 'testing'}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RotateCcw size={15} />
