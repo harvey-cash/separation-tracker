@@ -47,9 +47,16 @@ apps/
 
 ## Docs
 
+Active/current docs:
+
 - Local Tailnet deployment and QUANTUM staging automation: [docs/quantum-local-tailnet.md](docs/quantum-local-tailnet.md)
 - App workspace notes: [apps/brave-paws-app/README.md](apps/brave-paws-app/README.md)
 - Server workspace notes: [apps/brave-paws-server/README.md](apps/brave-paws-server/README.md)
+
+Historical context:
+
+- `docs/plans/` contains planning and implementation-brief docs kept for rationale and project history. Prefer the docs above for current operational behavior.
+- checklist-style docs under `docs/` are usually point-in-time implementation records rather than ongoing runbooks.
 
 ## Notes
 

@@ -3,7 +3,16 @@
 Date: 2026-05-03
 Owner: Harvey + Quantum
 Repo: `Q:/repos/separation-tracker`
-Status: proposed execution plan / handoff brief
+Status: historical execution plan / rationale note
+
+> Historical note: this document is preserved mainly as design rationale and a snapshot of the intended migration path on 2026-05-03.
+> For current operational behavior, deployment details, and QUANTUM staging automation, prefer:
+> - `../../README.md`
+> - `../quantum-local-tailnet.md`
+> - `../../apps/brave-paws-app/README.md`
+> - `../../apps/brave-paws-server/README.md`
+>
+> Some example hosts/paths below (such as `tailnet-host.example.ts.net`) are intentionally generic historical examples, not the current literal QUANTUM deployment values.
 
 ## Executive summary
 

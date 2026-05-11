@@ -1,5 +1,11 @@
 # Brave Paws recording metadata v1 checklist
 
+Status: completed historical implementation checklist
+
+> Historical note: this is a completed point-in-time checklist for the recording metadata v1 slice.
+> Keep it as an audit trail for what shipped and where the smoke-test artifacts landed, not as an active runbook.
+> For current recording behavior and server capability docs, prefer `../apps/brave-paws-server/README.md` and `./quantum-local-tailnet.md`.
+
 - [x] Inspect current app/server/deploy recording flow and choose the least-fragile insertion points.
 - [x] Add app-side runtime timeline event capture for active sessions, including actual step/session transitions.
 - [x] Extend recording API payloads/contracts so stop/finalization receives the session snapshot + timeline metadata.
