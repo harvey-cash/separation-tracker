@@ -68,11 +68,17 @@ If Harvey drops a fresher `brave_paws_sessions.csv` into the data folder, the se
 2. Start locally: `npm run server:start`
 3. Verify local routes with curl or a browser
 4. Install `deploy/systemd/brave-paws.service`
+   ```bash
+   sudo install -m 0644 /mnt/q/repos/separation-tracker/deploy/systemd/brave-paws.service /etc/systemd/system/brave-paws.service
+   sudo systemctl daemon-reload
+   sudo systemctl restart brave-paws.service
+   ```
 5. Expose the server through Tailscale Serve so `/separation/...` stays Tailnet-only
 
 ## Notes
 
 - The camera path is a same-origin proxy in front of picam / MediaMTX, and directory-style preview URLs such as `/separation/camera/live.stream` are redirected to the working trailing-slash preview page automatically.
+- `deploy/systemd/brave-paws.service` is the canonical QUANTUM staging unit; update `/etc/systemd/system/brave-paws.service` from that repo copy verbatim instead of hand-editing the live unit.
 - QUANTUM's deployment now wires the generic camera-streaming capability API to the existing OpenClaw picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, so the Brave Paws dashboard toggle and session lifecycle automation drive the same underlying picam enable/disable behavior as the assistant skill.
 - If you enable pairing, also set `BRAVE_PAWS_AUTH_TOKEN`; otherwise the HTTP pairing-creation endpoint stays disabled on purpose and only the local CLI can mint tokens.
 - Local browser persistence still exists in the app; QUANTUM hydrates on open and automatically pushes changes back to the inspectable QUANTUM data folder.
