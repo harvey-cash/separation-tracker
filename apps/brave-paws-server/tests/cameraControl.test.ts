@@ -30,7 +30,14 @@ function makeConfig(overrides: Partial<BravePawsServerConfig> = {}): BravePawsSe
     cameraControlStatusCommand: null,
     cameraControlEnableCommand: null,
     cameraControlDisableCommand: null,
+    recordingProvider: 'none',
+    recordingLabel: 'Session recording',
+    recordingStatusCommand: null,
+    recordingStartCommand: null,
+    recordingStopCommand: null,
     authToken: null,
+    corsAllowedOrigins: [],
+    recordingsDir: '/tmp/data/recordings',
     ...overrides,
   };
 }
