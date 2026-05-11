@@ -1,0 +1,8 @@
+[Unit]
+Description=Refresh Brave Paws QUANTUM staging deployment
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash /mnt/q/repos/separation-tracker/deploy/scripts/brave-paws-refresh-staging.sh

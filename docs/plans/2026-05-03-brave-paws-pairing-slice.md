@@ -1,5 +1,14 @@
 # Brave Paws pairing slice — implementation plan
 
+Status: historical implementation slice note
+
+> Historical note: this doc captures the original small-slice plan for adding opaque pairing links.
+> Keep it as rationale/history; for current app/server behavior prefer:
+> - `../../apps/brave-paws-app/README.md`
+> - `../../apps/brave-paws-server/README.md`
+>
+> The pairing capability described here has since been implemented, so this file should be read as a design snapshot rather than an active task list.
+
 ## Current state
 - The app already supports deep links that embed the raw `cameraUrl` in the query string and then caches the chosen stream in browser storage.
 - Runtime defaults fall back to same-origin paths, but the app copy/examples still assume a QUANTUM-specific shortcut and direct stream URL.
