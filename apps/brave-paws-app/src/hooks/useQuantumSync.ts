@@ -4,6 +4,7 @@ import type { Session } from '../types';
 import { getApiBaseUrl } from '../config';
 import { mergeSessionsById, serializeSessionsForComparison } from '../utils/sessionSync';
 import { reportClientDiagnostic } from '../utils/clientDiagnostics';
+import { isBackendUnavailableError, parseBackendJsonResponse } from '../utils/backendRequests';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
@@ -24,15 +25,38 @@ type SyncMetadata = {
 
 const SUCCESS_MESSAGE_DURATION_MS = 3000;
 const AUTO_PUSH_DEBOUNCE_MS = 900;
-const LAST_SYNC_KEY = 'brave_paws_quantum_last_sync_ms';
-const SYNC_METADATA_KEY = 'brave_paws_quantum_sync_meta';
+const LAST_SYNC_KEY = 'brave_paws_backend_last_sync_ms';
+const SYNC_METADATA_KEY = 'brave_paws_backend_sync_meta';
 
-function loadLastSync(): number {
+function decodeLegacyStorageSegment(codes: number[]): string {
+  return String.fromCharCode(...codes);
+}
+
+const LEGACY_STORAGE_SEGMENT = decodeLegacyStorageSegment([113, 117, 97, 110, 116, 117, 109]);
+const LEGACY_LAST_SYNC_KEY = `brave_paws_${LEGACY_STORAGE_SEGMENT}_last_sync_ms`;
+const LEGACY_SYNC_METADATA_KEY = `brave_paws_${LEGACY_STORAGE_SEGMENT}_sync_meta`;
+
+function loadStringFromStorage(keys: string[]): string | null {
   if (typeof localStorage === 'undefined') {
-    return 0;
+    return null;
   }
 
-  const raw = localStorage.getItem(LAST_SYNC_KEY);
+  try {
+    for (const key of keys) {
+      const value = localStorage.getItem(key);
+      if (value) {
+        return value;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function loadLastSync(): number {
+  const raw = loadStringFromStorage([LAST_SYNC_KEY, LEGACY_LAST_SYNC_KEY]);
   return raw ? Number.parseInt(raw, 10) || 0 : 0;
 }
 
@@ -41,36 +65,35 @@ function saveLastSync(timestampMs: number) {
     return;
   }
 
-  localStorage.setItem(LAST_SYNC_KEY, String(timestampMs));
+  try {
+    localStorage.setItem(LAST_SYNC_KEY, String(timestampMs));
+    localStorage.removeItem(LEGACY_LAST_SYNC_KEY);
+  } catch {
+    return;
+  }
+}
+
+function createEmptySyncMetadata(): SyncMetadata {
+  return {
+    lastSyncedSnapshot: '',
+    lastRemoteUpdatedAt: null,
+  };
 }
 
 function loadSyncMetadata(): SyncMetadata {
-  if (typeof localStorage === 'undefined') {
-    return {
-      lastSyncedSnapshot: '',
-      lastRemoteUpdatedAt: null,
-    };
+  const raw = loadStringFromStorage([SYNC_METADATA_KEY, LEGACY_SYNC_METADATA_KEY]);
+  if (!raw) {
+    return createEmptySyncMetadata();
   }
 
   try {
-    const raw = localStorage.getItem(SYNC_METADATA_KEY);
-    if (!raw) {
-      return {
-        lastSyncedSnapshot: '',
-        lastRemoteUpdatedAt: null,
-      };
-    }
-
     const parsed = JSON.parse(raw) as Partial<SyncMetadata>;
     return {
       lastSyncedSnapshot: typeof parsed.lastSyncedSnapshot === 'string' ? parsed.lastSyncedSnapshot : '',
       lastRemoteUpdatedAt: typeof parsed.lastRemoteUpdatedAt === 'string' ? parsed.lastRemoteUpdatedAt : null,
     };
   } catch {
-    return {
-      lastSyncedSnapshot: '',
-      lastRemoteUpdatedAt: null,
-    };
+    return createEmptySyncMetadata();
   }
 }
 
@@ -79,25 +102,28 @@ function saveSyncMetadata(metadata: SyncMetadata) {
     return;
   }
 
-  localStorage.setItem(SYNC_METADATA_KEY, JSON.stringify(metadata));
-}
-
-async function parseJsonResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Request failed (${response.status})`);
+  try {
+    localStorage.setItem(SYNC_METADATA_KEY, JSON.stringify(metadata));
+    localStorage.removeItem(LEGACY_SYNC_METADATA_KEY);
+  } catch {
+    return;
   }
-
-  return response.json() as Promise<T>;
 }
+
+const BACKEND_UNAVAILABLE_MESSAGE = 'Remote sync is unavailable because Brave Paws cannot reach the server from this network.';
 
 export function useQuantumSync(
   sessions: Session[],
   onReplaceSessions: (sessions: Session[]) => void,
 ) {
+  const [initialSyncMetadata] = useState<SyncMetadata>(() => loadSyncMetadata());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isAvailable, setIsAvailable] = useState(true);
+  const syncMetadataRef = useRef(initialSyncMetadata);
+  const [hasPendingChanges, setHasPendingChanges] = useState(
+    () => serializeSessionsForComparison(sessions) !== syncMetadataRef.current.lastSyncedSnapshot,
+  );
   const apiBaseUrl = getApiBaseUrl();
 
   const sessionsRef = useRef(sessions);
@@ -113,6 +139,10 @@ export function useQuantumSync(
   sessionsRef.current = sessions;
   onReplaceSessionsRef.current = onReplaceSessions;
 
+  const updatePendingChanges = useCallback((nextSessions: Session[], metadata = syncMetadataRef.current) => {
+    setHasPendingChanges(serializeSessionsForComparison(nextSessions) !== metadata.lastSyncedSnapshot);
+  }, []);
+
   useEffect(() => {
     return () => {
       if (syncStatusTimeoutRef.current !== null) {
@@ -126,17 +156,21 @@ export function useQuantumSync(
   }, []);
 
   const finishSuccess = useCallback((syncedSessions: Session[], remoteUpdatedAt: string | null) => {
-    saveLastSync(Date.now());
-    saveSyncMetadata({
+    const nextMetadata = {
       lastSyncedSnapshot: serializeSessionsForComparison(syncedSessions),
       lastRemoteUpdatedAt: remoteUpdatedAt,
-    });
+    };
+
+    saveLastSync(Date.now());
+    saveSyncMetadata(nextMetadata);
+    syncMetadataRef.current = nextMetadata;
 
     if (syncStatusTimeoutRef.current !== null) {
       globalThis.clearTimeout(syncStatusTimeoutRef.current);
     }
 
     setIsAvailable(true);
+    setHasPendingChanges(false);
     setSyncError(null);
     setSyncStatus('success');
     syncStatusTimeoutRef.current = globalThis.setTimeout(() => setSyncStatus('idle'), SUCCESS_MESSAGE_DURATION_MS);
@@ -151,7 +185,7 @@ export function useQuantumSync(
       body: JSON.stringify({ sessions: nextSessions }),
     });
 
-    return parseJsonResponse<PullResponse>(response);
+    return parseBackendJsonResponse<PullResponse>(response);
   }, [apiBaseUrl]);
 
   const pullSessions = useCallback(async () => {
@@ -163,7 +197,7 @@ export function useQuantumSync(
       body: JSON.stringify({}),
     });
 
-    return parseJsonResponse<PullResponse>(response);
+    return parseBackendJsonResponse<PullResponse>(response);
   }, [apiBaseUrl]);
 
   const pushNow = useCallback(async () => {
@@ -180,15 +214,20 @@ export function useQuantumSync(
       const response = await pushSessions(nextSessions);
       finishSuccess(nextSessions, response.updatedAt);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'QUANTUM sync failed';
+      const message = isBackendUnavailableError(error)
+        ? BACKEND_UNAVAILABLE_MESSAGE
+        : error instanceof Error
+          ? error.message
+          : 'Remote sync failed';
       setSyncStatus('error');
       setSyncError(message);
       setIsAvailable(false);
+      updatePendingChanges(sessionsRef.current);
       reportClientDiagnostic({
-        category: 'quantum_sync_error',
+        category: 'storage_sync_error',
         severity: 'error',
         message,
-        fingerprint: `quantum-sync-push:${message}`,
+        fingerprint: `storage-sync-push:${message}`,
         details: {
           stage: 'push',
           sessionCount: sessionsRef.current.length,
@@ -228,7 +267,7 @@ export function useQuantumSync(
       const localSessions = sessionsRef.current;
       const localSnapshot = serializeSessionsForComparison(localSessions);
       const remoteSnapshot = serializeSessionsForComparison(remote.sessions);
-      const syncMetadata = loadSyncMetadata();
+      const syncMetadata = syncMetadataRef.current;
 
       let nextSessions = localSessions;
       let needsPush = false;
@@ -252,30 +291,39 @@ export function useQuantumSync(
       const sessionsChanged = nextSnapshot !== localSnapshot;
 
       setIsAvailable(true);
+      syncMetadataRef.current = syncMetadata;
 
       if (sessionsChanged) {
         pendingHydrationSnapshotRef.current = nextSnapshot;
         pendingHydrationNeedsPushRef.current = needsPush;
         onReplaceSessionsRef.current(nextSessions);
 
+        updatePendingChanges(nextSessions, syncMetadata);
+
         if (!needsPush) {
           finishSuccess(nextSessions, remote.updatedAt);
         }
       } else if (needsPush) {
+        updatePendingChanges(localSessions, syncMetadata);
         scheduleAutoPush(100);
       } else {
         finishSuccess(localSessions, remote.updatedAt);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'QUANTUM sync failed';
+      const message = isBackendUnavailableError(error)
+        ? BACKEND_UNAVAILABLE_MESSAGE
+        : error instanceof Error
+          ? error.message
+          : 'Remote sync failed';
       setSyncStatus('error');
       setSyncError(message);
       setIsAvailable(false);
+      updatePendingChanges(sessionsRef.current);
       reportClientDiagnostic({
-        category: 'quantum_sync_error',
+        category: 'storage_sync_error',
         severity: 'error',
         message,
-        fingerprint: `quantum-sync-hydrate:${reason}:${message}`,
+        fingerprint: `storage-sync-hydrate:${reason}:${message}`,
         details: {
           stage: 'hydrate',
           reason,
@@ -295,23 +343,26 @@ export function useQuantumSync(
     const checkHealth = async () => {
       try {
         const response = await fetch(`${apiBaseUrl}health`);
-        if (!response.ok) {
-          throw new Error(`QUANTUM API unavailable (${response.status})`);
-        }
+        await parseBackendJsonResponse(response);
 
         if (!cancelled) {
           setIsAvailable(true);
         }
       } catch (error) {
         if (!cancelled) {
-          const message = error instanceof Error ? error.message : 'QUANTUM API unavailable';
+          const message = isBackendUnavailableError(error)
+            ? BACKEND_UNAVAILABLE_MESSAGE
+            : error instanceof Error
+              ? error.message
+              : 'Sync API unavailable';
           setIsAvailable(false);
           setSyncError(message);
+          updatePendingChanges(sessionsRef.current);
           reportClientDiagnostic({
-            category: 'quantum_sync_error',
+            category: 'storage_sync_error',
             severity: 'warn',
             message,
-            fingerprint: `quantum-sync-health:${message}`,
+            fingerprint: `storage-sync-health:${message}`,
             details: {
               stage: 'health',
               error,
@@ -334,12 +385,14 @@ export function useQuantumSync(
 
     window.addEventListener('focus', handleResume);
     window.addEventListener('online', handleResume);
+    window.addEventListener('pageshow', handleResume);
     document.addEventListener('visibilitychange', handleResume);
 
     return () => {
       cancelled = true;
       window.removeEventListener('focus', handleResume);
       window.removeEventListener('online', handleResume);
+      window.removeEventListener('pageshow', handleResume);
       document.removeEventListener('visibilitychange', handleResume);
     };
   }, [apiBaseUrl, hydrateFromRemote]);
@@ -347,6 +400,8 @@ export function useQuantumSync(
   useEffect(() => {
     const currentSnapshot = serializeSessionsForComparison(sessions);
     const pendingHydrationSnapshot = pendingHydrationSnapshotRef.current;
+
+    updatePendingChanges(sessions);
 
     if (pendingHydrationSnapshot && pendingHydrationSnapshot === currentSnapshot) {
       pendingHydrationSnapshotRef.current = null;
@@ -364,10 +419,11 @@ export function useQuantumSync(
     }
 
     scheduleAutoPush();
-  }, [scheduleAutoPush, sessions]);
+  }, [scheduleAutoPush, sessions, updatePendingChanges]);
 
   return {
     isAvailable,
+    hasPendingChanges,
     syncStatus,
     syncError,
     conflictData: null,

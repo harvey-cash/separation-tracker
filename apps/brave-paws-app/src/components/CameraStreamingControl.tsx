@@ -32,10 +32,10 @@ export function CameraStreamingControl({ control }: Props) {
           <p className="mt-2 text-sm text-slate-500">
             {isSupported
               ? 'Turn the live camera stream on before training, or switch it off when you only need the history.'
-              : capability.detail || 'This backend does not currently expose camera streaming control.'}
+              : error || capability.detail || 'This backend does not currently expose camera streaming control.'}
           </p>
 
-          {error && (
+          {error && isSupported && (
             <p className="mt-2 text-sm text-amber-700">{error}</p>
           )}
         </div>

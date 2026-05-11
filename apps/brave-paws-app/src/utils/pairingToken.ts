@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from '../config';
 import { buildCameraPairingUrl, type CameraStreamProfile } from './cameraUrl';
+import { parseBackendJsonResponse } from './backendRequests';
 
 export const PAIRING_TOKEN_QUERY_PARAM = 'pairingToken';
 const PAIRING_TOKEN_PATTERN = /^[A-Za-z0-9_-]{10,200}$/;
@@ -31,12 +32,7 @@ export async function resolveCameraUrlFromPairingToken(
   const fetchImpl = options.fetchImpl || fetch;
   const response = await fetchImpl(`${apiBaseUrl}pairings/${encodeURIComponent(token)}`);
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Pairing lookup failed (${response.status})`);
-  }
-
-  const payload = await response.json() as PairingLookupResponse;
+  const payload = await parseBackendJsonResponse<PairingLookupResponse>(response);
   return buildCameraPairingUrl(payload.cameraUrl || '', undefined, {
     profile: payload.profile,
     mode: payload.mode,

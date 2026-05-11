@@ -454,12 +454,7 @@ Important note: the app currently only accepts `https:` camera URLs except for l
 
 ## Recommendation
 
-Use a long-lived feature branch for v0.2 work and merge via regular PRs.
-
-Suggested branch name:
-- `quantum/brave-paws-v0.2-local-tailnet`
-
-A shorter Harvey-owned variant is also fine if preferred.
+This branch-workflow note is now historical. `main` is the default base branch for ongoing Brave Paws work, and personal work should start from `main` on short-lived `quantum/*` branches merged back via regular PRs.
 
 ## CI changes required
 
@@ -525,7 +520,7 @@ The key point is that local staging should validate the real deployment shape, n
 ## Phase 0 — planning and branch setup
 
 Deliverables:
-- create v0.2 feature branch
+- create a fresh `quantum/*` branch from `main`
 - confirm branch naming convention
 - widen CI branch coverage
 - document env/config strategy
@@ -572,7 +567,7 @@ Deliverables:
 Deliverables:
 - docs updated
 - tests updated
-- branch ready for PR
+- branch ready for a PR targeting `main`
 - explicit checklist of remaining gaps before any later `harvey.cash` deployment
 
 ---
@@ -728,9 +723,9 @@ Implement Brave Paws v0.2 so QUANTUM serves the frontend and backend locally ove
 
 ## First actions
 
-1. Create or switch to the v0.2 feature branch.
+1. Create or switch to a fresh `quantum/*` branch from `main`.
 2. Audit and remove hard-coded `harvey.cash` assumptions.
-3. Update CI branch triggers so arbitrary feature branches run checks.
+3. Update CI branch triggers so arbitrary development branches run checks.
 4. Add the backend/server workspace skeleton.
 5. Remove or quarantine the Brave Paws Streamer surface and its leftover references.
 6. Make a local QUANTUM-hosted build of:

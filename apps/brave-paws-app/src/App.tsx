@@ -216,6 +216,7 @@ export default function App() {
               }
             />
           }
+          isBackendUnavailable={!storageSync.provider.isAvailable}
         />
       )}
 
@@ -298,6 +299,11 @@ export default function App() {
           onSave={(updatedSession) => {
             updateSession(updatedSession);
             setActiveSession(updatedSession);
+          }}
+          onDelete={(sessionId) => {
+            deleteSession(sessionId);
+            setActiveSession(null);
+            setCurrentView(previousView);
           }}
         />
       )}

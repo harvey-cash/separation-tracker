@@ -14,6 +14,7 @@ type Props = {
   onViewSession: (session: Session) => void;
   cameraStreamingControl?: ReactNode;
   storageSync?: ReactNode;
+  isBackendUnavailable?: boolean;
 };
 
 export function getRecentSessions(sessions: Session[]) {
@@ -31,6 +32,7 @@ export function Dashboard({
   onViewSession,
   cameraStreamingControl,
   storageSync,
+  isBackendUnavailable = false,
 }: Props) {
   const abortedSessions = sessions.filter((s) => s.status === 'aborted');
   const recentSessions = getRecentSessions(sessions);
@@ -60,6 +62,16 @@ export function Dashboard({
         </button>
       )}
 
+      {isBackendUnavailable && (
+        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Remote features unavailable</p>
+          <p className="mt-2 text-sm text-amber-900">
+            Training still works locally on this device. Sessions stay saved here and sync automatically when the server is reachable again.
+            Live camera controls, recordings, and remote sync are unavailable from this network right now.
+          </p>
+        </section>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
           onClick={onStartNew}
@@ -69,6 +81,9 @@ export function Dashboard({
             <Play size={28} fill="currentColor" />
           </div>
           <span className="text-xl font-semibold">Start Training</span>
+          {isBackendUnavailable && (
+            <span className="text-center text-sm font-medium text-rose-50/90">Works locally now · syncs later when the server is back</span>
+          )}
         </button>
 
         <div className="grid grid-cols-2 gap-4">
@@ -155,14 +170,14 @@ export function Dashboard({
       {storageSync}
 
       <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Brave Paws v0.2.2</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Connected features</p>
         <div className="mt-2 flex items-start gap-3">
           <div className="rounded-2xl bg-rose-100 p-2.5 text-rose-500">
             <Server size={18} />
           </div>
           <p className="text-sm text-slate-500">
-            Brave Paws now favours the local QUANTUM Tailnet setup: pairing-aware session sync, direct picam playback,
-            backend camera control, session recording, and no separate Windows streamer companion.
+            When a compatible server is available, Brave Paws can add automatic sync, pairing-aware camera previews,
+            remote camera control, and session recording without a separate companion app.
           </p>
         </div>
       </section>

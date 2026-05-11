@@ -17,7 +17,7 @@ test('shouldSendDiagnosticFingerprint enforces the per-page volume cap', () => {
   const recent = new Map<string, number>();
 
   assert.equal(
-    shouldSendDiagnosticFingerprint(recent, 'quantum-sync-error', 1_000, 12, { maxEventsPerWindow: 12 }),
+    shouldSendDiagnosticFingerprint(recent, 'storage-sync-error', 1_000, 12, { maxEventsPerWindow: 12 }),
     false,
   );
 });
