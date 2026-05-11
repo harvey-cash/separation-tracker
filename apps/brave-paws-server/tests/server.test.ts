@@ -100,6 +100,7 @@ async function withFixtureServer(
     recordingStartCommand: null,
     recordingStopCommand: null,
     authToken: null,
+    corsAllowedOrigins: [],
     recordingsDir: path.join(dataDir, 'recordings'),
     ...configOverrides,
   };
@@ -126,6 +127,71 @@ test('health endpoint reports session metadata without leaking server file paths
     assert.equal(body.dataFilePath, undefined);
     assert.equal(body.csvFilePath, undefined);
     assert.equal(body.clientDiagnosticsFilePath, undefined);
+  });
+});
+
+test('allowed CORS origins receive reflected headers on API responses', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/health`, {
+      headers: {
+        origin: 'https://harvey.cash',
+      },
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), 'https://harvey.cash');
+    assert.equal(response.headers.get('access-control-allow-methods'), 'GET,POST,PUT,OPTIONS');
+    assert.equal(response.headers.get('access-control-allow-headers'), 'content-type,x-brave-paws-token');
+    assert.match(response.headers.get('vary') || '', /Origin/);
+  }, {
+    corsAllowedOrigins: ['https://harvey.cash'],
+  });
+});
+
+test('API OPTIONS preflight succeeds for allowed origins on sync routes', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    for (const requestPath of ['/separation/api/sync/pull', '/separation/api/sync/push']) {
+      const response = await fetch(`${baseUrl}${requestPath}`, {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://harvey.cash',
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type',
+        },
+      });
+
+      assert.equal(response.status, 204);
+      assert.equal(response.headers.get('access-control-allow-origin'), 'https://harvey.cash');
+      assert.equal(response.headers.get('access-control-allow-methods'), 'GET,POST,PUT,OPTIONS');
+      assert.equal(response.headers.get('access-control-allow-headers'), 'content-type,x-brave-paws-token');
+    }
+  }, {
+    corsAllowedOrigins: ['https://harvey.cash'],
+  });
+});
+
+test('disallowed origins do not receive permissive CORS headers', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/health`, {
+      headers: {
+        origin: 'https://evil.example',
+      },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+
+    const preflight = await fetch(`${baseUrl}/separation/api/sync/push`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://evil.example',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+    assert.equal(preflight.status, 403);
+    assert.equal(preflight.headers.get('access-control-allow-origin'), null);
+  }, {
+    corsAllowedOrigins: ['https://harvey.cash'],
   });
 });
 
@@ -712,7 +778,14 @@ test('client diagnostics endpoint requires auth when a token is configured', asy
     cameraControlStatusCommand: null,
     cameraControlEnableCommand: null,
     cameraControlDisableCommand: null,
+    recordingProvider: 'none',
+    recordingLabel: 'Session recording',
+    recordingStatusCommand: null,
+    recordingStartCommand: null,
+    recordingStopCommand: null,
     authToken: 'secret-token',
+    corsAllowedOrigins: [],
+    recordingsDir: path.join(dataDir, 'recordings'),
   };
 
   const server = createBravePawsServer(config);
@@ -844,7 +917,19 @@ test('pairing broker creates one-time pairing URLs and consumes them once', asyn
     pairingStoreFilePath: path.join(dataDir, 'pairings.json'),
     pairingEnabled: true,
     cameraUpstreamBaseUrl: `${upstreamBaseUrl}/`,
+    cameraControlProvider: 'none',
+    cameraControlLabel: 'Camera streaming',
+    cameraControlStatusCommand: null,
+    cameraControlEnableCommand: null,
+    cameraControlDisableCommand: null,
+    recordingProvider: 'none',
+    recordingLabel: 'Session recording',
+    recordingStatusCommand: null,
+    recordingStartCommand: null,
+    recordingStopCommand: null,
     authToken: 'secret-token',
+    corsAllowedOrigins: [],
+    recordingsDir: path.join(dataDir, 'recordings'),
   };
 
   const server = createBravePawsServer(config);

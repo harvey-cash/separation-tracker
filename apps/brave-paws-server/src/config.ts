@@ -29,6 +29,29 @@ function normalizeBaseUrl(value: string | undefined): string | null {
   }
 }
 
+function normalizeOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function parseCorsAllowedOrigins(value: string | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((entry) => normalizeOrigin(entry.trim()))
+        .filter((entry): entry is string => Boolean(entry)),
+    ),
+  );
+}
+
 export type BravePawsServerConfig = {
   host: string;
   port: number;
@@ -58,6 +81,7 @@ export type BravePawsServerConfig = {
   recordingStartCommand: string | null;
   recordingStopCommand: string | null;
   authToken: string | null;
+  corsAllowedOrigins: string[];
 };
 
 export function resolveConfig(env = process.env): BravePawsServerConfig {
@@ -96,5 +120,6 @@ export function resolveConfig(env = process.env): BravePawsServerConfig {
     recordingStartCommand: env.BRAVE_PAWS_RECORDING_START_COMMAND?.trim() || null,
     recordingStopCommand: env.BRAVE_PAWS_RECORDING_STOP_COMMAND?.trim() || null,
     authToken: env.BRAVE_PAWS_AUTH_TOKEN || null,
+    corsAllowedOrigins: parseCorsAllowedOrigins(env.BRAVE_PAWS_CORS_ALLOWED_ORIGINS),
   };
 }
