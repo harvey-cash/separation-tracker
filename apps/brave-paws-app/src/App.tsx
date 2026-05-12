@@ -135,7 +135,7 @@ export default function App() {
     }).catch(() => {
       // Camera control is best-effort; leave the pending state so a later refresh can retry.
     });
-  }, [cameraStreamingControl.capability.canSetEnabled, cameraStreamingControl.setEnabled]);
+  }, [activeSession, currentView, cameraStreamingControl.capability.canSetEnabled, cameraStreamingControl.setEnabled]);
 
   const handleStartNew = () => {
     let initialSteps = DEFAULT_STEPS;
