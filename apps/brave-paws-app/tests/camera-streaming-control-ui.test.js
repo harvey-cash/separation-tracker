@@ -12,6 +12,7 @@ test('App wires camera streaming control into the dashboard and active session l
   assert.match(app, /pendingSessionCameraStateRef\.current = true/);
   assert.match(app, /pendingSessionCameraStateRef\.current = false/);
   assert.match(app, /setEnabled\(pendingState, \{ silent: true \}\)/);
+  assert.match(app, /\}, \[activeSession, currentView, cameraStreamingControl\.capability\.canSetEnabled, cameraStreamingControl\.setEnabled\]\);/);
 });
 
 
