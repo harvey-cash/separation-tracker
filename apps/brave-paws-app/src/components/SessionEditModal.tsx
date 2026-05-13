@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { formatDuration } from '../utils/format';
 import { DurationInput } from './DurationInput';
 import { getSessionStatusLabel, getStatusButtonClasses, getStepStatusLabel } from '../utils/sessionStatus';
+import { applySessionCalendarDate } from '../utils/sessionDate';
 
 export function SessionEditModal({ 
   session, 
@@ -57,7 +58,7 @@ export function SessionEditModal({
   const handleSaveClick = () => {
     onSave({ 
       ...session, 
-      date: new Date(date).toISOString(),
+      date: applySessionCalendarDate(session.date, date),
       anxietyScore, 
       exercisedLevel,
       anyoneHome,

@@ -22,6 +22,7 @@ import {
   getStepStatusBadgeClasses,
   getStepStatusLabel,
 } from '../utils/sessionStatus';
+import { applySessionCalendarDate } from '../utils/sessionDate';
 
 type Props = {
   session: Session;
@@ -95,7 +96,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
   const handleSave = () => {
     onSave({
       ...session,
-      date: new Date(draftDate).toISOString(),
+      date: applySessionCalendarDate(session.date, draftDate),
       anxietyScore: draftAnxietyScore,
       exercisedLevel: draftExercisedLevel,
       anyoneHome: draftAnyoneHome,
