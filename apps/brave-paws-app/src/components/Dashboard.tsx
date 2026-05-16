@@ -3,7 +3,7 @@ import { formatDuration } from '../utils/format';
 import { Play, BarChart2, History, Heart, Info, Server } from 'lucide-react';
 import { format } from 'date-fns';
 import { ReactNode } from 'react';
-import { getAbortedStepCount, getCompletedStepCount } from '../utils/sessionStatus';
+import { getAbortedStepCount, getCompletedStepCount, getRecordedStepDurationSeconds } from '../utils/sessionStatus';
 
 type Props = {
   sessions: Session[];
@@ -137,7 +137,7 @@ export function Dashboard({
         ) : (
           <div className="space-y-3">
             {recentSessions.map((session) => {
-              const maxStep = Math.max(...session.steps.map(s => s.durationSeconds), 0);
+              const maxStep = Math.max(...session.steps.map((step) => getRecordedStepDurationSeconds(step)), 0);
               return (
                 <div
                   key={session.id}

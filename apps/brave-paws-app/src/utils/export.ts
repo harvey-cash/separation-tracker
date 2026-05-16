@@ -1,7 +1,7 @@
 import { Session, SessionStatus, Step, StepStatus } from '../types';
 import { format } from 'date-fns';
 import { buildImportedSessionId } from './sessionIdentity';
-import { getAbortedStepCount, getCompletedStepCount } from './sessionStatus';
+import { getAbortedStepCount, getCompletedStepCount, getRecordedStepDurationSeconds } from './sessionStatus';
 
 const STEP_COLUMN_COUNT = 10;
 const HEADERS = [
@@ -114,10 +114,10 @@ export function generateCSVContent(sessions: Session[]): string {
     const exercisedLevel = session.exercisedLevel ?? '';
     const anyoneHome = session.anyoneHome ? escapeCSVValue(session.anyoneHome) : '';
 
-    const maxDuration = session.steps.length > 0 ? Math.max(...session.steps.map((step) => step.durationSeconds)) : 0;
+    const maxDuration = session.steps.length > 0 ? Math.max(...session.steps.map((step) => getRecordedStepDurationSeconds(step))) : 0;
 
     const stepDurations = Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => {
-      return i < session.steps.length ? session.steps[i].durationSeconds : '';
+      return i < session.steps.length ? getRecordedStepDurationSeconds(session.steps[i]) : '';
     });
 
     const stepStatuses = Array.from({ length: STEP_COLUMN_COUNT }, (_, i) => {
@@ -236,6 +236,7 @@ export function parseCSV(csvContent: string): Session[] {
       status: sessionWithoutId.status,
       steps: sessionWithoutId.steps.map((step) => ({
         durationSeconds: step.durationSeconds,
+        actualDurationSeconds: step.actualDurationSeconds ?? null,
         status: step.status,
       })),
     });

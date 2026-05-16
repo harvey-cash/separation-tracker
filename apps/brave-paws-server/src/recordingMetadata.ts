@@ -51,6 +51,7 @@ export type BravePawsRecordingMetadataV1 = {
     steps: Array<{
       index: number;
       plannedDurationSeconds: number;
+      actualDurationSeconds: number | null;
       status: string;
     }>;
   };
@@ -158,6 +159,30 @@ function formatChapterDuration(durationSeconds: number | null): string | null {
   return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
 
+function getRecordedStepDurationSeconds(step: Session['steps'][number]): number {
+  return step.actualDurationSeconds ?? step.durationSeconds;
+}
+
+function describeSessionSnapshotStep(index: number, sessionSnapshot: Session): string | null {
+  const step = sessionSnapshot.steps[index];
+  if (!step) {
+    return null;
+  }
+
+  const actualDuration = formatChapterDuration(getRecordedStepDurationSeconds(step));
+  const stepLabel = `Step ${index + 1}${actualDuration ? ` · ${actualDuration}` : ''}`;
+
+  if (step.status === 'completed') {
+    return `${stepLabel} completed`;
+  }
+
+  if (step.status === 'aborted') {
+    return `${stepLabel} aborted`;
+  }
+
+  return stepLabel;
+}
+
 function describeTimelineState(event: SessionTimelineEvent): string {
   const stepNumber = event.currentStepIndex != null ? event.currentStepIndex + 1 : null;
   const plannedDuration = formatChapterDuration(event.stepDurationSeconds);
@@ -193,13 +218,116 @@ function clampMilliseconds(value: number, minValue: number, maxValue: number): n
   return Math.min(Math.max(value, minValue), maxValue);
 }
 
+function getRecordingTimelineLengthMs(options: {
+  recordingStartedAt?: string | null;
+  recordingStoppedAt?: string | null;
+  recordingDurationSeconds?: number | null;
+}): number | null {
+  const recordingStartedAtMs = options.recordingStartedAt ? Date.parse(options.recordingStartedAt) : Number.NaN;
+  const recordingStoppedAtMs = options.recordingStoppedAt ? Date.parse(options.recordingStoppedAt) : Number.NaN;
+
+  if (Number.isFinite(recordingStartedAtMs) && Number.isFinite(recordingStoppedAtMs)) {
+    return Math.max(0, recordingStoppedAtMs - recordingStartedAtMs);
+  }
+
+  if (options.recordingDurationSeconds != null) {
+    return Math.max(0, Math.round(options.recordingDurationSeconds * 1000));
+  }
+
+  return null;
+}
+
+function resolveSafeRelativeRecordingPath(config: BravePawsServerConfig, relativeRecordingPath: string): {
+  safeRelativePath: string;
+  resolvedRecordingPath: string;
+  metadataRelativePath: string;
+  metadataFilePath: string;
+} | null {
+  const segments = relativeRecordingPath
+    .split('/')
+    .filter(Boolean);
+
+  if (!segments.length || segments.some((segment) => segment === '.' || segment === '..' || segment.includes('..') || segment.includes('\\'))) {
+    return null;
+  }
+
+  const resolvedRecordingPath = path.resolve(config.recordingsDir, ...segments);
+  const relativeResolved = path.relative(config.recordingsDir, resolvedRecordingPath);
+  if (relativeResolved.startsWith('..') || path.isAbsolute(relativeResolved)) {
+    return null;
+  }
+
+  const safeRelativePath = relativeResolved.split(path.sep).join('/');
+  const metadataRelativePath = buildMetadataRelativePath(safeRelativePath);
+  const metadataFilePath = path.resolve(config.recordingsDir, ...metadataRelativePath.split('/'));
+  const metadataRelativeResolved = path.relative(config.recordingsDir, metadataFilePath);
+  if (metadataRelativeResolved.startsWith('..') || path.isAbsolute(metadataRelativeResolved)) {
+    return null;
+  }
+
+  return {
+    safeRelativePath,
+    resolvedRecordingPath,
+    metadataRelativePath,
+    metadataFilePath,
+  };
+}
+
 export function deriveRecordingChapters(options: {
+  sessionSnapshot?: Session | null;
   timelineEvents: SessionTimelineEvent[];
   recordingStartedAt?: string | null;
   recordingStoppedAt?: string | null;
   recordingDurationSeconds?: number | null;
 }): RecordingMetadataChapter[] {
   const timelineEvents = normalizeTimelineEvents(options.timelineEvents);
+  const sessionSnapshot = options.sessionSnapshot ?? null;
+
+  if (sessionSnapshot?.steps.length) {
+    const snapshotChapters: RecordingMetadataChapter[] = [];
+    const recordingTimelineLengthMs = getRecordingTimelineLengthMs(options);
+    let cursorMs = 0;
+
+    for (let index = 0; index < sessionSnapshot.steps.length; index += 1) {
+      const step = sessionSnapshot.steps[index]!;
+      const durationSeconds = getRecordedStepDurationSeconds(step);
+      const durationMs = Math.max(0, Math.round(durationSeconds * 1000));
+      const title = describeSessionSnapshotStep(index, sessionSnapshot);
+      if (!title || durationMs <= 0) {
+        continue;
+      }
+
+      const startTimeMs = recordingTimelineLengthMs != null
+        ? clampMilliseconds(cursorMs, 0, recordingTimelineLengthMs)
+        : cursorMs;
+      const endTimeMs = recordingTimelineLengthMs != null
+        ? clampMilliseconds(cursorMs + durationMs, startTimeMs, recordingTimelineLengthMs)
+        : cursorMs + durationMs;
+      if (endTimeMs <= startTimeMs) {
+        break;
+      }
+
+      snapshotChapters.push({
+        index: snapshotChapters.length + 1,
+        title,
+        startTimeMs,
+        endTimeMs,
+        startSeconds: Number((startTimeMs / 1000).toFixed(3)),
+        endSeconds: Number((endTimeMs / 1000).toFixed(3)),
+        sourceEventSequence: null,
+      });
+      cursorMs = endTimeMs;
+    }
+
+    if (snapshotChapters.length > 0 && sessionSnapshot.steps.some((step) => step.actualDurationSeconds != null)) {
+      return snapshotChapters;
+    }
+
+    if (!timelineEvents.length && snapshotChapters.length > 0) {
+      return snapshotChapters;
+    }
+  }
+
   if (!timelineEvents.length) {
     return [];
   }
@@ -269,6 +397,21 @@ function buildMetadataRelativePath(relativeRecordingPath: string): string {
 
 function buildMetadataFilePath(config: BravePawsServerConfig, relativeRecordingPath: string): string {
   return path.join(config.recordingsDir, ...buildMetadataRelativePath(relativeRecordingPath).split('/'));
+}
+
+async function readExistingMetadataTimelineEvents(
+  config: BravePawsServerConfig,
+  relativeRecordingPath: string,
+): Promise<SessionTimelineEvent[]> {
+  const metadataFilePath = buildMetadataFilePath(config, relativeRecordingPath);
+
+  try {
+    const raw = await fs.readFile(metadataFilePath, 'utf8');
+    const parsed = JSON.parse(raw) as { timeline?: { events?: unknown } };
+    return normalizeTimelineEvents(parsed.timeline?.events);
+  } catch {
+    return [];
+  }
 }
 
 async function readFileSize(filePath: string): Promise<number | null> {
@@ -379,6 +522,7 @@ export function buildRecordingMetadataSidecar(options: {
       steps: (sessionSnapshot?.steps ?? []).map((step, index) => ({
         index,
         plannedDurationSeconds: step.durationSeconds,
+        actualDurationSeconds: step.actualDurationSeconds ?? null,
         status: step.status,
       })),
     },
@@ -413,12 +557,18 @@ export async function finalizeRecordingMetadata(options: {
     return recording;
   }
 
-  const resolvedRecordingPath = path.join(options.config.recordingsDir, ...recording.relativeFilePath.split('/'));
-  const normalizedTimelineEvents = normalizeTimelineEvents(options.timelineEvents);
+  const resolvedPaths = resolveSafeRelativeRecordingPath(options.config, recording.relativeFilePath);
+  if (!resolvedPaths) {
+    return recording;
+  }
+
+  const { resolvedRecordingPath, metadataRelativePath, metadataFilePath, safeRelativePath } = resolvedPaths;
+  const providedTimelineEvents = normalizeTimelineEvents(options.timelineEvents);
+  const normalizedTimelineEvents = providedTimelineEvents.length > 0
+    ? providedTimelineEvents
+    : await readExistingMetadataTimelineEvents(options.config, safeRelativePath);
   const measuredSizeBytes = recording.sizeBytes ?? await readFileSize(resolvedRecordingPath);
   const measuredDurationSeconds = recording.durationSeconds ?? await probeMediaDurationSeconds(resolvedRecordingPath);
-  const metadataRelativePath = buildMetadataRelativePath(recording.relativeFilePath);
-  const metadataFilePath = buildMetadataFilePath(options.config, recording.relativeFilePath);
   const nextRecording: SessionRecording = {
     ...recording,
     sizeBytes: measuredSizeBytes,
@@ -427,6 +577,7 @@ export async function finalizeRecordingMetadata(options: {
   };
 
   const chapters = deriveRecordingChapters({
+    sessionSnapshot: options.sessionSnapshot,
     timelineEvents: normalizedTimelineEvents,
     recordingStartedAt: nextRecording.startedAt,
     recordingStoppedAt: nextRecording.stoppedAt,

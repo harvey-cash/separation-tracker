@@ -22,6 +22,7 @@ function buildSessionFingerprint(session: Omit<Session, 'id'> | Session): string
     status: session.status,
     steps: session.steps.map((step) => ({
       durationSeconds: step.durationSeconds,
+      actualDurationSeconds: step.actualDurationSeconds ?? null,
       status: step.status,
     })),
   });

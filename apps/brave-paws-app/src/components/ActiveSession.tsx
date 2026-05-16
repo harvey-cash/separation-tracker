@@ -4,7 +4,7 @@ import { Play, Pause, CheckCircle2, Circle, Flag, X, Heart, VideoOff, RotateCcw,
 import { formatTime, formatDuration } from '../utils/format';
 import { buildCameraStreamUrl, isCameraUrlValid } from '../utils/cameraUrl';
 import { CameraLinkInput } from './CameraLinkInput';
-import { TimerClock, getElapsedSeconds, getRemainingSeconds, pauseTimer, startTimer } from '../utils/timer';
+import { TimerClock, getElapsedSeconds, pauseTimer, startTimer } from '../utils/timer';
 import { ActiveSessionState } from '../utils/activeSessionStorage';
 import { reportClientDiagnostic } from '../utils/clientDiagnostics';
 import {
@@ -55,25 +55,11 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
   const [sessionElapsed, setSessionElapsed] = useState(() => getElapsedSeconds(initialSessionClock));
   const [sessionClock, setSessionClock] = useState<TimerClock>(() => initialSessionClock);
 
-  // Current step countdown
+  // Current step stopwatch
   const [currentStepIndex, setCurrentStepIndex] = useState(restoredState?.currentStepIndex ?? 0);
   const [isStepRunning, setIsStepRunning] = useState(restoredState?.isStepRunning ?? false);
   const [stepClock, setStepClock] = useState<TimerClock>(() => initialStepClock);
-  const [stepRemaining, setStepRemaining] = useState(() => {
-    const restoredSession = restoredState?.session ?? initialSession;
-    const restoredIndex = restoredState?.currentStepIndex ?? 0;
-    const currentStep = restoredSession.steps[restoredIndex];
-
-    if (!currentStep) {
-      return 0;
-    }
-
-    if (!restoredState) {
-      return currentStep.durationSeconds;
-    }
-
-    return getRemainingSeconds(currentStep.durationSeconds, restoredState.stepClock);
-  });
+  const [stepElapsed, setStepElapsed] = useState(() => getElapsedSeconds(initialStepClock));
   const [timelineEvents, setTimelineEvents] = useState<SessionTimelineEvent[]>(restoredState?.timelineEvents ?? []);
   const [previewReloadToken, setPreviewReloadToken] = useState(0);
   const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'live' | 'degraded' | 'disconnected'>('idle');
@@ -174,16 +160,21 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
 
   const finalizeStep = useCallback((index: number, status: StepStatus, now = Date.now()) => {
     const pausedStepClock = pauseTimer(stepClockRef.current, now);
+    const actualDurationSeconds = getElapsedSeconds(pausedStepClock, now);
     const nextStepClock = { startedAt: null, accumulatedMs: 0 };
     const currentSession = sessionRef.current;
     const newSteps = [...currentSession.steps];
-    newSteps[index] = { ...newSteps[index], status };
+    newSteps[index] = {
+      ...newSteps[index],
+      status,
+      actualDurationSeconds,
+    };
     const updatedSession = { ...currentSession, steps: newSteps };
 
     sessionRef.current = updatedSession;
     setSession(updatedSession);
     updateStepClock(nextStepClock);
-    setStepRemaining(0);
+    setStepElapsed(0);
     isStepRunningRef.current = false;
     setIsStepRunning(false);
 
@@ -200,7 +191,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       const nextStepIndex = index + 1;
       currentStepIndexRef.current = nextStepIndex;
       setCurrentStepIndex(nextStepIndex);
-      setStepRemaining(updatedSession.steps[nextStepIndex]!.durationSeconds);
+      setStepElapsed(0);
       return;
     }
 
@@ -221,19 +212,14 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     });
   }, [appendTimelineEvent, updateSessionClock, updateStepClock]);
 
-  const syncStepRemaining = useCallback((now = Date.now()) => {
+  const syncStepElapsed = useCallback((now = Date.now()) => {
     const currentStep = sessionRef.current.steps[currentStepIndexRef.current];
     if (!currentStep) {
       return;
     }
 
-    const remaining = getRemainingSeconds(currentStep.durationSeconds, stepClockRef.current, now);
-    setStepRemaining(remaining);
-
-      if (isStepRunningRef.current && remaining === 0) {
-        finalizeStep(currentStepIndexRef.current, 'completed', now);
-      }
-  }, [finalizeStep]);
+    setStepElapsed(getElapsedSeconds(stepClockRef.current, now));
+  }, []);
 
   const applyRecordingCapability = useCallback((capability: SessionRecordingCapability) => {
     setRecordingCapability(capability);
@@ -290,27 +276,27 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     };
   }, [isSessionRunning, syncSessionElapsed]);
 
-  // Step Countdown
+  // Step Stopwatch
   useEffect(() => {
-    syncStepRemaining();
+    syncStepElapsed();
     if (!isStepRunning) {
       return;
     }
 
     const intervalId = window.setInterval(() => {
-      syncStepRemaining();
+      syncStepElapsed();
     }, 1000);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [isStepRunning, syncStepRemaining]);
+  }, [isStepRunning, syncStepElapsed]);
 
   useEffect(() => {
     const syncTimers = () => {
       const now = Date.now();
       syncSessionElapsed(now);
-      syncStepRemaining(now);
+      syncStepElapsed(now);
     };
 
     const handleVisibilityChange = () => {
@@ -328,7 +314,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       window.removeEventListener('pageshow', syncTimers);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [syncSessionElapsed, syncStepRemaining]);
+  }, [syncSessionElapsed, syncStepElapsed]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -432,9 +418,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     if (isStepRunning) {
       const pausedClock = pauseTimer(stepClockRef.current, now);
       updateStepClock(pausedClock);
-      setStepRemaining(
-        getRemainingSeconds(sessionRef.current.steps[currentStepIndexRef.current]?.durationSeconds || 0, pausedClock, now)
-      );
+      setStepElapsed(getElapsedSeconds(pausedClock, now));
       isStepRunningRef.current = false;
       setIsStepRunning(false);
       appendTimelineEvent('step_paused', {
@@ -804,10 +788,14 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                 <Heart size={14} fill="currentColor" />
                 Step {currentStepIndex + 1} of {session.steps.length}
               </div>
-              <div className="text-8xl font-mono font-light text-slate-800 tracking-tighter mb-12 tabular-nums">
-                {formatTime(stepRemaining)}
+              <div className="text-8xl font-mono font-light text-slate-800 tracking-tighter tabular-nums">
+                {formatTime(stepElapsed)}
               </div>
-              
+              <div className="mt-3 mb-12 text-center">
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Goal</div>
+                <div className="mt-1 text-sm font-medium text-slate-500">{formatDuration(currentStep.durationSeconds)}</div>
+              </div>
+
               <div className="flex items-center gap-6">
                 <button
                   onClick={handleToggleStep}
@@ -893,9 +881,12 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
                     Step {idx + 1}
                   </span>
                 </div>
-                <span className="text-slate-500 font-mono text-sm font-medium">
-                  {formatDuration(step.durationSeconds)}
-                </span>
+                <div className="text-right font-mono text-sm font-medium text-slate-500">
+                  <div>{formatDuration(step.actualDurationSeconds ?? step.durationSeconds)}</div>
+                  {step.actualDurationSeconds != null && (
+                    <div className="text-[11px] text-slate-400">Goal {formatDuration(step.durationSeconds)}</div>
+                  )}
+                </div>
               </div>
             ))}
           </div>

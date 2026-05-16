@@ -15,7 +15,7 @@ import {
   type SessionRecordingCapability,
   type SessionRecordingController,
 } from './recordingControl.js';
-import { normalizeTimelineEvents } from './recordingMetadata.js';
+import { finalizeRecordingMetadata, normalizeTimelineEvents } from './recordingMetadata.js';
 import {
   buildPairingAppUrl,
   consumePairing,
@@ -38,6 +38,104 @@ const JSON_HEADERS = {
 const CORS_ALLOWED_METHODS = 'GET,POST,PUT,OPTIONS';
 const CORS_ALLOWED_HEADERS = 'content-type,x-brave-paws-token';
 const RECORDING_STOP_REQUEST_MAX_BYTES = 512 * 1024;
+const RECORDING_ARTIFACT_FINALIZE_CONCURRENCY = 2;
+
+function buildRecordingArtifactFingerprint(session: Session): string | null {
+  if (session.recording?.status !== 'completed' || !session.recording.relativeFilePath) {
+    return null;
+  }
+
+  return JSON.stringify({
+    date: session.date,
+    status: session.status,
+    totalDurationSeconds: session.totalDurationSeconds,
+    steps: session.steps.map((step) => ({
+      durationSeconds: step.durationSeconds,
+      actualDurationSeconds: step.actualDurationSeconds ?? null,
+      status: step.status,
+    })),
+    recording: {
+      status: session.recording.status,
+      provider: session.recording.provider,
+      sessionId: session.recording.sessionId,
+      startedAt: session.recording.startedAt ?? null,
+      stoppedAt: session.recording.stoppedAt ?? null,
+      relativeFilePath: session.recording.relativeFilePath,
+      durationSeconds: session.recording.durationSeconds ?? null,
+      hasAudio: session.recording.hasAudio ?? false,
+      metadataRelativeFilePath: session.recording.metadataRelativeFilePath ?? null,
+      chapterCount: session.recording.chapterCount ?? null,
+    },
+  });
+}
+
+async function finalizeSessionRecordingArtifacts(config: BravePawsServerConfig, session: Session): Promise<Session> {
+  if (!session.recording) {
+    return session;
+  }
+
+  const finalizedRecording = await finalizeRecordingMetadata({
+    config,
+    recording: session.recording,
+    sessionSnapshot: session,
+  });
+
+  if (finalizedRecording === session.recording) {
+    return session;
+  }
+
+  return {
+    ...session,
+    recording: finalizedRecording,
+  };
+}
+
+async function mapWithConcurrencyLimit<T, R>(
+  values: T[],
+  limit: number,
+  mapper: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (!values.length) {
+    return [];
+  }
+
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.max(1, Math.min(limit, values.length));
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < values.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(values[currentIndex]!, currentIndex);
+    }
+  }));
+
+  return results;
+}
+
+async function finalizeSessionsRecordingArtifacts(
+  config: BravePawsServerConfig,
+  sessions: Session[],
+  existingSessions: Session[] = [],
+): Promise<Session[]> {
+  const previousById = new Map(existingSessions.map((session) => [session.id, session]));
+
+  return mapWithConcurrencyLimit(sessions, RECORDING_ARTIFACT_FINALIZE_CONCURRENCY, async (session) => {
+    const nextFingerprint = buildRecordingArtifactFingerprint(session);
+    if (!nextFingerprint) {
+      return session;
+    }
+
+    const previousSession = previousById.get(session.id);
+    const previousFingerprint = previousSession ? buildRecordingArtifactFingerprint(previousSession) : null;
+    const needsRefresh = previousFingerprint !== nextFingerprint
+      || !session.recording?.metadataRelativeFilePath
+      || session.recording.chapterCount == null;
+
+    return needsRefresh ? finalizeSessionRecordingArtifacts(config, session) : session;
+  });
+}
 
 class JsonBodyTooLargeError extends Error {
   constructor(maxBytes: number) {
@@ -781,7 +879,8 @@ async function handleApiRequest(
       return;
     }
 
-    const store = await upsertSession(config.dataFilePath, payload);
+    const session = await finalizeSessionRecordingArtifacts(config, payload);
+    const store = await upsertSession(config.dataFilePath, session);
     sendJson(response, 201, store);
     return;
   }
@@ -800,7 +899,9 @@ async function handleApiRequest(
 
     const payload = await readJsonBody<{ sessions?: Session[] }>(request);
     const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
-    const store = await writeSessionStore(config.dataFilePath, sessions);
+    const existingStore = await readSessionStore(config.dataFilePath);
+    const finalizedSessions = await finalizeSessionsRecordingArtifacts(config, sessions, existingStore.sessions);
+    const store = await writeSessionStore(config.dataFilePath, finalizedSessions);
     sendJson(response, 200, store);
     return;
   }
@@ -920,10 +1021,10 @@ async function handleApiRequest(
       }
 
       const payload = await readJsonBody<Session>(request);
-      const nextSession = {
+      const nextSession = await finalizeSessionRecordingArtifacts(config, {
         ...payload,
         id: sessionId,
-      };
+      });
       const updatedStore = await upsertSession(config.dataFilePath, nextSession);
       sendJson(response, 200, updatedStore);
       return;

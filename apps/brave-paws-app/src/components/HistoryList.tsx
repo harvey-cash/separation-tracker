@@ -4,7 +4,7 @@ import { formatDuration } from '../utils/format';
 import { format } from 'date-fns';
 import { Trash2, Edit2, Plus, CalendarHeart, Download, Upload } from 'lucide-react';
 import { SessionEditModal } from './SessionEditModal';
-import { getAbortedStepCount, getCompletedStepCount, getSessionStatusLabel } from '../utils/sessionStatus';
+import { getAbortedStepCount, getCompletedStepCount, getRecordedStepDurationSeconds, getSessionStatusLabel } from '../utils/sessionStatus';
 
 export function HistoryList({ 
   sessions, 
@@ -135,7 +135,7 @@ export function HistoryList({
       ) : (
         <div className="space-y-4">
           {sortedSessions.map(session => {
-            const maxStep = Math.max(...session.steps.map(s => s.durationSeconds), 0);
+            const maxStep = Math.max(...session.steps.map((step) => getRecordedStepDurationSeconds(step)), 0);
             
             return (
               <div 

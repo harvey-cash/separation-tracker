@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { format } from 'date-fns';
+import { getRecordedStepDurationSeconds } from '../utils/sessionStatus';
 
 type Props = {
   sessions: Session[];
@@ -20,7 +21,7 @@ export function getGraphData(sessions: Session[]) {
   return [...sessions]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .map((session) => {
-      const maxDuration = Math.max(0, ...session.steps.map((step) => step.durationSeconds));
+      const maxDuration = Math.max(0, ...session.steps.map((step) => getRecordedStepDurationSeconds(step)));
       return {
         date: format(new Date(session.date), 'MMM d'),
         maxDurationMinutes: parseFloat((maxDuration / 60).toFixed(2)),

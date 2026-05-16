@@ -3,6 +3,7 @@ export type StepStatus = 'pending' | 'completed' | 'aborted';
 export type Step = {
   id: string;
   durationSeconds: number;
+  actualDurationSeconds?: number | null;
   status: StepStatus;
 };
 

@@ -16,6 +16,7 @@ import {
 import {
   getAbortedStepCount,
   getCompletedStepCount,
+  getRecordedStepDurationSeconds,
   getSessionStatusBadgeClasses,
   getSessionStatusLabel,
   getStatusButtonClasses,
@@ -125,6 +126,7 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
     const newStep: Step = {
       id: crypto.randomUUID(),
       durationSeconds: newStepDuration,
+      actualDurationSeconds: newStepDuration,
       status: 'completed',
     };
     setDraftSteps([...draftSteps, newStep]);
@@ -144,24 +146,45 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
   };
 
   const handleUpdateStepDuration = (id: string, duration: number) => {
-    setDraftSteps(draftSteps.map((s) =>
-      s.id === id ? { ...s, durationSeconds: duration } : s
-    ));
+    setDraftSteps(draftSteps.map((step) => {
+      if (step.id !== id) {
+        return step;
+      }
+
+      if (step.actualDurationSeconds != null || step.status !== 'pending') {
+        return { ...step, actualDurationSeconds: duration };
+      }
+
+      return { ...step, durationSeconds: duration };
+    }));
   };
 
   const handleUpdateStepStatus = (id: string, status: Step['status']) => {
-    setDraftSteps(draftSteps.map((step) =>
-      step.id === id ? { ...step, status } : step
-    ));
+    setDraftSteps(draftSteps.map((step) => {
+      if (step.id !== id) {
+        return step;
+      }
+
+      if (status === 'pending') {
+        return { ...step, status, actualDurationSeconds: null };
+      }
+
+      return {
+        ...step,
+        status,
+        actualDurationSeconds: step.actualDurationSeconds ?? step.durationSeconds,
+      };
+    }));
   };
 
-  const maxStep = Math.max(...session.steps.map(s => s.durationSeconds), 0);
+  const maxStep = Math.max(...session.steps.map((step) => getRecordedStepDurationSeconds(step)), 0);
   const completedSteps = getCompletedStepCount(session.steps);
   const abortedSteps = getAbortedStepCount(session.steps);
   
   const chartData = session.steps.map((step, index) => ({
     step: `Step ${index + 1}`,
-    duration: step.durationSeconds,
+    duration: getRecordedStepDurationSeconds(step),
+    goalDuration: step.durationSeconds,
     statusLabel: getStepStatusLabel(step.status),
   }));
 
@@ -301,7 +324,11 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
           <div>
             <p className="text-xs text-slate-500 mb-3 font-bold uppercase tracking-widest">Steps</p>
             <div className="space-y-3 mb-4">
-              {draftSteps.map((step, index) => (
+              {draftSteps.map((step, index) => {
+                const editableDuration = step.actualDurationSeconds ?? step.durationSeconds;
+                const isEditingActualDuration = step.actualDurationSeconds != null || step.status !== 'pending';
+
+                return (
                 <div
                   key={step.id}
                   className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors group"
@@ -310,14 +337,20 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
                     <GripVertical size={20} />
                   </div>
                   <span className="font-bold text-slate-400 w-8">#{index + 1}</span>
+                  <div className="min-w-[5rem] text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    {isEditingActualDuration ? 'Actual' : 'Goal'}
+                  </div>
                   <DurationInput
-                    valueSeconds={step.durationSeconds}
+                    valueSeconds={editableDuration}
                     onChange={(duration) => handleUpdateStepDuration(step.id, duration)}
                     className="flex-1"
                   />
-                  <span className="text-slate-500 w-16 text-right text-sm font-medium">
-                    {formatDuration(step.durationSeconds)}
-                  </span>
+                  <div className="min-w-[5.5rem] text-right text-sm font-medium text-slate-500">
+                    <div>{formatDuration(editableDuration)}</div>
+                    {isEditingActualDuration && (
+                      <div className="text-[11px] text-slate-400">Goal {formatDuration(step.durationSeconds)}</div>
+                    )}
+                  </div>
                   <select
                     value={step.status}
                     onChange={(e) => handleUpdateStepStatus(step.id, e.target.value as Step['status'])}
@@ -337,7 +370,8 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
                     <Trash2 size={20} />
                   </button>
                 </div>
-              ))}
+                );
+              })}
               {draftSteps.length === 0 && (
                 <div className="text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                   <p className="text-slate-400 font-medium text-sm">No steps recorded.</p>
@@ -522,7 +556,15 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
                     padding: '12px 16px',
                     fontWeight: 500
                   }}
-                  formatter={(value: number) => [`${value} s`, 'Duration']}
+                  formatter={(value: number, _name: string, payload) => {
+                    const goalDuration = payload?.payload?.goalDuration;
+                    return [
+                      goalDuration != null && goalDuration !== value
+                        ? `${value} s actual · ${goalDuration} s goal`
+                        : `${value} s`,
+                      'Duration',
+                    ];
+                  }}
                   labelStyle={{ color: '#64748b', marginBottom: '4px' }}
                 />
                 <Line
@@ -550,7 +592,12 @@ export function SessionView({ session, allSessions, onBack, onNavigate, onSave, 
             >
               <div>
                 <p className="font-bold text-slate-800">Step {index + 1}</p>
-                <p className="text-sm text-slate-500">{formatDuration(step.durationSeconds)}</p>
+                <p className="text-sm text-slate-500">
+                  {formatDuration(getRecordedStepDurationSeconds(step))}
+                  {step.actualDurationSeconds != null && (
+                    <span className="text-slate-400"> · goal {formatDuration(step.durationSeconds)}</span>
+                  )}
+                </p>
               </div>
               <span className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${getStepStatusBadgeClasses(step.status)}`}>
                 {getStepStatusLabel(step.status)}

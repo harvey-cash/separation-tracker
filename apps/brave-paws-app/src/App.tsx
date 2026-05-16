@@ -144,9 +144,10 @@ export default function App() {
     if (sessions.length > 0) {
       const sorted = [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const lastSession = sorted[0];
-      initialSteps = lastSession.steps.map(s => ({
-        ...s,
+      initialSteps = lastSession.steps.map((step) => ({
+        ...step,
         id: crypto.randomUUID(),
+        actualDurationSeconds: null,
         status: 'pending',
       }));
     }
