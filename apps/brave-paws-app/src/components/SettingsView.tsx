@@ -93,7 +93,7 @@ export function SettingsView({
                 id="longest-departure-value"
                 type="number"
                 min="0"
-                step={incrementMode === 'percentage' ? '1' : '1'}
+                step="1"
                 value={Number.isFinite(incrementValue) ? String(incrementValue) : '0'}
                 onChange={(event) => handleValueChange(event.target.value)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100"

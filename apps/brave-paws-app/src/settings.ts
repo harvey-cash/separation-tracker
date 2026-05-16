@@ -20,6 +20,15 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   },
 };
 
+function createDefaultAppSettings(): AppSettings {
+  return {
+    longestDepartureIncrement: {
+      mode: DEFAULT_APP_SETTINGS.longestDepartureIncrement.mode,
+      value: DEFAULT_APP_SETTINGS.longestDepartureIncrement.value,
+    },
+  };
+}
+
 function getStorage(): StorageLike | null {
   if (typeof localStorage === 'undefined') {
     return null;
@@ -66,7 +75,7 @@ function normalizeValue(value: unknown): number {
 
 export function normalizeAppSettings(value: unknown): AppSettings {
   if (!value || typeof value !== 'object') {
-    return DEFAULT_APP_SETTINGS;
+    return createDefaultAppSettings();
   }
 
   const candidate = value as {
@@ -87,13 +96,13 @@ export function normalizeAppSettings(value: unknown): AppSettings {
 export function loadAppSettings(storage: StorageLike | null = getStorage()): AppSettings {
   const stored = safeStorageGet(storage, APP_SETTINGS_STORAGE_KEY);
   if (!stored) {
-    return DEFAULT_APP_SETTINGS;
+    return createDefaultAppSettings();
   }
 
   try {
     return normalizeAppSettings(JSON.parse(stored));
   } catch {
-    return DEFAULT_APP_SETTINGS;
+    return createDefaultAppSettings();
   }
 }
 

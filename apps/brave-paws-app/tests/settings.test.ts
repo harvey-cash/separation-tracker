@@ -57,15 +57,21 @@ test('normalizeAppSettings falls back to defaults for malformed values', () => {
   });
 });
 
-test('loadAppSettings returns defaults when storage is empty', () => {
+test('loadAppSettings returns fresh default objects when storage is empty', () => {
   const storage = createStorage();
 
-  assert.deepEqual(loadAppSettings(storage), {
+  const first = loadAppSettings(storage);
+  const second = loadAppSettings(storage);
+
+  assert.deepEqual(first, {
     longestDepartureIncrement: {
       mode: 'minutes',
       value: 0,
     },
   });
+  assert.deepEqual(second, first);
+  assert.notStrictEqual(first, second);
+  assert.notStrictEqual(first.longestDepartureIncrement, second.longestDepartureIncrement);
 });
 
 test('saveAppSettings persists normalized settings', () => {
