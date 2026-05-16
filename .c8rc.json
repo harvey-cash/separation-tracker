@@ -1,0 +1,16 @@
+{
+  "all": false,
+  "include": [
+    "apps/brave-paws-app/src/**/*.ts",
+    "apps/brave-paws-app/src/**/*.tsx",
+    "apps/brave-paws-server/src/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.d.ts",
+    "**/*.config.*",
+    "apps/**/dist/**",
+    "apps/**/tests/**",
+    "apps/**/e2e/**",
+    "apps/brave-paws-app/src/components/**"
+  ]
+}

@@ -13,6 +13,8 @@
     "build": "npm run app:build && npm run landing:build && npm run server:build",
     "preview": "npm run app:preview",
     "test": "npm run app:test && npm run server:test",
+    "coverage": "c8 --reporter=text-summary --reporter=html --reporter=json-summary npm run test",
+    "coverage:check": "c8 --check-coverage --lines 80 --statements 80 --functions 85 --reporter=text-summary --reporter=json-summary npm run test",
     "lint": "npm run app:lint && npm run server:lint",
     "test:e2e": "npm run app:test:e2e",
     "clean": "npm run app:clean && npm run landing:clean && npm run server:clean",
@@ -34,5 +36,8 @@
     "server:create-pairing": "npm run create-pairing --workspace brave-paws-server --",
     "server:test": "npm run test --workspace brave-paws-server",
     "server:clean": "npm run clean --workspace brave-paws-server"
+  },
+  "devDependencies": {
+    "c8": "^11.0.0"
   }
 }
