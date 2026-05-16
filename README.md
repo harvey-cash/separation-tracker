@@ -65,6 +65,6 @@ Historical context:
 - Browser-local persistence remains first-class, with automatic backend hydration/push around it.
 - Canonical synced data can live on the self-hosted server while public bundles stay free of private camera origins.
 - Pairing records reject credential-bearing camera URLs so secrets do not leak into stored broker state or client responses.
-- Unit-test coverage intentionally targets shared runtime logic in `apps/brave-paws-app/src` and `apps/brave-paws-server/src`; React component shells remain primarily guarded by the Playwright e2e suite.
+- Unit-test coverage intentionally targets shared runtime logic in `apps/brave-paws-app/src` and `apps/brave-paws-server/src`, with app entrypoints, hooks, store/type-only files, and React component shells kept out of the line-coverage gate; those UI surfaces remain primarily guarded by the Playwright e2e suite.
 - Public CD remains `main`-only; feature branches get CI without triggering deploy.
 - QUANTUM staging is separate from public CD: `deploy/scripts/install-brave-paws-staging-automation.sh` installs a timer-driven local staging refresh that rebuilds from the local dev repo's latest committed HEAD into `/mnt/q/repos/separation-tracker-staging/`, refreshes the canonical service unit, restarts `brave-paws.service`, and verifies health/capabilities.
