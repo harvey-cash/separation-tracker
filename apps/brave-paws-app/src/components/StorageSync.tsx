@@ -1,14 +1,12 @@
-import { type ReactNode } from 'react';
 import { AlertCircle, Check, Loader2, RefreshCw, Server } from 'lucide-react';
 
 import type { StorageProviderState } from '../hooks/useStorageSync';
 
 type Props = {
   provider: StorageProviderState;
-  backendConnection?: ReactNode;
 };
 
-export function StorageSync({ provider, backendConnection }: Props) {
+export function StorageSync({ provider }: Props) {
   return (
     <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 space-y-5">
       <div className="flex items-start justify-between gap-4">
@@ -64,8 +62,6 @@ export function StorageSync({ provider, backendConnection }: Props) {
           <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">Syncs on reconnect</div>
           <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">Refreshes after saves and imports</div>
         </div>
-
-        {backendConnection}
 
         {provider.onSyncNow && provider.isAvailable ? (
           <div className="flex flex-wrap gap-2">

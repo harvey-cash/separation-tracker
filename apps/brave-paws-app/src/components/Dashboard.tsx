@@ -1,6 +1,6 @@
 import { Session } from '../types';
 import { formatDuration } from '../utils/format';
-import { Play, BarChart2, History, Heart, Info, Server } from 'lucide-react';
+import { Play, BarChart2, History, Heart, Info, Server, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { ReactNode } from 'react';
 import { getAbortedStepCount, getCompletedStepCount, getRecordedStepDurationSeconds } from '../utils/sessionStatus';
@@ -11,6 +11,7 @@ type Props = {
   onViewGraph: () => void;
   onViewHistory: () => void;
   onViewInfo: () => void;
+  onViewSettings: () => void;
   onViewSession: (session: Session) => void;
   cameraStreamingControl?: ReactNode;
   storageSync?: ReactNode;
@@ -29,6 +30,7 @@ export function Dashboard({
   onViewGraph,
   onViewHistory,
   onViewInfo,
+  onViewSettings,
   onViewSession,
   cameraStreamingControl,
   storageSync,
@@ -39,7 +41,14 @@ export function Dashboard({
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-8">
-      <header className="text-center py-10">
+      <header className="relative text-center py-10">
+        <button
+          onClick={onViewSettings}
+          aria-label="Settings"
+          className="absolute right-0 top-6 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white p-3 text-slate-500 shadow-sm transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+        >
+          <Settings size={20} />
+        </button>
         <div className="inline-flex items-center justify-center p-3 bg-rose-100 text-rose-500 rounded-full mb-4">
           <Heart size={32} fill="currentColor" />
         </div>
