@@ -11,12 +11,13 @@ import { SessionView } from './components/SessionView';
 import { InfoView } from './components/InfoView';
 import { CameraStreamingControl } from './components/CameraStreamingControl';
 import { StorageSync } from './components/StorageSync';
-import { BackendConnectionSettings } from './components/BackendConnectionSettings';
+import { SettingsView } from './components/SettingsView';
 import { useCameraStreamingControl } from './hooks/useCameraStreamingControl';
 import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
 import { loadStoredBackendRootUrl } from './config';
+import { buildNewSessionSteps, loadAppSettings, saveAppSettings } from './settings';
 import { PAIRING_TOKEN_QUERY_PARAM, resolveCameraUrlFromPairingToken } from './utils/pairingToken';
 import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
 import {
@@ -28,7 +29,7 @@ import {
 } from './utils/activeSessionStorage';
 import { ArrowLeft } from 'lucide-react';
 
-type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view' | 'info';
+type View = 'dashboard' | 'config' | 'active' | 'complete' | 'graph' | 'history' | 'session-view' | 'info' | 'settings';
 
 const DEFAULT_STEPS: Step[] = [
   { id: crypto.randomUUID(), durationSeconds: 30, status: 'pending' },
@@ -48,6 +49,7 @@ export default function App() {
   const [activeSessionState, setActiveSessionState] = useState<ActiveSessionState | null>(restoredActiveSessionState);
   const [cameraUrl, setCameraUrl] = useState(() => getCameraUrlFromSearch(window.location.search) || localStorage.getItem(CAMERA_URL_STORAGE_KEY) || '');
   const [backendRootUrl, setBackendRootUrl] = useState<string | null>(() => loadStoredBackendRootUrl());
+  const [appSettings, setAppSettings] = useState(() => loadAppSettings());
   const cameraStreamingControl = useCameraStreamingControl();
   const wasTrainingActiveRef = useRef(false);
   const pendingSessionCameraStateRef = useRef<boolean | null>(restoredActiveSessionState ? true : null);
@@ -102,6 +104,10 @@ export default function App() {
     clearActiveSessionState();
   }, [activeSessionState]);
 
+  useEffect(() => {
+    saveAppSettings(appSettings);
+  }, [appSettings]);
+
   const handleImportSessions = useCallback((imported: Session[]) => {
     replaceSessions(imported);
   }, [replaceSessions]);
@@ -144,12 +150,7 @@ export default function App() {
     if (sessions.length > 0) {
       const sorted = [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const lastSession = sorted[0];
-      initialSteps = lastSession.steps.map((step) => ({
-        ...step,
-        id: crypto.randomUUID(),
-        actualDurationSeconds: null,
-        status: 'pending',
-      }));
+      initialSteps = buildNewSessionSteps(lastSession.steps, appSettings);
     }
 
     const newSession: Session = {
@@ -199,6 +200,7 @@ export default function App() {
           onViewGraph={() => setCurrentView('graph')}
           onViewHistory={() => setCurrentView('history')}
           onViewInfo={() => setCurrentView('info')}
+          onViewSettings={() => setCurrentView('settings')}
           onViewSession={(session) => {
             setActiveSession(session);
             setPreviousView('dashboard');
@@ -208,13 +210,6 @@ export default function App() {
           storageSync={
             <StorageSync
               provider={storageSync.provider}
-              backendConnection={
-                <BackendConnectionSettings
-                  currentBackendRootUrl={backendRootUrl}
-                  isBackendAvailable={storageSync.provider.isAvailable}
-                  onBackendRootUrlChange={setBackendRootUrl}
-                />
-              }
             />
           }
           isBackendUnavailable={!storageSync.provider.isAvailable}
@@ -311,6 +306,17 @@ export default function App() {
 
       {currentView === 'info' && (
         <InfoView onBack={() => setCurrentView('dashboard')} />
+      )}
+
+      {currentView === 'settings' && (
+        <SettingsView
+          settings={appSettings}
+          currentBackendRootUrl={backendRootUrl}
+          isBackendAvailable={storageSync.provider.isAvailable}
+          onBack={() => setCurrentView('dashboard')}
+          onBackendRootUrlChange={setBackendRootUrl}
+          onSettingsChange={setAppSettings}
+        />
       )}
     </div>
   );
