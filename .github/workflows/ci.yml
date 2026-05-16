@@ -24,7 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Run unit tests with coverage gate
+        run: npm run coverage:check
       - run: npm run lint
       - run: npm run build
 

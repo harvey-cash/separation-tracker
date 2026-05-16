@@ -1,0 +1,22 @@
+{
+  "all": true,
+  "include": [
+    "apps/brave-paws-app/src/**/*.ts",
+    "apps/brave-paws-app/src/**/*.tsx",
+    "apps/brave-paws-server/src/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.d.ts",
+    "**/*.config.*",
+    "apps/**/dist/**",
+    "apps/**/tests/**",
+    "apps/**/e2e/**",
+    "apps/brave-paws-app/src/App.tsx",
+    "apps/brave-paws-app/src/main.tsx",
+    "apps/brave-paws-app/src/components/**",
+    "apps/brave-paws-app/src/hooks/**",
+    "apps/brave-paws-app/src/store.ts",
+    "apps/brave-paws-app/src/types.ts",
+    "apps/brave-paws-server/src/types.ts"
+  ]
+}
