@@ -38,6 +38,7 @@ const JSON_HEADERS = {
 const CORS_ALLOWED_METHODS = 'GET,POST,PUT,OPTIONS';
 const CORS_ALLOWED_HEADERS = 'content-type,x-brave-paws-token';
 const RECORDING_STOP_REQUEST_MAX_BYTES = 512 * 1024;
+const RECORDING_ARTIFACT_FINALIZE_CONCURRENCY = 2;
 
 function buildRecordingArtifactFingerprint(session: Session): string | null {
   if (session.recording?.status !== 'completed' || !session.recording.relativeFilePath) {
@@ -89,6 +90,30 @@ async function finalizeSessionRecordingArtifacts(config: BravePawsServerConfig, 
   };
 }
 
+async function mapWithConcurrencyLimit<T, R>(
+  values: T[],
+  limit: number,
+  mapper: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (!values.length) {
+    return [];
+  }
+
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.max(1, Math.min(limit, values.length));
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < values.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(values[currentIndex]!, currentIndex);
+    }
+  }));
+
+  return results;
+}
+
 async function finalizeSessionsRecordingArtifacts(
   config: BravePawsServerConfig,
   sessions: Session[],
@@ -96,7 +121,7 @@ async function finalizeSessionsRecordingArtifacts(
 ): Promise<Session[]> {
   const previousById = new Map(existingSessions.map((session) => [session.id, session]));
 
-  return Promise.all(sessions.map(async (session) => {
+  return mapWithConcurrencyLimit(sessions, RECORDING_ARTIFACT_FINALIZE_CONCURRENCY, async (session) => {
     const nextFingerprint = buildRecordingArtifactFingerprint(session);
     if (!nextFingerprint) {
       return session;
@@ -109,7 +134,7 @@ async function finalizeSessionsRecordingArtifacts(
       || session.recording.chapterCount == null;
 
     return needsRefresh ? finalizeSessionRecordingArtifacts(config, session) : session;
-  }));
+  });
 }
 
 class JsonBodyTooLargeError extends Error {

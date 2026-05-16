@@ -218,6 +218,61 @@ function clampMilliseconds(value: number, minValue: number, maxValue: number): n
   return Math.min(Math.max(value, minValue), maxValue);
 }
 
+function getRecordingTimelineLengthMs(options: {
+  recordingStartedAt?: string | null;
+  recordingStoppedAt?: string | null;
+  recordingDurationSeconds?: number | null;
+}): number | null {
+  const recordingStartedAtMs = options.recordingStartedAt ? Date.parse(options.recordingStartedAt) : Number.NaN;
+  const recordingStoppedAtMs = options.recordingStoppedAt ? Date.parse(options.recordingStoppedAt) : Number.NaN;
+
+  if (Number.isFinite(recordingStartedAtMs) && Number.isFinite(recordingStoppedAtMs)) {
+    return Math.max(0, recordingStoppedAtMs - recordingStartedAtMs);
+  }
+
+  if (options.recordingDurationSeconds != null) {
+    return Math.max(0, Math.round(options.recordingDurationSeconds * 1000));
+  }
+
+  return null;
+}
+
+function resolveSafeRelativeRecordingPath(config: BravePawsServerConfig, relativeRecordingPath: string): {
+  safeRelativePath: string;
+  resolvedRecordingPath: string;
+  metadataRelativePath: string;
+  metadataFilePath: string;
+} | null {
+  const segments = relativeRecordingPath
+    .split('/')
+    .filter(Boolean);
+
+  if (!segments.length || segments.some((segment) => segment === '.' || segment === '..' || segment.includes('..') || segment.includes('\\'))) {
+    return null;
+  }
+
+  const resolvedRecordingPath = path.resolve(config.recordingsDir, ...segments);
+  const relativeResolved = path.relative(config.recordingsDir, resolvedRecordingPath);
+  if (relativeResolved.startsWith('..') || path.isAbsolute(relativeResolved)) {
+    return null;
+  }
+
+  const safeRelativePath = relativeResolved.split(path.sep).join('/');
+  const metadataRelativePath = buildMetadataRelativePath(safeRelativePath);
+  const metadataFilePath = path.resolve(config.recordingsDir, ...metadataRelativePath.split('/'));
+  const metadataRelativeResolved = path.relative(config.recordingsDir, metadataFilePath);
+  if (metadataRelativeResolved.startsWith('..') || path.isAbsolute(metadataRelativeResolved)) {
+    return null;
+  }
+
+  return {
+    safeRelativePath,
+    resolvedRecordingPath,
+    metadataRelativePath,
+    metadataFilePath,
+  };
+}
+
 export function deriveRecordingChapters(options: {
   sessionSnapshot?: Session | null;
   timelineEvents: SessionTimelineEvent[];
@@ -230,6 +285,7 @@ export function deriveRecordingChapters(options: {
 
   if (sessionSnapshot?.steps.length) {
     const snapshotChapters: RecordingMetadataChapter[] = [];
+    const recordingTimelineLengthMs = getRecordingTimelineLengthMs(options);
     let cursorMs = 0;
 
     for (let index = 0; index < sessionSnapshot.steps.length; index += 1) {
@@ -241,16 +297,26 @@ export function deriveRecordingChapters(options: {
         continue;
       }
 
+      const startTimeMs = recordingTimelineLengthMs != null
+        ? clampMilliseconds(cursorMs, 0, recordingTimelineLengthMs)
+        : cursorMs;
+      const endTimeMs = recordingTimelineLengthMs != null
+        ? clampMilliseconds(cursorMs + durationMs, startTimeMs, recordingTimelineLengthMs)
+        : cursorMs + durationMs;
+      if (endTimeMs <= startTimeMs) {
+        break;
+      }
+
       snapshotChapters.push({
         index: snapshotChapters.length + 1,
         title,
-        startTimeMs: cursorMs,
-        endTimeMs: cursorMs + durationMs,
-        startSeconds: Number((cursorMs / 1000).toFixed(3)),
-        endSeconds: Number(((cursorMs + durationMs) / 1000).toFixed(3)),
+        startTimeMs,
+        endTimeMs,
+        startSeconds: Number((startTimeMs / 1000).toFixed(3)),
+        endSeconds: Number((endTimeMs / 1000).toFixed(3)),
         sourceEventSequence: null,
       });
-      cursorMs += durationMs;
+      cursorMs = endTimeMs;
     }
 
     if (snapshotChapters.length > 0 && sessionSnapshot.steps.some((step) => step.actualDurationSeconds != null)) {
@@ -491,15 +557,18 @@ export async function finalizeRecordingMetadata(options: {
     return recording;
   }
 
-  const resolvedRecordingPath = path.join(options.config.recordingsDir, ...recording.relativeFilePath.split('/'));
+  const resolvedPaths = resolveSafeRelativeRecordingPath(options.config, recording.relativeFilePath);
+  if (!resolvedPaths) {
+    return recording;
+  }
+
+  const { resolvedRecordingPath, metadataRelativePath, metadataFilePath, safeRelativePath } = resolvedPaths;
   const providedTimelineEvents = normalizeTimelineEvents(options.timelineEvents);
   const normalizedTimelineEvents = providedTimelineEvents.length > 0
     ? providedTimelineEvents
-    : await readExistingMetadataTimelineEvents(options.config, recording.relativeFilePath);
+    : await readExistingMetadataTimelineEvents(options.config, safeRelativePath);
   const measuredSizeBytes = recording.sizeBytes ?? await readFileSize(resolvedRecordingPath);
   const measuredDurationSeconds = recording.durationSeconds ?? await probeMediaDurationSeconds(resolvedRecordingPath);
-  const metadataRelativePath = buildMetadataRelativePath(recording.relativeFilePath);
-  const metadataFilePath = buildMetadataFilePath(options.config, recording.relativeFilePath);
   const nextRecording: SessionRecording = {
     ...recording,
     sizeBytes: measuredSizeBytes,
