@@ -32,7 +32,7 @@ From the repo root:
 | `npm run build` | Build landing, app, and server workspaces. |
 | `npm test` | Run app and server unit tests. |
 | `npm run coverage` | Generate a local unit-test coverage report for runtime logic modules. |
-| `npm run coverage:check` | Run unit tests with the CI coverage gate (80% lines/statements, 85% functions). |
+| `npm run coverage:check` | Run unit tests with the CI coverage gate (80% line coverage only). |
 | `npm run lint` | Type-check app and server workspaces. |
 | `npm run test:e2e` | Run app Playwright tests. |
 | `npm run server:start` | Start the compiled Brave Paws server locally. |
