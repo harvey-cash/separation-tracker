@@ -64,6 +64,10 @@ export function getResolvedStepCount(steps: Step[]): number {
   return steps.filter((step) => step.status !== 'pending').length;
 }
 
+export function getRecordedStepDurationSeconds(step: Step): number {
+  return step.actualDurationSeconds ?? step.durationSeconds;
+}
+
 export function normalizeStep(value: unknown): Step | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -72,6 +76,7 @@ export function normalizeStep(value: unknown): Step | null {
   const candidate = value as {
     id?: unknown;
     durationSeconds?: unknown;
+    actualDurationSeconds?: unknown;
     status?: unknown;
     completed?: unknown;
   };
@@ -85,6 +90,11 @@ export function normalizeStep(value: unknown): Step | null {
       ? Math.max(0, candidate.durationSeconds)
       : 0;
 
+  const actualDurationSeconds =
+    typeof candidate.actualDurationSeconds === 'number' && Number.isFinite(candidate.actualDurationSeconds)
+      ? Math.max(0, candidate.actualDurationSeconds)
+      : undefined;
+
   // Legacy data only stored a boolean completed flag, where false meant the step
   // had not been resolved yet. Preserve that as pending for backwards compatibility.
   const status = isStepStatus(candidate.status)
@@ -96,6 +106,7 @@ export function normalizeStep(value: unknown): Step | null {
   return {
     id: candidate.id,
     durationSeconds,
+    ...(actualDurationSeconds != null ? { actualDurationSeconds } : {}),
     status,
   };
 }

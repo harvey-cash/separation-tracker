@@ -7,6 +7,7 @@ function serializeStep(step: Step) {
   return {
     id: step.id,
     durationSeconds: step.durationSeconds,
+    actualDurationSeconds: step.actualDurationSeconds ?? null,
     status: step.status,
   };
 }

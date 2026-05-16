@@ -110,10 +110,12 @@ export function generateCSVContent(sessions: Session[]): string {
     const notes = session.notes ? escapeCSVValue(session.notes) : '';
     const exercisedLevel = session.exercisedLevel ?? '';
     const anyoneHome = session.anyoneHome ? escapeCSVValue(session.anyoneHome) : '';
-    const maxDuration = session.steps.length > 0 ? Math.max(...session.steps.map((step) => step.durationSeconds)) : 0;
+    const maxDuration = session.steps.length > 0
+      ? Math.max(...session.steps.map((step) => step.actualDurationSeconds ?? step.durationSeconds))
+      : 0;
 
     const stepDurations = Array.from({ length: STEP_COLUMN_COUNT }, (_, index) => (
-      index < session.steps.length ? session.steps[index].durationSeconds : ''
+      index < session.steps.length ? (session.steps[index].actualDurationSeconds ?? session.steps[index].durationSeconds) : ''
     ));
     const stepStatuses = Array.from({ length: STEP_COLUMN_COUNT }, (_, index) => (
       index < session.steps.length ? session.steps[index].status : ''
@@ -222,6 +224,7 @@ export function parseCSV(content: string): Session[] {
       status: sessionWithoutId.status,
       steps: sessionWithoutId.steps.map((step) => ({
         durationSeconds: step.durationSeconds,
+        actualDurationSeconds: step.actualDurationSeconds ?? null,
         status: step.status,
       })),
     });

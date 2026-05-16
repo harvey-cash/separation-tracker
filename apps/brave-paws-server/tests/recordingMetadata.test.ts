@@ -90,6 +90,45 @@ test('deriveRecordingChapters uses actual runtime event timing instead of naive 
   ]);
 });
 
+test('deriveRecordingChapters falls back to session snapshot actual durations when they are available', () => {
+  const sessionSnapshot: Session = {
+    id: 'session-actuals',
+    date: '2026-05-10T09:00:00.000Z',
+    totalDurationSeconds: 75,
+    status: 'completed',
+    steps: [
+      { id: 'step-1', durationSeconds: 30, actualDurationSeconds: 42, status: 'completed' },
+      { id: 'step-2', durationSeconds: 20, actualDurationSeconds: 18, status: 'aborted' },
+    ],
+  };
+
+  const chapters = deriveRecordingChapters({
+    sessionSnapshot,
+    timelineEvents: normalizeTimelineEvents([
+      {
+        sequence: 0,
+        type: 'step_started',
+        occurredAt: '2026-05-10T09:00:00.000Z',
+        sessionElapsedSeconds: 0,
+        sessionRunning: true,
+        currentStepIndex: 0,
+        stepId: 'step-1',
+        stepStatus: 'pending',
+        stepRunning: true,
+        stepElapsedSeconds: 0,
+        stepDurationSeconds: 30,
+      },
+    ]),
+    recordingStartedAt: '2026-05-10T09:00:00.000Z',
+    recordingStoppedAt: '2026-05-10T09:01:15.000Z',
+  });
+
+  assert.deepEqual(chapters.map((chapter) => ({ title: chapter.title, startSeconds: chapter.startSeconds, endSeconds: chapter.endSeconds })), [
+    { title: 'Step 1 · 42s completed', startSeconds: 0, endSeconds: 42 },
+    { title: 'Step 2 · 18s aborted', startSeconds: 42, endSeconds: 60 },
+  ]);
+});
+
 test('buildRecordingMetadataSidecar emits the canonical v1 sidecar structure', () => {
   const sessionSnapshot: Session = {
     id: 'session-123',
@@ -97,8 +136,8 @@ test('buildRecordingMetadataSidecar emits the canonical v1 sidecar structure', (
     totalDurationSeconds: 60,
     status: 'completed',
     steps: [
-      { id: 'step-1', durationSeconds: 30, status: 'completed' },
-      { id: 'step-2', durationSeconds: 20, status: 'completed' },
+      { id: 'step-1', durationSeconds: 30, actualDurationSeconds: 32, status: 'completed' },
+      { id: 'step-2', durationSeconds: 20, actualDurationSeconds: 18, status: 'completed' },
     ],
   };
   const recording: SessionRecording = {
@@ -150,6 +189,7 @@ test('buildRecordingMetadataSidecar emits the canonical v1 sidecar structure', (
   assert.equal(sidecar.recordingFile.relativePath, '2026/05/10/session-123.mp4');
   assert.equal(sidecar.recordingFile.metadataRelativePath, '2026/05/10/session-123.brave-paws.json');
   assert.equal(sidecar.session.stepCount, 2);
+  assert.equal(sidecar.session.steps[0]?.actualDurationSeconds, 32);
   assert.equal(sidecar.recording.chapterCount, chapters.length);
   assert.equal(sidecar.recording.chaptersEmbedded, true);
   assert.equal(sidecar.timeline.eventCount, 1);
