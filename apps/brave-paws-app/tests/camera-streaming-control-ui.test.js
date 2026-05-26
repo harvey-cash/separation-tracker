@@ -11,8 +11,23 @@ test('App wires camera streaming control into the dashboard and active session l
   assert.match(app, /currentView === 'active' && Boolean\(activeSession\)/);
   assert.match(app, /pendingSessionCameraStateRef\.current = true/);
   assert.match(app, /pendingSessionCameraStateRef\.current = false/);
+  assert.match(app, /cameraStreamingControl=\{cameraStreamingControl\}/);
+  assert.match(app, /cameraStreamingControl\.isLoading/);
+  assert.match(app, /cameraStreamingControl\.capability\.enabled === pendingState/);
   assert.match(app, /setEnabled\(pendingState, \{ silent: true \}\)/);
-  assert.match(app, /\}, \[activeSession, currentView, cameraStreamingControl\.capability\.canSetEnabled, cameraStreamingControl\.setEnabled\]\);/);
+  assert.match(app, /cameraStreamingControl\.capability\.enabled,/);
+});
+
+
+test('ActiveSession disables camera streaming explicitly when the session ends without blocking completion', () => {
+  const activeSession = readFileSync(resolve(process.cwd(), 'src/components/ActiveSession.tsx'), 'utf8');
+
+  assert.match(activeSession, /cameraStreamingControl\?: Pick<CameraStreamingControlState, 'capability' \| 'setEnabled'>/);
+  assert.match(activeSession, /cameraStreamingControl\.capability\.enabled !== true/);
+  assert.match(activeSession, /void cameraStreamingControl\.setEnabled\(false, \{ silent: true \}\)\.catch/);
+  assert.doesNotMatch(activeSession, /await cameraStreamingControl\.setEnabled\(false, \{ silent: true \}\);/);
+  assert.doesNotMatch(activeSession, /await disableCameraStreamingAtSessionEnd\(\);/);
+  assert.match(activeSession, /Failed to disable camera streaming at session end\./);
 });
 
 

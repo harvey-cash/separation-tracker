@@ -7,6 +7,7 @@ import { CameraLinkInput } from './CameraLinkInput';
 import { TimerClock, getElapsedSeconds, pauseTimer, startTimer } from '../utils/timer';
 import { ActiveSessionState } from '../utils/activeSessionStorage';
 import { reportClientDiagnostic } from '../utils/clientDiagnostics';
+import type { CameraStreamingControlState } from '../hooks/useCameraStreamingControl';
 import {
   fetchSessionRecordingCapability,
   startSessionRecording,
@@ -21,6 +22,7 @@ type Props = {
   session: Session;
   initialState?: ActiveSessionState;
   cameraUrl?: string;
+  cameraStreamingControl?: Pick<CameraStreamingControlState, 'capability' | 'setEnabled'>;
   onCameraUrlChange?: (url: string) => void;
   onStateChange?: (state: ActiveSessionState) => void;
   onCompleteSession: (session: Session) => void;
@@ -39,7 +41,7 @@ export function shouldAppendInitialTimelineEvent(
   return lastTimelineEvent?.type !== 'session_resumed';
 }
 
-export function ActiveSession({ session: initialSession, initialState, cameraUrl = '', onCameraUrlChange, onStateChange, onCompleteSession, onCancel }: Props) {
+export function ActiveSession({ session: initialSession, initialState, cameraUrl = '', cameraStreamingControl, onCameraUrlChange, onStateChange, onCompleteSession, onCancel }: Props) {
   const restoredState = initialState?.session.id === initialSession.id ? initialState : undefined;
   const initialSessionClock = restoredState?.sessionClock ?? {
     startedAt: Date.now(),
@@ -259,6 +261,25 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     chaptersEmbedded: sessionRef.current.recording?.chaptersEmbedded ?? null,
     detail,
   }), [recordingCapability.provider]);
+
+  const disableCameraStreamingAtSessionEnd = useCallback(() => {
+    if (!cameraStreamingControl?.capability.canSetEnabled || cameraStreamingControl.capability.enabled !== true) {
+      return;
+    }
+
+    void cameraStreamingControl.setEnabled(false, { silent: true }).catch((cameraDisableError) => {
+      reportClientDiagnostic({
+        category: 'camera_preview_issue',
+        severity: 'warn',
+        message: 'Failed to disable camera streaming at session end.',
+        fingerprint: 'camera-streaming:disable-session-end',
+        details: {
+          error: cameraDisableError,
+          sessionId: sessionRef.current.id,
+        },
+      });
+    });
+  }, [cameraStreamingControl]);
 
   // Background Stopwatch
   useEffect(() => {
@@ -488,6 +509,8 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       }
     }
 
+    disableCameraStreamingAtSessionEnd();
+
     onCompleteSession({
       ...recordingSessionSnapshot,
       recording: nextRecording,
@@ -535,6 +558,8 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
         setIsRecordingUpdating(false);
       }
     }
+
+    disableCameraStreamingAtSessionEnd();
 
     onCancel();
   };

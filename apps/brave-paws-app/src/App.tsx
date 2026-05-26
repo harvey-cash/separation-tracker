@@ -130,18 +130,40 @@ export default function App() {
 
   useEffect(() => {
     const pendingState = pendingSessionCameraStateRef.current;
-    if (pendingState == null || !cameraStreamingControl.capability.canSetEnabled) {
+    if (pendingState == null || cameraStreamingControl.isLoading || !cameraStreamingControl.capability.canSetEnabled) {
       return;
     }
 
-    void cameraStreamingControl.setEnabled(pendingState, { silent: true }).then(() => {
-      if (pendingSessionCameraStateRef.current === pendingState) {
+    if (cameraStreamingControl.capability.enabled === pendingState) {
+      pendingSessionCameraStateRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+
+    void cameraStreamingControl.setEnabled(pendingState, { silent: true }).then((nextCapability) => {
+      if (cancelled) {
+        return;
+      }
+
+      if (pendingSessionCameraStateRef.current === pendingState && nextCapability.enabled === pendingState) {
         pendingSessionCameraStateRef.current = null;
       }
     }).catch(() => {
       // Camera control is best-effort; leave the pending state so a later refresh can retry.
     });
-  }, [activeSession, currentView, cameraStreamingControl.capability.canSetEnabled, cameraStreamingControl.setEnabled]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSession,
+    currentView,
+    cameraStreamingControl.capability.canSetEnabled,
+    cameraStreamingControl.capability.enabled,
+    cameraStreamingControl.isLoading,
+    cameraStreamingControl.setEnabled,
+  ]);
 
   const handleStartNew = () => {
     let initialSteps = DEFAULT_STEPS;
@@ -231,6 +253,7 @@ export default function App() {
           session={activeSession}
           initialState={activeSessionState ?? undefined}
           cameraUrl={cameraUrl}
+          cameraStreamingControl={cameraStreamingControl}
           onCameraUrlChange={setCameraUrl}
           onStateChange={setActiveSessionState}
           onCompleteSession={handleCompleteSession}

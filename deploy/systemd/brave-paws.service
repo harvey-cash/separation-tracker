@@ -13,6 +13,7 @@ Environment=BRAVE_PAWS_PORT=4310
 Environment=BRAVE_PAWS_PUBLIC_BASE_URL=https://quantum.tail080401.ts.net:7447
 Environment="BRAVE_PAWS_CORS_ALLOWED_ORIGINS=https://harvey.cash,https://www.harvey.cash"
 Environment="BRAVE_PAWS_DATA_DIR=/mnt/q/fermi/brave-paws/data"
+Environment="BRAVE_PAWS_RECORDINGS_DIR=/mnt/s/Fermi/Separation Training Sessions/Brave Paws"
 Environment=BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL=http://127.0.0.1:18888/
 Environment=BRAVE_PAWS_CAMERA_CONTROL_PROVIDER=command
 Environment="BRAVE_PAWS_CAMERA_CONTROL_LABEL=Picam streaming"

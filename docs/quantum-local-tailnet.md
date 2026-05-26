@@ -37,6 +37,7 @@ Default bind:
 | `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://quantum.tail080401.ts.net:7447` |
 | `BRAVE_PAWS_CORS_ALLOWED_ORIGINS` | `https://harvey.cash,https://www.harvey.cash` |
 | `BRAVE_PAWS_DATA_DIR` | `/mnt/q/fermi/brave-paws/data` |
+| `BRAVE_PAWS_RECORDINGS_DIR` | `/mnt/s/Fermi/Separation Training Sessions/Brave Paws` |
 | `BRAVE_PAWS_AUTH_TOKEN` | `replace-with-long-random-secret-before-enabling-pairing` |
 | `BRAVE_PAWS_CAMERA_UPSTREAM_BASE_URL` | `http://127.0.0.1:18888/` |
 | `BRAVE_PAWS_CAMERA_CONTROL_PROVIDER` | `command` |
@@ -56,6 +57,8 @@ QUANTUM keeps a canonical JSON store plus a mirrored CSV export in the same data
 - `${BRAVE_PAWS_DATA_DIR}/brave_paws_sessions.csv`
 
 If Harvey drops a fresher `brave_paws_sessions.csv` into the data folder, the server ingests it on the next read and rewrites the canonical JSON store.
+
+Session recordings live separately under `${BRAVE_PAWS_RECORDINGS_DIR}` so the media archive sits on `S:` while the lighter session JSON/CSV store stays on `Q:`.
 
 ## API surface
 
