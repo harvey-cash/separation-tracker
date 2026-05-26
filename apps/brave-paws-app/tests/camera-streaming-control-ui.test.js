@@ -19,11 +19,14 @@ test('App wires camera streaming control into the dashboard and active session l
 });
 
 
-test('ActiveSession disables camera streaming explicitly when the session ends', () => {
+test('ActiveSession disables camera streaming explicitly when the session ends without blocking completion', () => {
   const activeSession = readFileSync(resolve(process.cwd(), 'src/components/ActiveSession.tsx'), 'utf8');
 
   assert.match(activeSession, /cameraStreamingControl\?: Pick<CameraStreamingControlState, 'capability' \| 'setEnabled'>/);
-  assert.match(activeSession, /await cameraStreamingControl\.setEnabled\(false, \{ silent: true \}\);/);
+  assert.match(activeSession, /cameraStreamingControl\.capability\.enabled !== true/);
+  assert.match(activeSession, /void cameraStreamingControl\.setEnabled\(false, \{ silent: true \}\)\.catch/);
+  assert.doesNotMatch(activeSession, /await cameraStreamingControl\.setEnabled\(false, \{ silent: true \}\);/);
+  assert.doesNotMatch(activeSession, /await disableCameraStreamingAtSessionEnd\(\);/);
   assert.match(activeSession, /Failed to disable camera streaming at session end\./);
 });
 

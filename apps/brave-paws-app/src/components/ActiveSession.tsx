@@ -262,14 +262,12 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
     detail,
   }), [recordingCapability.provider]);
 
-  const disableCameraStreamingAtSessionEnd = useCallback(async () => {
-    if (!cameraStreamingControl?.capability.canSetEnabled) {
+  const disableCameraStreamingAtSessionEnd = useCallback(() => {
+    if (!cameraStreamingControl?.capability.canSetEnabled || cameraStreamingControl.capability.enabled !== true) {
       return;
     }
 
-    try {
-      await cameraStreamingControl.setEnabled(false, { silent: true });
-    } catch (cameraDisableError) {
+    void cameraStreamingControl.setEnabled(false, { silent: true }).catch((cameraDisableError) => {
       reportClientDiagnostic({
         category: 'camera_preview_issue',
         severity: 'warn',
@@ -280,7 +278,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
           sessionId: sessionRef.current.id,
         },
       });
-    }
+    });
   }, [cameraStreamingControl]);
 
   // Background Stopwatch
@@ -511,7 +509,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       }
     }
 
-    await disableCameraStreamingAtSessionEnd();
+    disableCameraStreamingAtSessionEnd();
 
     onCompleteSession({
       ...recordingSessionSnapshot,
@@ -561,7 +559,7 @@ export function ActiveSession({ session: initialSession, initialState, cameraUrl
       }
     }
 
-    await disableCameraStreamingAtSessionEnd();
+    disableCameraStreamingAtSessionEnd();
 
     onCancel();
   };
