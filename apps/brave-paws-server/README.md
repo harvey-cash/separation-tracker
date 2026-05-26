@@ -27,6 +27,7 @@ It serves three things from one localhost process:
 | `BRAVE_PAWS_PUBLIC_BASE_URL` | unset | Canonical external base URL used for logs, pairing URLs, and deployment docs |
 | `BRAVE_PAWS_CORS_ALLOWED_ORIGINS` | unset | Comma-separated origin allowlist for cross-origin browser access to the API (for example `https://harvey.cash,https://www.harvey.cash`) |
 | `BRAVE_PAWS_DATA_DIR` | `var/brave-paws` in the repo | Session storage directory (live QUANTUM deploy uses `/mnt/q/fermi/brave-paws/data`) |
+| `BRAVE_PAWS_RECORDINGS_DIR` | `<data dir>/recordings` | Optional canonical recordings directory when session media should live separately from the JSON/CSV session store |
 | `BRAVE_PAWS_AUTH_TOKEN` | unset | Token expected in `x-brave-paws-token` for write requests; required before the HTTP pairing-creation endpoint will mint links |
 | `BRAVE_PAWS_ENABLE_PAIRING` | `false` | Enables the opaque one-time pairing broker |
 | `BRAVE_PAWS_PAIRING_STORE_FILE` | `<data dir>/pairings.json` | Optional override for pairing-token storage |
@@ -51,7 +52,7 @@ It serves three things from one localhost process:
 
 Session data is stored as pretty JSON in `sessions.json` and mirrored to `brave_paws_sessions.csv` in the same directory so it stays easy to inspect, back up, and seed from a manual CSV drop.
 
-When session recording is enabled, finalized media files are expected under `<data dir>/recordings/`, and saved session objects can carry a lightweight `recording` pointer with metadata plus a backend download path.
+When session recording is enabled, finalized media files are expected under `BRAVE_PAWS_RECORDINGS_DIR` when it is set, or `<data dir>/recordings/` otherwise. Saved session objects can carry a lightweight `recording` pointer with metadata plus a backend download path.
 
 When pairing is enabled, opaque one-time camera pairing records are stored separately in `pairings.json`. Those links are meant to bootstrap a browser once; after the app resolves a token, it caches the resulting camera link locally and the token cannot be reused.
 
