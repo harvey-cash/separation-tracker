@@ -1,6 +1,6 @@
 import { getApiBaseUrl } from '../config';
 import type { Session, SessionRecording, SessionTimelineEvent } from '../types';
-import { parseBackendJsonResponse } from './backendRequests';
+import { isBackendUnavailableError, parseBackendJsonResponse } from './backendRequests';
 
 export type CameraStreamingCapability = {
   key: 'cameraStreaming';
@@ -101,6 +101,22 @@ export async function startSessionRecording(
   return parseBackendJsonResponse<SessionRecordingCapability>(response);
 }
 
+const STOP_RECORDING_RETRY_DELAYS_MS = [250, 750] as const;
+
+function isRetryableStopRecordingError(error: unknown): boolean {
+  if (isBackendUnavailableError(error)) {
+    return true;
+  }
+
+  return error instanceof TypeError;
+}
+
+function waitForRetry(delayMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
 export async function stopSessionRecording(
   payload: {
     sessionId: string;
@@ -111,13 +127,27 @@ export async function stopSessionRecording(
   fetchImpl: typeof fetch = fetch,
   apiBaseUrl = getApiBaseUrl(),
 ): Promise<SessionRecordingCapability> {
-  const response = await fetchImpl(`${apiBaseUrl}recording/stop`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  let lastError: unknown = null;
 
-  return parseBackendJsonResponse<SessionRecordingCapability>(response);
+  for (let attempt = 0; attempt <= STOP_RECORDING_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const response = await fetchImpl(`${apiBaseUrl}recording/stop`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      return parseBackendJsonResponse<SessionRecordingCapability>(response);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableStopRecordingError(error) || attempt === STOP_RECORDING_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+      await waitForRetry(STOP_RECORDING_RETRY_DELAYS_MS[attempt]!);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Unable to stop session recording');
 }

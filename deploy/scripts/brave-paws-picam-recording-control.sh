@@ -149,6 +149,36 @@ clear_state() {
   rm -f "$STATE_FILE"
 }
 
+session_result_path() {
+  local session_id="$1"
+  printf '%s\n' "$SESSIONS_DIR/$session_id/result.json"
+}
+
+write_session_result() {
+  local session_id="$1"
+  local payload="$2"
+  local result_path
+  result_path="$(session_result_path "$session_id")"
+  mkdir -p "$(dirname "$result_path")"
+  printf '%s\n' "$payload" >"$result_path"
+}
+
+print_saved_session_result() {
+  local session_id="$1"
+  if [[ -z "$session_id" ]]; then
+    return 1
+  fi
+
+  local result_path
+  result_path="$(session_result_path "$session_id")"
+  if [[ ! -f "$result_path" ]]; then
+    return 1
+  fi
+
+  cat "$result_path"
+  return 0
+}
+
 is_pid_alive() {
   local pid="$1"
   [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
@@ -277,8 +307,10 @@ start_recording() {
   local mkv_path="$session_dir/capture.mkv"
   local mp4_path="$session_dir/final.mp4"
   local log_path="$session_dir/ffmpeg.log"
+  local result_path
+  result_path="$(session_result_path "$SESSION_ID")"
   mkdir -p "$session_dir"
-  rm -f "$mkv_path" "$mp4_path"
+  rm -f "$mkv_path" "$mp4_path" "$result_path"
 
   local has_audio="false"
   if ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "$RTSP_URL" 2>/dev/null | grep -q '^audio$'; then
@@ -314,6 +346,9 @@ stop_recording() {
   load_state
 
   if [[ -z "$STATE_SESSION_ID" ]]; then
+    if print_saved_session_result "$SESSION_ID"; then
+      return
+    fi
     status_json
     return
   fi
@@ -443,9 +478,8 @@ PY
 
   local size_bytes
   size_bytes="$(stat -c '%s' "$remote_file")"
-  clear_state
-
-  json_out \
+  local completed_payload
+  completed_payload="$(json_out \
     key '"sessionRecording"' \
     label '"Session recording"' \
     provider '"command"' \
@@ -473,7 +507,10 @@ print(json.dumps({
   'detail': sys.argv[8] or None,
 }))
 PY
-)"
+)")"
+  clear_state
+  write_session_result "$session_id" "$completed_payload"
+  echo "$completed_payload"
 }
 
 case "$MODE" in

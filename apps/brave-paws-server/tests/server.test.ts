@@ -333,10 +333,10 @@ test('session recording capability can be started and stopped through the comman
       assert.equal(stopped.active, false);
       assert.equal(stopped.sessionId, 'session-123');
       assert.equal(stopped.recording?.status, 'completed');
-      assert.equal(stopped.recording?.relativeFilePath, '2026/05/09/session-123.mp4');
-      assert.equal(stopped.recording?.downloadPath, '/separation/api/recordings/file/2026/05/09/session-123.mp4');
-      assert.equal(stopped.recording?.metadataRelativeFilePath, '2026/05/09/session-123.brave-paws.json');
-      assert.equal(stopped.recording?.metadataDownloadPath, '/separation/api/recordings/file/2026/05/09/session-123.brave-paws.json');
+      assert.equal(stopped.recording?.relativeFilePath, '2026/05/09/2026-05-09 18-00-00 - max 12m.mp4');
+      assert.equal(stopped.recording?.downloadPath, '/separation/api/recordings/file/2026/05/09/2026-05-09%2018-00-00%20-%20max%2012m.mp4');
+      assert.equal(stopped.recording?.metadataRelativeFilePath, '2026/05/09/2026-05-09 18-00-00 - max 12m.brave-paws.json');
+      assert.equal(stopped.recording?.metadataDownloadPath, '/separation/api/recordings/file/2026/05/09/2026-05-09%2018-00-00%20-%20max%2012m.brave-paws.json');
       assert.equal(stopped.recording?.chapterCount, 2);
       assert.equal(stopped.recording?.chaptersEmbedded, false);
 
@@ -344,10 +344,10 @@ test('session recording capability can be started and stopped through the comman
       assert.equal(servedRecording.status, 200);
       assert.equal(await servedRecording.text(), 'fake recording payload');
 
-      const storedRecordingPath = path.join(config.recordingsDir, '2026/05/09/session-123.mp4');
+      const storedRecordingPath = path.join(config.recordingsDir, '2026/05/09/2026-05-09 18-00-00 - max 12m.mp4');
       assert.equal(await fs.readFile(storedRecordingPath, 'utf8'), 'fake recording payload');
 
-      const storedMetadataPath = path.join(config.recordingsDir, '2026/05/09/session-123.brave-paws.json');
+      const storedMetadataPath = path.join(config.recordingsDir, '2026/05/09/2026-05-09 18-00-00 - max 12m.brave-paws.json');
       const sidecar = JSON.parse(await fs.readFile(storedMetadataPath, 'utf8')) as {
         version: number;
         recordingFile: { metadataRelativePath: string; relativePath: string };
@@ -356,8 +356,8 @@ test('session recording capability can be started and stopped through the comman
         chapters: Array<{ title: string }>;
       };
       assert.equal(sidecar.version, 1);
-      assert.equal(sidecar.recordingFile.relativePath, '2026/05/09/session-123.mp4');
-      assert.equal(sidecar.recordingFile.metadataRelativePath, '2026/05/09/session-123.brave-paws.json');
+      assert.equal(sidecar.recordingFile.relativePath, '2026/05/09/2026-05-09 18-00-00 - max 12m.mp4');
+      assert.equal(sidecar.recordingFile.metadataRelativePath, '2026/05/09/2026-05-09 18-00-00 - max 12m.brave-paws.json');
       assert.equal(sidecar.recording.chapterCount, 2);
       assert.equal(sidecar.recording.chaptersEmbedded, false);
       assert.equal(sidecar.timeline.eventCount, 4);
@@ -368,6 +368,65 @@ test('session recording capability can be started and stopped through the comman
       recordingStatusCommand: `python3 - <<'PY'\nimport json, os\nstate_file = ${JSON.stringify(stateFilePath)}\nif not os.path.exists(state_file):\n    print(json.dumps({"active": False, "sessionId": None, "recording": None}))\nelse:\n    print(open(state_file, 'r', encoding='utf8').read())\nPY`,
       recordingStartCommand: `python3 - <<'PY'\nimport json, os\nstate_file = ${JSON.stringify(stateFilePath)}\npayload = {"active": True, "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "recording": {"status": "recording", "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "startedAt": "2026-05-09T18:00:00.000Z", "hasAudio": True}}\nos.makedirs(os.path.dirname(state_file), exist_ok=True)\nopen(state_file, 'w', encoding='utf8').write(json.dumps(payload))\nprint(json.dumps(payload))\nPY`,
       recordingStopCommand: `python3 - <<'PY'\nimport json, os\nstate_file = ${JSON.stringify(stateFilePath)}\npayload = {"active": False, "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "recording": {"status": "completed", "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "startedAt": "2026-05-09T18:00:00.000Z", "stoppedAt": "2026-05-09T18:12:00.000Z", "hasAudio": True, "relativeFilePath": "2026/05/09/session-123.mp4", "durationSeconds": 720, "sizeBytes": 19}}\nos.makedirs(os.path.dirname(state_file), exist_ok=True)\nopen(state_file, 'w', encoding='utf8').write(json.dumps(payload))\nprint(json.dumps(payload))\nPY`,
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('session recording stop replays a cached completed result for the same session id', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'brave-paws-recording-stop-cache-'));
+  const stopCountFilePath = path.join(tempDir, 'stop-count.txt');
+  const recordingDir = path.join(tempDir, 'recordings');
+
+  try {
+    await withFixtureServer(async ({ baseUrl }) => {
+      const recordingSourcePath = path.join(recordingDir, '2026/05/09/session-123.mp4');
+      await fs.mkdir(path.dirname(recordingSourcePath), { recursive: true });
+      await fs.writeFile(recordingSourcePath, 'fake recording payload');
+
+      const payload = {
+        sessionId: 'session-123',
+        disposition: 'save',
+        sessionSnapshot: {
+          id: 'session-123',
+          date: '2026-05-09T18:00:00.000Z',
+          totalDurationSeconds: 720,
+          status: 'completed' as const,
+          steps: [
+            { id: 'step-1', durationSeconds: 30, status: 'completed' as const },
+            { id: 'step-2', durationSeconds: 690, status: 'completed' as const },
+          ],
+        },
+      };
+
+      const firstResponse = await fetch(`${baseUrl}/separation/api/recording/stop`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      assert.equal(firstResponse.status, 200);
+
+      const secondResponse = await fetch(`${baseUrl}/separation/api/recording/stop`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      assert.equal(secondResponse.status, 200);
+
+      const secondBody = await secondResponse.json() as {
+        sessionId: string | null;
+        recording: { relativeFilePath: string | null } | null;
+      };
+      assert.equal(secondBody.sessionId, 'session-123');
+      assert.equal(secondBody.recording?.relativeFilePath, '2026/05/09/2026-05-09 18-00-00 - max 12m.mp4');
+      assert.equal((await fs.readFile(stopCountFilePath, 'utf8')).trim(), '1');
+    }, {
+      recordingProvider: 'command',
+      recordingsDir: recordingDir,
+      recordingStatusCommand: `python3 - <<'PY'\nimport json\nprint(json.dumps({"active": False, "sessionId": None, "recording": None}))\nPY`,
+      recordingStartCommand: `python3 - <<'PY'\nimport json\nprint(json.dumps({"active": True, "sessionId": "session-123", "recording": {"status": "recording", "sessionId": "session-123", "provider": "command"}}))\nPY`,
+      recordingStopCommand: `python3 - <<'PY'\nimport json, os\ncount_file = ${JSON.stringify(stopCountFilePath)}\ncount = 0\nif os.path.exists(count_file):\n    count = int(open(count_file, 'r', encoding='utf8').read().strip() or '0')\ncount += 1\nos.makedirs(os.path.dirname(count_file), exist_ok=True)\nopen(count_file, 'w', encoding='utf8').write(str(count))\npayload = {"active": False, "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "recording": {"status": "completed", "sessionId": os.environ.get("BRAVE_PAWS_RECORDING_SESSION_ID"), "startedAt": "2026-05-09T18:00:00.000Z", "stoppedAt": "2026-05-09T18:12:00.000Z", "hasAudio": True, "relativeFilePath": "2026/05/09/session-123.mp4", "durationSeconds": 720, "sizeBytes": 19}}\nprint(json.dumps(payload))\nPY`,
     });
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });

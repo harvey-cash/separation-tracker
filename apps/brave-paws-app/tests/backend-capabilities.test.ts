@@ -183,6 +183,47 @@ test('fetchBackendCapabilities reports invalid non-HTML JSON payloads as unexpec
   );
 });
 
+test('stopSessionRecording retries transient fetch failures and returns the recovered stop result', async () => {
+  let attempts = 0;
+  const capability = await stopSessionRecording(
+    {
+      sessionId: 'session-abc',
+      disposition: 'save',
+    },
+    (async () => {
+      attempts += 1;
+      if (attempts < 3) {
+        throw new TypeError('Failed to fetch');
+      }
+
+      return new Response(JSON.stringify({
+        ...UNSUPPORTED_SESSION_RECORDING_CAPABILITY,
+        supported: true,
+        canStart: true,
+        canStop: true,
+        active: false,
+        sessionId: 'session-abc',
+        provider: 'command',
+        recording: {
+          status: 'completed',
+          sessionId: 'session-abc',
+          provider: 'command',
+          relativeFilePath: '2026/05/09/2026-05-09 18-00-00 - max 12m.mp4',
+        },
+        detail: null,
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch,
+    'https://brave-paws.example/separation/api/',
+  );
+
+  assert.equal(attempts, 3);
+  assert.equal(capability.recording?.status, 'completed');
+  assert.equal(capability.recording?.relativeFilePath, '2026/05/09/2026-05-09 18-00-00 - max 12m.mp4');
+});
+
 test('stopSessionRecording posts the stop payload to the recording stop endpoint', async () => {
   const capability = await stopSessionRecording(
     {

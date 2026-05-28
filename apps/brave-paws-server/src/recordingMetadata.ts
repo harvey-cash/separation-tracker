@@ -87,6 +87,121 @@ function normalizeTimestamp(value: unknown): string | null {
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
+function formatRecordingFilenameTimestamp(value: string | null | undefined): string | null {
+  if (typeof value !== 'string' || !value.trim() || !Number.isFinite(Date.parse(value))) {
+    return null;
+  }
+
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day, hour, minute, second] = match;
+  return `${year}-${month}-${day} ${hour}-${minute}-${second}`;
+}
+
+function formatRecordingFilenameDuration(durationSeconds: number | null): string | null {
+  if (durationSeconds == null || !Number.isFinite(durationSeconds) || durationSeconds < 0) {
+    return null;
+  }
+
+  const totalSeconds = Math.round(durationSeconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts: string[] = [];
+
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+
+  if (minutes > 0 || hours > 0) {
+    parts.push(hours > 0 && seconds > 0 && minutes < 10 ? `${minutes}m` : `${minutes}m`);
+  }
+
+  if (seconds > 0 || (!hours && !minutes)) {
+    parts.push(`${seconds}s`);
+  }
+
+  return parts.join('');
+}
+
+function getPlannedSessionDurationSeconds(sessionSnapshot: Session | null | undefined): number | null {
+  if (!sessionSnapshot?.steps.length) {
+    return null;
+  }
+
+  const total = sessionSnapshot.steps.reduce((sum, step) => sum + Math.max(0, step.durationSeconds), 0);
+  return Number.isFinite(total) ? total : null;
+}
+
+function sanitizeRecordingFilenameComponent(value: string): string {
+  return value
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function moveFile(sourcePath: string, targetPath: string): Promise<void> {
+  try {
+    await fs.rename(sourcePath, targetPath);
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : null;
+    if (code !== 'EXDEV') {
+      throw error;
+    }
+
+    await fs.copyFile(sourcePath, targetPath);
+    await fs.unlink(sourcePath);
+  }
+}
+
+async function buildPreferredRelativeRecordingPath(options: {
+  config: BravePawsServerConfig;
+  recording: SessionRecording;
+  currentRelativePath: string;
+  sessionSnapshot?: Session | null;
+}): Promise<string | null> {
+  const timestampLabel = formatRecordingFilenameTimestamp(options.recording.startedAt ?? options.recording.stoppedAt ?? null);
+  if (!timestampLabel) {
+    return null;
+  }
+
+  const extension = path.posix.extname(options.currentRelativePath) || '.mp4';
+  const dirname = path.posix.dirname(options.currentRelativePath);
+  const durationLabel = formatRecordingFilenameDuration(getPlannedSessionDurationSeconds(options.sessionSnapshot));
+  const preferredBasename = sanitizeRecordingFilenameComponent(
+    durationLabel ? `${timestampLabel} - max ${durationLabel}` : timestampLabel,
+  );
+  const baseRelativePath = dirname === '.'
+    ? `${preferredBasename}${extension}`
+    : path.posix.join(dirname, `${preferredBasename}${extension}`);
+
+  if (baseRelativePath === options.currentRelativePath) {
+    return baseRelativePath;
+  }
+
+  const baseResolvedPath = path.join(options.config.recordingsDir, ...baseRelativePath.split('/'));
+  if (!await pathExists(baseResolvedPath)) {
+    return baseRelativePath;
+  }
+
+  const sessionSuffix = options.recording.sessionId?.slice(0, 8) ?? 'recording';
+  return dirname === '.'
+    ? `${preferredBasename} - ${sessionSuffix}${extension}`
+    : path.posix.join(dirname, `${preferredBasename} - ${sessionSuffix}${extension}`);
+}
+
 function normalizeStepStatus(value: unknown): StepStatus | null {
   return STEP_STATUSES.has(value as StepStatus) ? (value as StepStatus) : null;
 }
@@ -557,9 +672,33 @@ export async function finalizeRecordingMetadata(options: {
     return recording;
   }
 
-  const resolvedPaths = resolveSafeRelativeRecordingPath(options.config, recording.relativeFilePath);
+  let workingRecording = recording;
+  let resolvedPaths = resolveSafeRelativeRecordingPath(options.config, workingRecording.relativeFilePath!);
   if (!resolvedPaths) {
     return recording;
+  }
+
+  const preferredRelativePath = await buildPreferredRelativeRecordingPath({
+    config: options.config,
+    recording: workingRecording,
+    currentRelativePath: resolvedPaths.safeRelativePath,
+    sessionSnapshot: options.sessionSnapshot,
+  });
+
+  if (preferredRelativePath && preferredRelativePath !== resolvedPaths.safeRelativePath) {
+    const preferredResolvedPaths = resolveSafeRelativeRecordingPath(options.config, preferredRelativePath);
+    if (preferredResolvedPaths) {
+      await fs.mkdir(path.dirname(preferredResolvedPaths.resolvedRecordingPath), { recursive: true });
+      await moveFile(resolvedPaths.resolvedRecordingPath, preferredResolvedPaths.resolvedRecordingPath);
+      if (preferredResolvedPaths.metadataFilePath !== resolvedPaths.metadataFilePath) {
+        await fs.rm(resolvedPaths.metadataFilePath, { force: true });
+      }
+      workingRecording = {
+        ...workingRecording,
+        relativeFilePath: preferredResolvedPaths.safeRelativePath,
+      };
+      resolvedPaths = preferredResolvedPaths;
+    }
   }
 
   const { resolvedRecordingPath, metadataRelativePath, metadataFilePath, safeRelativePath } = resolvedPaths;
@@ -570,7 +709,7 @@ export async function finalizeRecordingMetadata(options: {
   const measuredSizeBytes = recording.sizeBytes ?? await readFileSize(resolvedRecordingPath);
   const measuredDurationSeconds = recording.durationSeconds ?? await probeMediaDurationSeconds(resolvedRecordingPath);
   const nextRecording: SessionRecording = {
-    ...recording,
+    ...workingRecording,
     sizeBytes: measuredSizeBytes,
     durationSeconds: measuredDurationSeconds,
     metadataRelativeFilePath: metadataRelativePath,
@@ -585,7 +724,7 @@ export async function finalizeRecordingMetadata(options: {
   });
 
   let chaptersEmbedded = false;
-  if (path.extname(resolvedRecordingPath).toLowerCase() === '.mp4') {
+  if (nextRecording.durationSeconds != null && path.extname(resolvedRecordingPath).toLowerCase() === '.mp4') {
     try {
       chaptersEmbedded = await embedChaptersIntoMp4(resolvedRecordingPath, chapters);
     } catch (error) {
