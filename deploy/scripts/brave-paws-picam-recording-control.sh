@@ -154,6 +154,16 @@ is_pid_alive() {
   [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
 }
 
+probe_media_duration_seconds() {
+  local media_path="$1"
+  ffprobe -v error -show_entries format=duration -of default=nk=1:nw=1 "$media_path" | awk '{printf "%.0f", $1}' || true
+}
+
+is_valid_media_file() {
+  local media_path="$1"
+  [[ -s "$media_path" ]] && ffprobe -v error -show_entries format=duration -of default=nk=1:nw=1 "$media_path" >/dev/null 2>&1
+}
+
 terminate_recording_process() {
   local pid="$1"
 
@@ -162,7 +172,7 @@ terminate_recording_process() {
   fi
 
   kill -INT "$pid" 2>/dev/null || true
-  for _ in $(seq 1 40); do
+  for _ in $(seq 1 120); do
     if ! kill -0 "$pid" 2>/dev/null; then
       return 0
     fi
@@ -264,10 +274,11 @@ start_recording() {
   fi
 
   local session_dir="$SESSIONS_DIR/$SESSION_ID"
+  local mkv_path="$session_dir/capture.mkv"
   local mp4_path="$session_dir/final.mp4"
   local log_path="$session_dir/ffmpeg.log"
   mkdir -p "$session_dir"
-  rm -f "$mp4_path"
+  rm -f "$mkv_path" "$mp4_path"
 
   local has_audio="false"
   if ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "$RTSP_URL" 2>/dev/null | grep -q '^audio$'; then
@@ -278,7 +289,7 @@ start_recording() {
   scale_filter="scale=-2:${VIDEO_HEIGHT}:flags=lanczos"
 
   local pid
-  pid="$({ nohup ffmpeg -nostdin -hide_banner -loglevel warning -rtsp_transport tcp -i "$RTSP_URL" -map 0:v:0 -map 0:a? -vf "$scale_filter" -c:v libx264 -preset veryfast -pix_fmt yuv420p -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" -c:a aac -b:a "$AUDIO_BITRATE" -movflags +faststart "$mp4_path" >"$log_path" 2>&1 < /dev/null & echo $!; } )"
+  pid="$({ nohup ffmpeg -nostdin -hide_banner -loglevel warning -rtsp_transport tcp -i "$RTSP_URL" -map 0:v:0 -map 0:a? -vf "$scale_filter" -c:v libx264 -preset veryfast -pix_fmt yuv420p -b:v "$VIDEO_BITRATE" -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" -c:a aac -b:a "$AUDIO_BITRATE" -f matroska "$mkv_path" >"$log_path" 2>&1 < /dev/null & echo $!; } )"
   sleep 1
 
   if ! kill -0 "$pid" 2>/dev/null; then
@@ -291,7 +302,7 @@ start_recording() {
   STATE_SESSION_DATE="$SESSION_DATE"
   STATE_PID="$pid"
   STATE_SESSION_DIR="$session_dir"
-  STATE_MKV_PATH=""
+  STATE_MKV_PATH="$mkv_path"
   STATE_MP4_PATH="$mp4_path"
   STATE_LOG_PATH="$log_path"
   STATE_HAS_AUDIO="$has_audio"
@@ -353,9 +364,10 @@ PY
   local session_id="$STATE_SESSION_ID"
   local started_at="$STATE_STARTED_AT"
   local has_audio="$STATE_HAS_AUDIO"
+  local mkv_path="$STATE_MKV_PATH"
   local mp4_path="$STATE_MP4_PATH"
 
-  if [[ ! -s "$STATE_MP4_PATH" ]]; then
+  if [[ ! -s "$mkv_path" ]]; then
     clear_state
     json_out \
       key '"sessionRecording"' \
@@ -382,9 +394,55 @@ PY
     return
   fi
 
-  local duration_seconds size_bytes
-  duration_seconds="$(ffprobe -v error -show_entries format=duration -of default=nk=1:nw=1 "$STATE_MP4_PATH" | awk '{printf "%.0f", $1}' || true)"
-  size_bytes="$(stat -c '%s' "$STATE_MP4_PATH")"
+  if ! is_valid_media_file "$mkv_path"; then
+    clear_state
+    json_out \
+      key '"sessionRecording"' \
+      label '"Session recording"' \
+      provider '"command"' \
+      supported __TRUE__ \
+      canStart __TRUE__ \
+      canStop __TRUE__ \
+      active __FALSE__ \
+      sessionId "\"$session_id\"" \
+      detail '"Recording ended with an unreadable capture file."' \
+      recording "$(python3 - <<'PY' "$session_id" "$started_at" "$stopped_at" "$has_audio"
+import json, sys
+print(json.dumps({
+  'status': 'failed',
+  'sessionId': sys.argv[1] or None,
+  'startedAt': sys.argv[2] or None,
+  'stoppedAt': sys.argv[3] or None,
+  'hasAudio': sys.argv[4].lower() == 'true',
+  'detail': 'Recording ended with an unreadable capture file.',
+}))
+PY
+)"
+    return
+  fi
+
+  local remote_file="$mkv_path"
+  local duration_seconds
+  duration_seconds="$(probe_media_duration_seconds "$mkv_path")"
+  local detail=""
+
+  rm -f "$mp4_path"
+  if ffmpeg -y -i "$mkv_path" -map 0 -c copy -movflags +faststart "$mp4_path" >>"$STATE_LOG_PATH" 2>&1; then
+    if is_valid_media_file "$mp4_path"; then
+      remote_file="$mp4_path"
+      duration_seconds="$(probe_media_duration_seconds "$mp4_path")"
+      rm -f "$mkv_path"
+    else
+      rm -f "$mp4_path"
+      detail='MP4 finalization failed validation; saved MKV fallback.'
+    fi
+  else
+    rm -f "$mp4_path"
+    detail='MP4 finalization failed; saved MKV fallback.'
+  fi
+
+  local size_bytes
+  size_bytes="$(stat -c '%s' "$remote_file")"
   clear_state
 
   json_out \
@@ -396,8 +454,12 @@ PY
     canStop __TRUE__ \
     active __FALSE__ \
     sessionId "\"$session_id\"" \
-    detail __NULL__ \
-    recording "$(python3 - <<'PY' "$session_id" "$started_at" "$stopped_at" "$has_audio" "$mp4_path" "$duration_seconds" "$size_bytes"
+    detail "$(python3 - <<'PY' "$detail"
+import json, sys
+print(json.dumps(sys.argv[1] or None))
+PY
+)" \
+    recording "$(python3 - <<'PY' "$session_id" "$started_at" "$stopped_at" "$has_audio" "$remote_file" "$duration_seconds" "$size_bytes" "$detail"
 import json, sys
 print(json.dumps({
   'status': 'completed',
@@ -408,7 +470,7 @@ print(json.dumps({
   'remoteFilePath': sys.argv[5],
   'durationSeconds': int(sys.argv[6]) if sys.argv[6] else None,
   'sizeBytes': int(sys.argv[7]) if sys.argv[7] else None,
-  'detail': None,
+  'detail': sys.argv[8] or None,
 }))
 PY
 )"
@@ -443,6 +505,11 @@ print(value)
 PY
 }
 
+is_valid_local_media_file() {
+  local media_path="$1"
+  [[ -s "$media_path" ]] && ffprobe -v error -show_entries format=duration -of default=nk=1:nw=1 "$media_path" >/dev/null 2>&1
+}
+
 status_cmd() {
   remote_exec status
 }
@@ -452,7 +519,7 @@ start_cmd() {
 }
 
 stop_cmd() {
-  local remote_json session_id remote_file started_at relative_file destination_dir destination_path duration_seconds has_audio size_bytes recording_status
+  local remote_json session_id remote_file started_at relative_file destination_dir destination_path duration_seconds has_audio size_bytes recording_status remote_extension transfer_tmp detail
   remote_json="$(remote_exec stop)"
 
   if [[ "${BRAVE_PAWS_RECORDING_DISPOSITION:-save}" == 'discard' ]]; then
@@ -471,15 +538,57 @@ stop_cmd() {
   started_at="$(extract_json_field "$remote_json" 'recording.startedAt' || true)"
   duration_seconds="$(extract_json_field "$remote_json" 'recording.durationSeconds' || true)"
   has_audio="$(extract_json_field "$remote_json" 'recording.hasAudio' || true)"
+  detail="$(extract_json_field "$remote_json" 'recording.detail' || true)"
 
   if [[ -z "$started_at" || "$started_at" == 'None' ]]; then
     destination_dir="$LOCAL_RECORDINGS_DIR/unknown-date"
   else
     destination_dir="$LOCAL_RECORDINGS_DIR/$(date -d "$started_at" '+%Y/%m/%d')"
   fi
+
+  remote_extension="${remote_file##*.}"
+  if [[ -z "$remote_extension" || "$remote_extension" == "$remote_file" ]]; then
+    remote_extension='mp4'
+  fi
+
   mkdir -p "$destination_dir"
-  destination_path="$destination_dir/${session_id}.mp4"
-  scp -q "$PICAM_HOST_ALIAS:$remote_file" "$destination_path"
+  destination_path="$destination_dir/${session_id}.${remote_extension}"
+  transfer_tmp="$(mktemp "/tmp/brave-paws-recording-${session_id}.XXXXXX.${remote_extension}")"
+  trap 'rm -f "$transfer_tmp"' RETURN
+
+  scp -q "$PICAM_HOST_ALIAS:$remote_file" "$transfer_tmp"
+
+  if ! is_valid_local_media_file "$transfer_tmp"; then
+    python3 - <<'PY' "$remote_json"
+import json, sys
+payload = json.loads(sys.argv[1])
+recording = payload.get('recording') or {}
+recording['status'] = 'failed'
+recording['detail'] = 'Transferred recording failed validation on QUANTUM; remote source kept on picam.'
+payload['recording'] = recording
+print(json.dumps(payload))
+PY
+    return
+  fi
+
+  cp -f "$transfer_tmp" "$destination_path"
+  if ! is_valid_local_media_file "$destination_path"; then
+    rm -f "$destination_path"
+    cp -f "$transfer_tmp" "$destination_path"
+  fi
+  if ! is_valid_local_media_file "$destination_path"; then
+    python3 - <<'PY' "$remote_json"
+import json, sys
+payload = json.loads(sys.argv[1])
+recording = payload.get('recording') or {}
+recording['status'] = 'failed'
+recording['detail'] = 'Archive copy on QUANTUM failed validation; remote source kept on picam.'
+payload['recording'] = recording
+print(json.dumps(payload))
+PY
+    return
+  fi
+
   ssh "$PICAM_HOST_ALIAS" "rm -rf $(printf '%q' "$(dirname "$remote_file")")" >/dev/null
 
   size_bytes="$(stat -c '%s' "$destination_path")"
@@ -489,7 +598,7 @@ print(os.path.relpath(sys.argv[2], sys.argv[1]).replace(os.sep, '/'))
 PY
 )"
 
-  python3 - <<'PY' "$remote_json" "$relative_file" "$size_bytes" "$duration_seconds" "$has_audio"
+  python3 - <<'PY' "$remote_json" "$relative_file" "$size_bytes" "$duration_seconds" "$has_audio" "$detail"
 import json, sys
 payload = json.loads(sys.argv[1])
 recording = payload.get('recording') or {}
@@ -499,6 +608,8 @@ if sys.argv[4]:
     recording['durationSeconds'] = int(sys.argv[4])
 if sys.argv[5]:
     recording['hasAudio'] = sys.argv[5].lower() == 'true'
+if sys.argv[6]:
+    recording['detail'] = sys.argv[6]
 recording.pop('remoteFilePath', None)
 payload['recording'] = recording
 print(json.dumps(payload))
