@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -278,8 +279,26 @@ function buildRecordingEnv(config: BravePawsServerConfig, payload: RecordingComm
   };
 }
 
+function getStopResultCacheKey(sessionId: string): string {
+  return createHash('sha256').update(sessionId).digest('hex');
+}
+
 function getStopResultCacheFilePath(config: BravePawsServerConfig, sessionId: string): string {
-  return path.join(config.dataDir, 'recording-stop-cache', `${sessionId}.json`);
+  return path.join(config.dataDir, 'recording-stop-cache', `${getStopResultCacheKey(sessionId)}.json`);
+}
+
+async function writeFileAtomic(filePath: string, content: string): Promise<void> {
+  const directoryPath = path.dirname(filePath);
+  await fs.mkdir(directoryPath, { recursive: true });
+
+  const tempFilePath = path.join(directoryPath, `${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`);
+  try {
+    await fs.writeFile(tempFilePath, content, 'utf8');
+    await fs.rename(tempFilePath, filePath);
+  } catch (error) {
+    await fs.rm(tempFilePath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 async function readCachedStopCapability(options: {
@@ -303,8 +322,7 @@ async function writeCachedStopCapability(options: {
   capability: SessionRecordingCapability;
 }): Promise<void> {
   const cacheFilePath = getStopResultCacheFilePath(options.config, options.sessionId);
-  await fs.mkdir(path.dirname(cacheFilePath), { recursive: true });
-  await fs.writeFile(cacheFilePath, `${JSON.stringify(options.capability)}\n`, 'utf8');
+  await writeFileAtomic(cacheFilePath, `${JSON.stringify(options.capability)}\n`);
 }
 
 class UnsupportedSessionRecordingController implements SessionRecordingController {

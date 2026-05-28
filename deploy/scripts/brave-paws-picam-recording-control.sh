@@ -158,9 +158,14 @@ write_session_result() {
   local session_id="$1"
   local payload="$2"
   local result_path
+  local result_dir
+  local temp_path
   result_path="$(session_result_path "$session_id")"
-  mkdir -p "$(dirname "$result_path")"
-  printf '%s\n' "$payload" >"$result_path"
+  result_dir="$(dirname "$result_path")"
+  mkdir -p "$result_dir"
+  temp_path="$result_dir/.result.$$.tmp"
+  printf '%s\n' "$payload" >"$temp_path"
+  mv -f "$temp_path" "$result_path"
 }
 
 print_saved_session_result() {

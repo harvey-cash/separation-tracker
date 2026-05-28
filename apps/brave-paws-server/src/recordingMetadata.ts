@@ -117,7 +117,7 @@ function formatRecordingFilenameDuration(durationSeconds: number | null): string
   }
 
   if (minutes > 0 || hours > 0) {
-    parts.push(hours > 0 && seconds > 0 && minutes < 10 ? `${minutes}m` : `${minutes}m`);
+    parts.push(`${minutes}m`);
   }
 
   if (seconds > 0 || (!hours && !minutes)) {
