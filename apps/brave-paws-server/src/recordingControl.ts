@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { promisify } from 'node:util';
 
 import type { BravePawsServerConfig } from './config.js';
@@ -254,15 +257,72 @@ function buildCapability(options: {
   };
 }
 
+function getSessionMaxDurationSeconds(payload: RecordingCommandPayload): number | null {
+  if (!payload.sessionSnapshot?.steps.length) {
+    return null;
+  }
+
+  const total = payload.sessionSnapshot.steps.reduce((sum, step) => sum + Math.max(0, step.durationSeconds), 0);
+  return Number.isFinite(total) ? total : null;
+}
+
 function buildRecordingEnv(config: BravePawsServerConfig, payload: RecordingCommandPayload = {}): Record<string, string> {
+  const sessionMaxDurationSeconds = getSessionMaxDurationSeconds(payload);
   return {
     BRAVE_PAWS_DATA_DIR: config.dataDir,
     BRAVE_PAWS_RECORDINGS_DIR: config.recordingsDir,
     BRAVE_PAWS_RECORDING_SESSION_ID: payload.sessionId || '',
     BRAVE_PAWS_RECORDING_SESSION_DATE: payload.sessionDate || '',
     BRAVE_PAWS_RECORDING_SESSION_STATUS: payload.sessionStatus || '',
+    BRAVE_PAWS_RECORDING_SESSION_MAX_DURATION_SECONDS: sessionMaxDurationSeconds == null ? '' : String(sessionMaxDurationSeconds),
     BRAVE_PAWS_RECORDING_DISPOSITION: payload.disposition || 'save',
   };
+}
+
+function getStopResultCacheKey(sessionId: string): string {
+  return createHash('sha256').update(sessionId).digest('hex');
+}
+
+function getStopResultCacheFilePath(config: BravePawsServerConfig, sessionId: string): string {
+  return path.join(config.dataDir, 'recording-stop-cache', `${getStopResultCacheKey(sessionId)}.json`);
+}
+
+async function writeFileAtomic(filePath: string, content: string): Promise<void> {
+  const directoryPath = path.dirname(filePath);
+  await fs.mkdir(directoryPath, { recursive: true });
+
+  const tempFilePath = path.join(directoryPath, `${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`);
+  try {
+    await fs.writeFile(tempFilePath, content, 'utf8');
+    await fs.rename(tempFilePath, filePath);
+  } catch (error) {
+    await fs.rm(tempFilePath, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function readCachedStopCapability(options: {
+  config: BravePawsServerConfig;
+  sessionId: string;
+  label: string;
+  provider: string;
+}): Promise<SessionRecordingCapability | null> {
+  try {
+    const raw = await fs.readFile(getStopResultCacheFilePath(options.config, options.sessionId), 'utf8');
+    const capability = parseCapabilityOutput(raw, options.label, options.provider);
+    return capability.sessionId === options.sessionId ? capability : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedStopCapability(options: {
+  config: BravePawsServerConfig;
+  sessionId: string;
+  capability: SessionRecordingCapability;
+}): Promise<void> {
+  const cacheFilePath = getStopResultCacheFilePath(options.config, options.sessionId);
+  await writeFileAtomic(cacheFilePath, `${JSON.stringify(options.capability)}\n`);
 }
 
 class UnsupportedSessionRecordingController implements SessionRecordingController {
@@ -364,6 +424,18 @@ class CommandSessionRecordingController implements SessionRecordingController {
 
   async stopRecording(payload: RecordingCommandPayload): Promise<SessionRecordingCapability> {
     return this.runExclusive(async () => {
+      if (payload.sessionId) {
+        const cachedCapability = await readCachedStopCapability({
+          config: this.options.config,
+          sessionId: payload.sessionId,
+          label: this.options.label,
+          provider: this.options.provider,
+        });
+        if (cachedCapability) {
+          return cachedCapability;
+        }
+      }
+
       try {
         const result = await runShellCommand(
           this.options.stopCommand,
@@ -371,26 +443,35 @@ class CommandSessionRecordingController implements SessionRecordingController {
           buildRecordingEnv(this.options.config, payload),
         );
         const capability = parseCapabilityOutput(result.stdout, this.options.label, this.options.provider);
-        if (!capability.recording || payload.disposition === 'discard') {
-          return capability;
+
+        let resolvedCapability = capability;
+        if (capability.recording && payload.disposition !== 'discard') {
+          try {
+            const finalizedRecording = await finalizeRecordingMetadata({
+              config: this.options.config,
+              recording: capability.recording,
+              sessionSnapshot: payload.sessionSnapshot,
+              timelineEvents: payload.timelineEvents,
+            });
+
+            resolvedCapability = {
+              ...capability,
+              recording: finalizedRecording,
+            };
+          } catch (metadataError) {
+            console.warn('Session recording metadata finalization failed.', metadataError);
+          }
         }
 
-        try {
-          const finalizedRecording = await finalizeRecordingMetadata({
+        if (payload.sessionId && !resolvedCapability.active) {
+          await writeCachedStopCapability({
             config: this.options.config,
-            recording: capability.recording,
-            sessionSnapshot: payload.sessionSnapshot,
-            timelineEvents: payload.timelineEvents,
+            sessionId: payload.sessionId,
+            capability: resolvedCapability,
           });
-
-          return {
-            ...capability,
-            recording: finalizedRecording,
-          };
-        } catch (metadataError) {
-          console.warn('Session recording metadata finalization failed.', metadataError);
-          return capability;
         }
+
+        return resolvedCapability;
       } catch (error) {
         console.error('Session recording stop command failed', error);
         return this.readCapability(payload, getSafeCommandErrorDetail(error, getCommandFailureDetail('stop')));
