@@ -671,7 +671,7 @@ test('camera preview path serves the Brave Paws compatibility player page', asyn
     assert.match(response.headers.get('content-type') || '', /text\/html/);
     const html = await response.text();
     assert.match(html, /Brave Paws Picam Preview/);
-    assert.match(html, /video1_stream\.m3u8/);
+    assert.match(html, /index\.m3u8/);
     assert.match(html, /hls\.min\.js/);
   });
 });

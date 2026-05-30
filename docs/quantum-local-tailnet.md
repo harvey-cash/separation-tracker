@@ -2,7 +2,7 @@
 
 This repo now includes a single local-first server workspace for Brave Paws v0.2.
 
-## What runs on QUANTUM
+## What runs on QUARK
 
 - landing page: `/separation/`
 - app: `/separation/app/`
@@ -11,12 +11,12 @@ This repo now includes a single local-first server workspace for Brave Paws v0.2
 
 The intended public-facing origin for v0.2 is Tailnet-only.
 
-If `:443` is already occupied by public Funnel-backed routes on QUANTUM, expose Brave Paws on a dedicated Tailnet-only HTTPS port instead. The current live deployment target is:
+If `:443` is already occupied by public Funnel-backed routes on QUARK, expose Brave Paws on a dedicated Tailnet-only HTTPS port instead. The current live deployment target is:
 
-- `https://quantum.tail080401.ts.net:7447/separation/`
-- `https://quantum.tail080401.ts.net:7447/separation/app/`
-- `https://quantum.tail080401.ts.net:7447/separation/api/health`
-- `https://quantum.tail080401.ts.net:7447/separation/camera/live.stream/`
+- `https://quark.tail080401.ts.net:7447/separation/`
+- `https://quark.tail080401.ts.net:7447/separation/app/`
+- `https://quark.tail080401.ts.net:7447/separation/api/health`
+- `https://quark.tail080401.ts.net:7447/separation/camera/live.stream/`
 
 ## Local build and run
 
@@ -32,9 +32,9 @@ Default bind:
 
 ## Environment variables
 
-| Variable | Current QUANTUM staging value |
+| Variable | Current QUARK staging value |
 | --- | --- |
-| `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://quantum.tail080401.ts.net:7447` |
+| `BRAVE_PAWS_PUBLIC_BASE_URL` | `https://quark.tail080401.ts.net:7447` |
 | `BRAVE_PAWS_CORS_ALLOWED_ORIGINS` | `https://harvey.cash,https://www.harvey.cash` |
 | `BRAVE_PAWS_DATA_DIR` | `/mnt/q/fermi/brave-paws/data` |
 | `BRAVE_PAWS_RECORDINGS_DIR` | `/mnt/s/Fermi/Separation Training Sessions/Brave Paws` |
@@ -70,7 +70,7 @@ Session recordings live separately under `${BRAVE_PAWS_RECORDINGS_DIR}` so the m
 - `POST /separation/api/sync/pull`
 - `POST /separation/api/sync/push`
 
-## Suggested QUANTUM rollout
+## Suggested QUARK rollout
 
 1. Build the repo: `npm run build`
 2. Start locally: `npm run server:start`
@@ -81,9 +81,9 @@ Session recordings live separately under `${BRAVE_PAWS_RECORDINGS_DIR}` so the m
    ```
 5. Expose the server through Tailscale Serve so `/separation/...` stays Tailnet-only
 
-## Automated QUANTUM staging refresh
+## Automated QUARK staging refresh
 
-QUANTUM staging is meant to follow the local development repo's latest committed HEAD automatically, without hand-editing `/etc/systemd/system/brave-paws.service`.
+QUARK staging is meant to follow the local development repo's latest committed HEAD automatically, without hand-editing `/etc/systemd/system/brave-paws.service`.
 
 The automation works like this:
 
@@ -119,9 +119,9 @@ Expected refresh-service behavior:
 ## Notes
 
 - The camera path is a same-origin proxy in front of picam / MediaMTX, and directory-style preview URLs such as `/separation/camera/live.stream` are redirected to the working trailing-slash preview page automatically.
-- `deploy/systemd/brave-paws.service` is the canonical QUANTUM staging unit, but the live copy should now be refreshed automatically by `brave-paws-staging-refresh.service` instead of hand-editing `/etc/systemd/system/brave-paws.service`.
-- QUANTUM's deployment now wires the generic camera-streaming capability API to the existing OpenClaw picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, so the Brave Paws dashboard toggle and session lifecycle automation drive the same underlying picam enable/disable behavior as the assistant skill.
-- QUANTUM's deployment also wires the generic recording capability API to `deploy/scripts/brave-paws-picam-recording-control.sh`, so the app footer/active-session recording controls reflect the same backend capability contract used in tests.
-- If the hosted `harvey.cash` frontend cannot connect to the Tailnet backend root, check CORS first: the QUANTUM backend must include `BRAVE_PAWS_CORS_ALLOWED_ORIGINS=https://harvey.cash,https://www.harvey.cash` and `/separation/api/capabilities` should report both `cameraStreaming.provider = "command"` and `sessionRecording.provider = "command"`.
+- `deploy/systemd/brave-paws.service` is the canonical QUARK staging unit, but the live copy should now be refreshed automatically by `brave-paws-staging-refresh.service` instead of hand-editing `/etc/systemd/system/brave-paws.service`.
+- QUARK's deployment now wires the generic camera-streaming capability API to the existing OpenClaw picam privacy-toggle skill through `deploy/scripts/brave-paws-picam-camera-control.sh`, so the Brave Paws dashboard toggle and session lifecycle automation drive the same underlying picam enable/disable behavior as the assistant skill.
+- QUARK's deployment also wires the generic recording capability API to `deploy/scripts/brave-paws-picam-recording-control.sh`, so the app footer/active-session recording controls reflect the same backend capability contract used in tests.
+- If the hosted `harvey.cash` frontend cannot connect to the Tailnet backend root, check CORS first: the QUARK backend must include `BRAVE_PAWS_CORS_ALLOWED_ORIGINS=https://harvey.cash,https://www.harvey.cash` and `/separation/api/capabilities` should report both `cameraStreaming.provider = "command"` and `sessionRecording.provider = "command"`.
 - If you enable pairing, also set `BRAVE_PAWS_AUTH_TOKEN`; otherwise the HTTP pairing-creation endpoint stays disabled on purpose and only the local CLI can mint tokens.
-- Local browser persistence still exists in the app; QUANTUM hydrates on open and automatically pushes changes back to the inspectable QUANTUM data folder.
+- Local browser persistence still exists in the app; QUARK hydrates on open and automatically pushes changes back to the inspectable QUARK data folder.

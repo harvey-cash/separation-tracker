@@ -442,7 +442,7 @@ function buildCameraPreviewHtml(): string {
 
   <script src="hls.min.js"></script>
   <script>
-    const MANIFEST_URL = 'video1_stream.m3u8' + window.location.search;
+    const MANIFEST_URL = 'index.m3u8' + window.location.search;
     const video = document.getElementById('video');
     const statusEl = document.getElementById('status');
     let hls = null;
