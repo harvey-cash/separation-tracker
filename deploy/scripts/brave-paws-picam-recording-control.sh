@@ -596,7 +596,7 @@ stop_cmd() {
   mkdir -p "$destination_dir"
   destination_path="$destination_dir/${session_id}.${remote_extension}"
   transfer_tmp="$(mktemp "/tmp/brave-paws-recording-${session_id}.XXXXXX.${remote_extension}")"
-  trap 'rm -f "$transfer_tmp"' RETURN
+  trap "rm -f '$transfer_tmp'" RETURN
 
   scp -q "$PICAM_HOST_ALIAS:$remote_file" "$transfer_tmp"
 
@@ -606,7 +606,7 @@ import json, sys
 payload = json.loads(sys.argv[1])
 recording = payload.get('recording') or {}
 recording['status'] = 'failed'
-recording['detail'] = 'Transferred recording failed validation on QUANTUM; remote source kept on picam.'
+recording['detail'] = 'Transferred recording failed validation on QUARK; remote source kept on picam.'
 payload['recording'] = recording
 print(json.dumps(payload))
 PY
@@ -624,7 +624,7 @@ import json, sys
 payload = json.loads(sys.argv[1])
 recording = payload.get('recording') or {}
 recording['status'] = 'failed'
-recording['detail'] = 'Archive copy on QUANTUM failed validation; remote source kept on picam.'
+recording['detail'] = 'Archive copy on QUARK failed validation; remote source kept on picam.'
 payload['recording'] = recording
 print(json.dumps(payload))
 PY
