@@ -1,5 +1,5 @@
 [Unit]
-Description=Poll for Brave Paws QUANTUM staging refreshes
+Description=Poll for Brave Paws QUARK staging refreshes
 
 [Timer]
 OnBootSec=2min
