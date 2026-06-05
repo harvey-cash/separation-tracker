@@ -69,6 +69,7 @@ Recommended layout on QUARK:
 - dedicated live clone: `~/services/separation-tracker-live`
 - live backend service: `brave-paws.service`
 - release-follow timer: `brave-paws-cd-sync.timer`
+- canonical live unit source: `deploy/systemd/brave-paws.live.service`
 
 Install the sync timer from the live clone:
 

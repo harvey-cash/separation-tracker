@@ -7,8 +7,8 @@ SERVICE_NAME="${BRAVE_PAWS_SYSTEMD_SERVICE_NAME:-brave-paws.service}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/brave-paws"
 STATE_FILE="$STATE_DIR/cd-sync-state.json"
 HEALTHCHECK_URL="${BRAVE_PAWS_HEALTHCHECK_URL:-http://127.0.0.1:4310/separation/api/health}"
-USER_UNIT_SOURCE_REL="deploy/systemd/brave-paws.service"
-USER_UNIT_DEST="/etc/systemd/system/${SERVICE_NAME}"
+SYSTEMD_UNIT_SOURCE_REL="${BRAVE_PAWS_SYSTEMD_UNIT_SOURCE_REL:-deploy/systemd/brave-paws.live.service}"
+SYSTEMD_UNIT_DEST="${BRAVE_PAWS_SYSTEMD_UNIT_DEST:-/etc/systemd/system/${SERVICE_NAME}}"
 DRY_RUN=0
 FORCE=0
 
@@ -120,8 +120,8 @@ current_branch=$current_branch
 current_sha=$current_sha
 service_state=$service_state
 last_release_id=$last_release_id
-user_unit_source=$REPO_ROOT/$USER_UNIT_SOURCE_REL
-user_unit_dest=$USER_UNIT_DEST
+systemd_unit_source=$REPO_ROOT/$SYSTEMD_UNIT_SOURCE_REL
+systemd_unit_dest=$SYSTEMD_UNIT_DEST
 need_sync=$need_sync
 EOF
   exit 0
@@ -137,7 +137,7 @@ if [[ "$current_branch" != "main" ]]; then
 fi
 
 git reset --hard "$desired_sha"
-install -D -m 0644 "$REPO_ROOT/$USER_UNIT_SOURCE_REL" "$USER_UNIT_DEST"
+install -D -m 0644 "$REPO_ROOT/$SYSTEMD_UNIT_SOURCE_REL" "$SYSTEMD_UNIT_DEST"
 systemctl daemon-reload
 npm ci
 npm run build

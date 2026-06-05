@@ -89,6 +89,8 @@ For the durable live backend path that mirrors `harvey-dashboard`, keep a separa
 sudo ~/services/separation-tracker-live/deploy/scripts/install-brave-paws-cd-sync-timer.sh
 ```
 
+The live release-follow job uses `deploy/systemd/brave-paws.live.service` as the canonical unit source for the dedicated live clone.
+
 The live release-follow job:
 
 - fetches repo tags and selects the highest `vX.Y.Z` release created by CD
