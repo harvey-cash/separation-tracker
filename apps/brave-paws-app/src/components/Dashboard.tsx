@@ -1,6 +1,6 @@
 import { Session } from '../types';
 import { formatDuration } from '../utils/format';
-import { Play, BarChart2, History, Heart, Info, Server, Settings } from 'lucide-react';
+import { AlertTriangle, Play, BarChart2, History, Heart, Info, Server, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { ReactNode } from 'react';
 import { getAbortedStepCount, getCompletedStepCount, getRecordedStepDurationSeconds } from '../utils/sessionStatus';
@@ -16,6 +16,8 @@ type Props = {
   cameraStreamingControl?: ReactNode;
   storageSync?: ReactNode;
   isBackendUnavailable?: boolean;
+  appVersion?: string;
+  backendVersion?: string | null;
 };
 
 export function getRecentSessions(sessions: Session[]) {
@@ -35,9 +37,12 @@ export function Dashboard({
   cameraStreamingControl,
   storageSync,
   isBackendUnavailable = false,
+  appVersion = __APP_VERSION__,
+  backendVersion = null,
 }: Props) {
   const abortedSessions = sessions.filter((s) => s.status === 'aborted');
   const recentSessions = getRecentSessions(sessions);
+  const versionsMatch = !backendVersion || backendVersion === appVersion;
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-8">
@@ -191,7 +196,15 @@ export function Dashboard({
         </div>
       </section>
 
-      <p className="text-center text-xs text-slate-300 pb-2">v{__APP_VERSION__}</p>
+      <section className="rounded-3xl border border-slate-100 bg-white p-4 text-center shadow-sm">
+        <p className="text-xs text-slate-400">Frontend v{appVersion} · Backend {backendVersion ? `v${backendVersion}` : 'unknown'}</p>
+        {!versionsMatch && (
+          <p className="mt-2 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+            <AlertTriangle size={14} />
+            Version mismatch — refresh or redeploy recommended.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

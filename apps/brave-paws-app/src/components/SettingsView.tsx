@@ -9,6 +9,7 @@ type Props = {
   isBackendAvailable: boolean;
   onBack: () => void;
   onBackendRootUrlChange: (backendRootUrl: string | null) => void;
+  onBackendVersionChange?: (backendVersion: string | null) => void;
   onSettingsChange: (settings: AppSettings) => void;
 };
 
@@ -18,6 +19,7 @@ export function SettingsView({
   isBackendAvailable,
   onBack,
   onBackendRootUrlChange,
+  onBackendVersionChange,
   onSettingsChange,
 }: Props) {
   const incrementMode = settings.longestDepartureIncrement.mode;
@@ -129,6 +131,7 @@ export function SettingsView({
           currentBackendRootUrl={currentBackendRootUrl}
           isBackendAvailable={isBackendAvailable}
           onBackendRootUrlChange={onBackendRootUrlChange}
+          onBackendVersionChange={onBackendVersionChange}
         />
       </section>
     </div>

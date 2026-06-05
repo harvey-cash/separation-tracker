@@ -117,16 +117,39 @@ async function withFixtureServer(
   }
 }
 
-test('health endpoint reports session metadata without leaking server file paths', async () => {
+test('health endpoint reports version/auth/session metadata without leaking server file paths', async () => {
   await withFixtureServer(async ({ baseUrl }) => {
     const response = await fetch(`${baseUrl}/separation/api/health`);
     assert.equal(response.status, 200);
-    const body = await response.json() as { status: string; sessionCount: number; dataFilePath?: string; csvFilePath?: string; clientDiagnosticsFilePath?: string };
+    const body = await response.json() as {
+      status: string;
+      service: string;
+      version: string;
+      writeAuthRequired: boolean;
+      sessionCount: number;
+      dataFilePath?: string;
+      csvFilePath?: string;
+      clientDiagnosticsFilePath?: string;
+    };
     assert.equal(body.status, 'ok');
+    assert.equal(body.service, 'brave-paws-server');
+    assert.match(body.version, /^\d+\.\d+\.\d+$/);
+    assert.equal(body.writeAuthRequired, false);
     assert.equal(body.sessionCount, 0);
     assert.equal(body.dataFilePath, undefined);
     assert.equal(body.csvFilePath, undefined);
     assert.equal(body.clientDiagnosticsFilePath, undefined);
+  });
+});
+
+test('health endpoint reports when write auth is required', async () => {
+  await withFixtureServer(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/separation/api/health`);
+    assert.equal(response.status, 200);
+    const body = await response.json() as { writeAuthRequired: boolean };
+    assert.equal(body.writeAuthRequired, true);
+  }, {
+    authToken: 'test-token',
   });
 });
 

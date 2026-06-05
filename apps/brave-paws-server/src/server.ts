@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync } from 'node:fs';
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 
@@ -29,6 +29,10 @@ import {
   writeSessionStore,
 } from './storage.js';
 import type { Session } from './types.js';
+
+const { version: appVersion = 'dev' } = JSON.parse(
+  readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
+) as { version?: string };
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -735,6 +739,9 @@ async function handleApiRequest(
     const store = await readSessionStore(config.dataFilePath);
     sendJson(response, 200, {
       status: 'ok',
+      service: 'brave-paws-server',
+      version: appVersion,
+      writeAuthRequired: Boolean(config.authToken),
       publicBaseUrl: config.publicBaseUrl,
       appBasePath: config.appBasePath,
       apiBasePath: config.apiBasePath,

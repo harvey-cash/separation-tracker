@@ -1,0 +1,9 @@
+[Unit]
+Description=Sync Brave Paws backend to latest released main on QUARK
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/services/separation-tracker-live
+ExecStart=%h/services/separation-tracker-live/deploy/scripts/sync-brave-paws-backend-to-latest-release.sh

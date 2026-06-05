@@ -14,6 +14,7 @@ type Props = {
   currentBackendRootUrl: string | null;
   isBackendAvailable: boolean;
   onBackendRootUrlChange: (backendRootUrl: string | null) => void;
+  onBackendVersionChange?: (backendVersion: string | null) => void;
 };
 
 type ConnectionStatus = 'idle' | 'testing' | 'saved' | 'error';
@@ -22,6 +23,7 @@ export function BackendConnectionSettings({
   currentBackendRootUrl,
   isBackendAvailable,
   onBackendRootUrlChange,
+  onBackendVersionChange,
 }: Props) {
   const [draftValue, setDraftValue] = useState(currentBackendRootUrl || '');
   const [status, setStatus] = useState<ConnectionStatus>('idle');
@@ -61,6 +63,9 @@ export function BackendConnectionSettings({
         throw new Error(`Backend health check failed (${response.status})`);
       }
 
+      const healthPayload = await response.json() as { version?: string };
+      onBackendVersionChange?.(typeof healthPayload.version === 'string' && healthPayload.version ? healthPayload.version : null);
+
       const saved = saveStoredBackendRootUrl(normalized);
       onBackendRootUrlChange(saved);
       setDraftValue(saved || normalized);
@@ -75,6 +80,7 @@ export function BackendConnectionSettings({
   const handleReset = () => {
     clearStoredBackendRootUrl();
     onBackendRootUrlChange(null);
+    onBackendVersionChange?.(null);
     setDraftValue('');
     setStatus('idle');
     setMessage('Reset to the deployment default backend.');

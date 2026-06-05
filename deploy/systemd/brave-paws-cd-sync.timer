@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll latest Brave Paws release and sync QUARK backend after CD
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=brave-paws-cd-sync.service
+
+[Install]
+WantedBy=timers.target
