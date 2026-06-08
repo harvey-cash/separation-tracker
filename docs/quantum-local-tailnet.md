@@ -81,6 +81,27 @@ Session recordings live separately under `${BRAVE_PAWS_RECORDINGS_DIR}` so the m
    ```
 5. Expose the server through Tailscale Serve so `/separation/...` stays Tailnet-only
 
+## Automated QUARK live release-follow sync
+
+For the durable live backend path that mirrors `harvey-dashboard`, keep a separate live clone on QUARK (recommended: `~/services/separation-tracker-live`) and install the release-follow timer there:
+
+```bash
+sudo ~/services/separation-tracker-live/deploy/scripts/install-brave-paws-cd-sync-timer.sh
+```
+
+The live release-follow job uses `deploy/systemd/brave-paws.live.service` as the canonical unit source for the dedicated live clone.
+
+The live release-follow job:
+
+- fetches repo tags and selects the highest `vX.Y.Z` release created by CD
+- resets the live clone to that tagged commit on `main`
+- runs `npm ci` and `npm run build`
+- reinstalls the canonical `deploy/systemd/brave-paws.live.service`
+- restarts `brave-paws.service`
+- records the applied release in `~/.local/state/brave-paws/cd-sync-state.json`
+
+That path is intentionally separate from the staging worktree automation below, so release-follow deploys do not fight with local dev/staging refreshes.
+
 ## Automated QUARK staging refresh
 
 QUARK staging is meant to follow the local development repo's latest committed HEAD automatically, without hand-editing `/etc/systemd/system/brave-paws.service`.

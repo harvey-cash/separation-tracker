@@ -18,4 +18,6 @@ test('Dashboard keeps training available locally and describes connected feature
   assert.match(dashboard, /remote camera control/);
   assert.match(dashboard, /session recording/);
   assert.match(dashboard, /without a separate companion app/);
+  assert.match(dashboard, /Frontend v\{/);
+  assert.match(dashboard, /Version mismatch — refresh or redeploy recommended\./);
 });

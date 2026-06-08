@@ -16,7 +16,7 @@ import { useCameraStreamingControl } from './hooks/useCameraStreamingControl';
 import { useStorageSync } from './hooks/useStorageSync';
 import { exportToCSV, parseCSV } from './utils/export';
 import { CAMERA_URL_STORAGE_KEY, getCameraUrlFromSearch } from './utils/cameraUrl';
-import { loadStoredBackendRootUrl } from './config';
+import { getApiBaseUrl, loadStoredBackendRootUrl } from './config';
 import { buildNewSessionSteps, loadAppSettings, saveAppSettings } from './settings';
 import { PAIRING_TOKEN_QUERY_PARAM, resolveCameraUrlFromPairingToken } from './utils/pairingToken';
 import { installGlobalClientDiagnostics } from './utils/clientDiagnostics';
@@ -51,6 +51,7 @@ export default function App() {
   const [backendRootUrl, setBackendRootUrl] = useState<string | null>(() => loadStoredBackendRootUrl());
   const [appSettings, setAppSettings] = useState(() => loadAppSettings());
   const cameraStreamingControl = useCameraStreamingControl();
+  const [backendVersion, setBackendVersion] = useState<string | null>(null);
   const wasTrainingActiveRef = useRef(false);
   const pendingSessionCameraStateRef = useRef<boolean | null>(restoredActiveSessionState ? true : null);
 
@@ -88,6 +89,52 @@ export default function App() {
     };
 
     void applyPairingFromLocation();
+  }, [backendRootUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const healthUrl = `${getApiBaseUrl()}health`;
+
+    const refreshBackendVersion = async () => {
+      try {
+        const response = await fetch(healthUrl, { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`Backend health check failed (${response.status})`);
+        }
+
+        const payload = await response.json() as { version?: string };
+        if (!cancelled) {
+          setBackendVersion(typeof payload.version === 'string' && payload.version ? payload.version : null);
+        }
+      } catch {
+        if (!cancelled) {
+          setBackendVersion(null);
+        }
+      }
+    };
+
+    void refreshBackendVersion();
+
+    const handleResume = () => {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+
+      void refreshBackendVersion();
+    };
+
+    window.addEventListener('focus', handleResume);
+    window.addEventListener('online', handleResume);
+    window.addEventListener('pageshow', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleResume);
+      window.removeEventListener('online', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
+    };
   }, [backendRootUrl]);
 
   // Keep cameraUrl in sync with local storage
@@ -235,6 +282,7 @@ export default function App() {
             />
           }
           isBackendUnavailable={!storageSync.provider.isAvailable}
+          backendVersion={backendVersion}
         />
       )}
 

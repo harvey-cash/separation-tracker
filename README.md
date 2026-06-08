@@ -60,6 +60,36 @@ Historical context:
 - `docs/plans/` contains planning and implementation-brief docs kept for rationale and project history. Prefer the docs above for current operational behavior.
 - checklist-style docs under `docs/` are usually point-in-time implementation records rather than ongoing runbooks.
 
+## Live QUARK backend release-follow sync
+
+Brave Paws can now follow the latest successful `main` release on QUARK in the same style as `harvey-dashboard`.
+
+Recommended layout on QUARK:
+
+- dedicated live clone: `~/services/separation-tracker-live`
+- live backend service: `brave-paws.service`
+- release-follow timer: `brave-paws-cd-sync.timer`
+- canonical live unit source: `deploy/systemd/brave-paws.live.service`
+
+Install the sync timer from the live clone:
+
+```bash
+sudo ~/services/separation-tracker-live/deploy/scripts/install-brave-paws-cd-sync-timer.sh
+```
+
+What it does:
+
+- fetches tags from `harvey-cash/separation-tracker` and selects the highest `vX.Y.Z` release tag
+- switches the live clone to `main`
+- hard-resets to that release-tag commit
+- runs `npm ci`
+- rebuilds Brave Paws
+- reinstalls the canonical `brave-paws.service` unit from the live clone
+- restarts `brave-paws.service`
+- records the applied release in `~/.local/state/brave-paws/cd-sync-state.json`
+
+This gives QUARK a durable post-CD update path without relying on direct GitHub Actions access into the host.
+
 ## Notes
 
 - Browser-local persistence remains first-class, with automatic backend hydration/push around it.
