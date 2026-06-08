@@ -96,7 +96,7 @@ The live release-follow job:
 - fetches repo tags and selects the highest `vX.Y.Z` release created by CD
 - resets the live clone to that tagged commit on `main`
 - runs `npm ci` and `npm run build`
-- reinstalls the canonical `deploy/systemd/brave-paws.service`
+- reinstalls the canonical `deploy/systemd/brave-paws.live.service`
 - restarts `brave-paws.service`
 - records the applied release in `~/.local/state/brave-paws/cd-sync-state.json`
 

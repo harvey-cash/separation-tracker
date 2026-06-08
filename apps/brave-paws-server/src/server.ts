@@ -30,9 +30,18 @@ import {
 } from './storage.js';
 import type { Session } from './types.js';
 
-const { version: appVersion = 'dev' } = JSON.parse(
-  readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
-) as { version?: string };
+export function loadAppVersion(packageJsonUrl = new URL('../../../package.json', import.meta.url)): string {
+  try {
+    const parsed = JSON.parse(readFileSync(packageJsonUrl, 'utf8')) as {
+      version?: unknown;
+    };
+    return typeof parsed.version === 'string' && parsed.version.trim() ? parsed.version : 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+
+const appVersion = loadAppVersion();
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',

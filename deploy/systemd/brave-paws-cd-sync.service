@@ -5,5 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/services/separation-tracker-live
-ExecStart=%h/services/separation-tracker-live/deploy/scripts/sync-brave-paws-backend-to-latest-release.sh
+Environment=BRAVE_PAWS_REPO_ROOT=/home/harvey/services/separation-tracker-live
+Environment=XDG_STATE_HOME=/home/harvey/.local/state
+WorkingDirectory=/home/harvey/services/separation-tracker-live
+ExecStart=/home/harvey/services/separation-tracker-live/deploy/scripts/sync-brave-paws-backend-to-latest-release.sh

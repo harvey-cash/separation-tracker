@@ -5,7 +5,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
-import { createBravePawsServer } from '../src/server.ts';
+import { createBravePawsServer, loadAppVersion } from '../src/server.ts';
 import { type BravePawsServerConfig } from '../src/config.ts';
 import { getSessionsCsvFilePath } from '../src/storage.ts';
 
@@ -116,6 +116,14 @@ async function withFixtureServer(
     await fs.rm(tempDir, { recursive: true, force: true });
   }
 }
+
+test('loadAppVersion falls back to dev when package.json is unreadable or invalid', () => {
+  const missingUrl = new URL('file:///definitely-missing-package.json');
+  assert.equal(loadAppVersion(missingUrl), 'dev');
+
+  const invalidPackageJsonUrl = new URL(`data:application/json,${encodeURIComponent('{not json}')}`);
+  assert.equal(loadAppVersion(invalidPackageJsonUrl), 'dev');
+});
 
 test('health endpoint reports version/auth/session metadata without leaking server file paths', async () => {
   await withFixtureServer(async ({ baseUrl }) => {

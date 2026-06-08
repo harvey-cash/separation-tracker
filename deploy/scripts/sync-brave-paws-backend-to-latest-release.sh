@@ -58,22 +58,24 @@ fi
 
 git fetch origin --prune --tags
 
-mapfile -t release_fields < <(git tag -l 'v*' | python3 -c 'import re, sys
+mapfile -t release_fields < <(gh release list --exclude-drafts --exclude-pre-releases --limit 100 --json tagName,publishedAt,isLatest | python3 -c 'import json, re, sys
 
-def version_key(tag: str):
-    m = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", tag.strip())
-    if not m:
-        return (-1, -1, -1)
-    return tuple(int(part) for part in m.groups())
-
-tags = [line.strip() for line in sys.stdin if line.strip()]
-valid = [tag for tag in tags if version_key(tag) != (-1, -1, -1)]
+releases = json.load(sys.stdin)
+valid = []
+for release in releases:
+    tag = (release.get("tagName") or "").strip()
+    match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", tag)
+    if not match:
+        continue
+    valid.append((tuple(int(part) for part in match.groups()), tag, release.get("publishedAt") or ""))
 if not valid:
     raise SystemExit(1)
-latest = max(valid, key=version_key)
-print(latest)
+_, latest_tag, published_at = max(valid, key=lambda item: item[0])
+print(latest_tag)
+print(published_at)
 ')
 release_tag="${release_fields[0]:-}"
+release_published_at="${release_fields[1]:-}"
 
 if [[ -z "$release_tag" ]]; then
   echo "Could not determine latest release tag for $REPO_SLUG" >&2
@@ -81,7 +83,10 @@ if [[ -z "$release_tag" ]]; then
 fi
 
 release_id="$release_tag"
-release_published_at="$(git log -1 --format=%cI "refs/tags/$release_tag")"
+if [[ -z "$release_published_at" ]]; then
+  echo "Could not determine published_at for $release_tag" >&2
+  exit 1
+fi
 
 if ! desired_sha="$(git rev-parse -q --verify "refs/tags/$release_tag^{commit}")"; then
   echo "Latest release tag $release_tag is not available locally after fetch." >&2
